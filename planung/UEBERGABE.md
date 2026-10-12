@@ -1,4 +1,4 @@
-# Übergabe · Umsetzung des Plans (Stand 05.10.2026)
+# Übergabe · Umsetzung des Plans (Stand 06.10.2026)
 
 > **Einstieg für den nächsten Chat:** zuerst [`../UEBERGABE.md`](../UEBERGABE.md) (Arbeitsweise, Konventionen), dann diese Datei, dann [`WARTELISTE.md`](WARTELISTE.md) (was auf Max wartet). Der Plan selbst steht in [`PLAN.md`](PLAN.md).
 >
@@ -28,7 +28,17 @@
 - **Tests:** alle grün in `main`, lokal und in der CI (Kapitel 6).
 - **Für Max wichtig:** Seit B2 gelten alte Anmeldungen nicht mehr. Jedes Handy meldet sich einmal neu an, mit Name und eigener PIN.
 
-### Diese Runde (04.10.2026)
+### Diese Runde (05./06.10.2026)
+
+| PR | Inhalt |
+|---|---|
+| #8 | Aufräumen: alte Handy-Oberfläche aus dem Anzeige-Client, überholter Entwurf, Doku-Stand nach Umbau Phase 5, Repo-Name |
+| #9 | Biom-IDs vollständig aus Mojangs `mojang-biomes.json` (Cherry Grove 192, Pale Garden 193, Sulfur Caves 194) |
+| #10 | Companion: Spielerprofil oben in der Sidebar (Name + Platzhalter), Knopf „Neue Version · Aktualisieren“ als PWA |
+
+Neu auf der Warteliste: H7 (Farben der neuen Biome), H8 (Probe bei Netlify), N6 („Aktualisieren“ auch bei neuen Daten?), E17 (Inhalt des Spielerprofils), E18 (Heimnetz-Betrieb vom Laptop behalten?), E19 (Sammelobjekt-Karten mit Struktur-Ansicht, Besatz-Icon und Biom-Hintergrund; Max liefert die Ansichten), Kapitel 5 (Branches löschen).
+
+### Vorige Runde (04.10.2026)
 
 | PR | Inhalt |
 |---|---|

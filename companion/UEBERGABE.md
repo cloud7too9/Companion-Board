@@ -82,6 +82,7 @@ Koordinaten-Sammlung nach dem Datenmodell (`../referenz/minecraft_tool_datenmode
 - **Icon je Besatz** ist die Schmiedevorlage aus `ruestungs-baukasten/vorlagen/` (Liste und Detail-Kopf, offene blass).
 - Abhaken gilt **für die ganze Welt** und merkt sich, wer es wann gefunden hat.
 - Verknüpfung zur Karte: Zu jedem Fundort erscheinen die bekannten Strukturen, die nächste mit Entfernung. „Karte“ springt direkt dorthin.
+- **Geplant (Max, 06.10.2026, Warteliste E19):** Jede Sammelobjekt-Karte bekommt die **Ansicht der zugeordneten Struktur** plus das Icon des Besatzes, der **Hintergrund wird an das Biom der Struktur angeglichen** (Farbe aus `biom-ids.js`). Die Struktur-Ansichten liefert Max. Vorbild und Fakten (Fundchancen je Struktur, Duplizieren am Schmiedetisch: Vorlage + Block + 7 Diamanten, Block je Vorlage) in `referenz/sammelobjekte/besaetze-fundorte-chancen-duplizieren.png`.
 - **Kennblöcke als PNG** (von Max, Quelle minecraft.wiki): Jede Fundort-Struktur zeigt ihren typischen Block, z. B. Unheilvolles Banner für den Außenposten, Netherziegel für die Netherfestung. Dazu der deutsche Strukturname aus `icons/manifest.json`, klein darunter der Seed-Map-Name.
   - Die Bilder liegen in `companion/icons/`. Das Board liefert den Ordner seit der Zusammenführung selbst unter `/icons/` aus (auch für die Anzeige); eine eigene Kopie gibt es nicht mehr.
   - **Überall eingebaut**: Sammelobjekte (Gruppen, Detail), Karte (Liste, Canvas-Marker, Detail, Screenshot-Prüfliste), Aufs Board (die Karte schickt `typ` mit) und im Board selbst (Anzeige, Handy-Liste, Ort-Detail). Kategorien ohne Bild behalten ihr Symbol bzw. Linien-Icon.
@@ -317,7 +318,7 @@ companion/
 │   ├── struktur_kennbloecke/ Kennblock-PNGs der Fundorte (Pfadruinen fehlt noch)
 │   └── banner/               Bedrock-Icons für die Banner-Anleitung (Wolle, Stock, Farbstoffe, Bannervorlage)
 ├── referenz/
-│   ├── sammelobjekte/  Trails-&-Tales-Übersicht der Fundorte
+│   ├── sammelobjekte/  Trails-&-Tales-Übersicht der Fundorte; Fundchancen + Duplizier-Blöcke je Besatz (Vorbild für E19)
 │   ├── banner/         Beispiel aus einem Banner-Editor
 │   └── ruestung/       3 Sets + 4 Verzauberungs-Reihenfolgen
 ├── tests/              Playwright-Tests: Banner, Portale, Sammelobjekte, Kennblöcke, Karte, Board, Live-Betrieb, getrennte Ursprünge, Netlify-Build, Anzeigeschema, Rüstung, Welt-Import, Anzeige-Link, Widgets
