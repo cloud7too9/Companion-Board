@@ -1,6 +1,6 @@
 # Plan: Widget-Dashboard, Offline-Sync und Welt-Import
 
-> Für Claude Code · Repo `flexibel-visionboard` · Stand 01.10.2026 · Entscheidungen von Max eingearbeitet
+> Für Claude Code · Repo `Companion-Board` (ursprünglich `flexibel-visionboard`) · Stand 01.10.2026 · Entscheidungen von Max eingearbeitet · Nachträge 13.10.2026 bei B3 und N5
 > Grundlage: die Ideen in [`ideen/`](ideen/) und die Baupläne in [`bauplaene/`](bauplaene/) aus der Planungskommission
 
 ---
@@ -52,7 +52,7 @@ Daneben laufen zwei unabhängige Stränge:
 | Board-Anzeige | `koordinaten-board/client/` (React) unter `/anzeige` | Orte der aktiven Welt und „Aufs Board“. **Nur auf `localhost`** (`istLokal` in `server.js`), sonst nur mit `ANZEIGE_OFFEN=1`, dann aber für jedes Gerät im Netz und ohne Schutz *(überholt durch Umbau Phase 1: nur noch mit Anzeige-Link, `ANZEIGE_OFFEN` entfernt)* | bleibt vorerst. Geht später in `/dashboard` auf. Bekommt vorher schon den Anzeige-Link (A6). |
 | Daten | `koordinaten-board/server/src/daten.js` | IDs vom Server (`neueId`), Urheber als Name im Feld `von` | stabile Benutzer-ID, Client-IDs |
 | Beitreten | QR-Code → `/?pin=…`, Name frei, `sperre.js` | Board-PIN + freier Name | wird **Account mit PIN**, die Anmeldung erreicht man über den QR-Code (E9) |
-| Offline | `localStorage` für Verbindung und Name | kein Service Worker, keine IndexedDB | neu |
+| Offline | `localStorage` für Verbindung und Name | kein Service Worker, keine IndexedDB *(überholt seit 13.10.2026: Service Worker und PWA laufen über Netlify, siehe `Bauplan-Offline-Sync-und-Identitaet.md`, Nachtrag)* | neu |
 | Welt-Import | `biom-dekoder.js`, `biom-welt.js`, `vendor/` | Dekoder fertig (PR #6), **noch kein Upload-Feld** | Strang C |
 
 ---
@@ -185,6 +185,8 @@ Betrifft `companion/companion-prototyp.html`, `companion/regeln.js` und `koordin
 
 ### Phase B3 · Service Worker und IndexedDB ⏸
 
+> **Überholt seit 13.10.2026:** Service Worker, versionierter Cache und PWA sind über Netlify gebaut (`/app/sw.js`), HTTPS kommt von Netlify und Cloudflare. Was von B3 bleibt (Live-Modus ohne Netz, IndexedDB, Nachladen über `/api/aenderungen`), steht im Nachtrag von [`bauplaene/Bauplan-Offline-Sync-und-Identitaet.md`](bauplaene/Bauplan-Offline-Sync-und-Identitaet.md).
+
 - `companion/sw.js`, ausgeliefert vom Board unter `/sw.js` (Scope `/`). Er cacht die App-Shell: Seite, `regeln.js`, `board-karten.js`, `icons/`, `vendor/`.
 - **Cache-Falle:** Die Seite kommt heute bewusst ohne Cache (`OHNE_CACHE`). Der Service Worker braucht deshalb eine Versionsnummer im Cache-Namen und „neue Version verfügbar → neu laden“.
 - IndexedDB ersetzt `localStorage` für die Daten. Der Geräteschlüssel bleibt im `localStorage`.
@@ -261,9 +263,9 @@ Git: Nach jeder Phase pushen. Nach jedem Strang (bzw. nach jedem Haltepunkt mit 
 | E12 | ZIP mit Unterordner | **annehmen** |
 | E13 | Kleine Widgets bedienbar? | **Abhaken am Handy erlaubt**, das Board bleibt reine Anzeige |
 | E14 | Anleitung und Abdeckung | **nur iPhone, besuchte Gebiete reichen** |
-| N5 | HTTPS für Offline (04.10.2026) | **eigenes Zertifikat am Board**, das iPhone vertraut ihm einmal |
+| ~~N5~~ | HTTPS für Offline (04.10.2026) | ~~eigenes Zertifikat am Board~~ **hinfällig seit 13.10.2026:** HTTPS kommt von Netlify und Cloudflare (Umbau Phase 5/6) |
 | E15 | Edition (04.10.2026) | **nur Bedrock**, Java gibt es nirgendwo |
-| E16 | Board und „Aufs Board“ (04.10.2026) | Das Board bekommt eine **Sitzung**, die lebt, solange das Board läuft. „Aufs Board“ fügt den Inhalt als **Widget an der ersten freien Stelle** ein. Bauplan folgt. |
+| E16 | Board und „Aufs Board“ (04.10.2026) | Das Board bekommt eine **Sitzung**, die lebt, solange das Board läuft. „Aufs Board“ fügt den Inhalt als **Widget an der ersten freien Stelle** ein. Bauplan: [`bauplaene/Bauplan-Sitzung.md`](bauplaene/Bauplan-Sitzung.md) (abgenommen 13.10.2026). |
 | E8 | Themes Sammelobjekte, Banner, Rüstung (04.10.2026) | **vertagt**, wird an anderer Stelle geklärt; Platzhalter bleibt |
 
 ---

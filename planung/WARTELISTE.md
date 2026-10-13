@@ -24,7 +24,7 @@ Bei jedem Haltepunkt stehen Branch und Screenshots. Die Screenshots erzeugen die
 | H7 | **Farben der neuen Biome** (06.10.2026): Cherry Grove (rosa), Pale Garden (fahles Graugrün) und Sulfur Caves (schwefelgelb) haben Kartenfarben von Claude (`tools/biom-ids-bauen.mjs`, `NACHTRAG`). **Max (06.10.2026):** Die Biom-Farben werden auch der **Hintergrund der Sammelobjekt-Karten** (siehe E19), dort fallen sie also doppelt auf. | `main` (#9) | Sobald eine Welt eines davon enthält: Welt-Import, dann Prüfliste und Karte anschauen. Andere Farbe gewünscht → eine Zeile im `NACHTRAG`, `npm run biom-ids`. |
 | ~~H8~~ | **Erledigt (13.10.2026).** **Probe bei Netlify** (Umbauplan Phase 5): Max hat die Companion unter `/app/` als PWA installiert und ist beigetreten. Der Haken in `UMBAUPLAN.md` ist gesetzt, Phase 5 ist abgeschlossen. | `main` | – (weiter mit Phase 6: Pi, Tunnel, Domain) |
 
-Später, wenn es so weit ist: B3 (am echten iPhone im Flugmodus).
+Geplant (Bauplan „Sitzung“): **H9** Dashboard mit allen Blöcken der alten Anzeige (Screenshots), **H10** Probe am Fernseher/Tablet und über Mobilfunk nach dem Umschalten. Später: B3 am echten iPhone im Flugmodus, mit Daten.
 
 **Pull Requests:** Seit dem 04.10.2026 ist alles in `main`: #7, #9–#11 und #19 einzeln, die Kette A2–A6 mit B1/B2 und dem Anzeige-Link in einem Merge über #17. #12–#16 sind darin enthalten und geschlossen (Kapitel 3 in [`UEBERGABE.md`](UEBERGABE.md); diese Nummern meinen das alte Repo). Im neuen Repo: #1–#7 Umbau Phasen 1–5, am 06.10.2026 #8 (Aufräumen), #9 (Biom-IDs) und #10 (Spielerprofil, Aktualisieren), #11 (Warteliste), am 13.10.2026 #12 (Umbau abgeschlossen, E18). **Gemergt wird nur nach Rückfrage bei Max.**
 
@@ -37,7 +37,7 @@ Später, wenn es so weit ist: B3 (am echten iPhone im Flugmodus).
 | ~~N1~~ | **Entschieden:** Abgehakt wird im Bereich der Companion (wie heute). „Anzeige anordnen“ ordnet nur an. | – |
 | ~~N2~~ | **Entschieden: Weg 1** – React-Route `/dashboard/anordnen` aus `companion/widgets/`, geöffnet aus der Companion (Board → Anzeigen → „Anzeige anordnen“). Gebaut auf `bereich/widgets-anzeigen`. | – |
 | ~~N4~~ | **Entschieden („Ja“):** Die Board-PIN im QR-Code bleibt als Zugang zum Server, die Account-PIN kommt dazu. **B2 ist gebaut** (Branch `board/identitaet`): Accounts mit eigener PIN, Auswahl beim Beitreten, Geräteschlüssel, `werBistDu()`. Wer schon beigetreten war, meldet sich einmal neu an (Name + eigene PIN). | – |
-| ~~N5~~ | **Entschieden (04.10.2026): HTTPS am Board mit eigenem Zertifikat.** Das Board erzeugt sein Zertifikat selbst, jedes iPhone installiert es einmal als Profil und vertraut ihm. Bleibt im Heimnetz, kostenlos. | – (B3–B5 sind frei) |
+| ~~N5~~ | ~~Entschieden (04.10.2026): HTTPS am Board mit eigenem Zertifikat.~~ **Hinfällig seit 13.10.2026:** HTTPS, sicherer Kontext und PWA kommen von Netlify und Cloudflare. B3 ist neu zugeschnitten (Nachtrag in `bauplaene/Bauplan-Offline-Sync-und-Identitaet.md`): Live-Modus ohne Netz, IndexedDB, Nachladen. | – (B3–B5 sind frei) |
 | N6 | **„Aktualisieren bei neuen Inhalten“** (Max, 05.10.2026): Gebaut ist der Knopf für eine **neue Version der App** (PWA, #10). War auch gemeint, dass die App bei **neuen Daten anderer Spieler** einen Knopf zeigt, statt sie wie heute sofort live zu übernehmen? | – (nur, falls die Antwort „ja“ ist) |
 
 ---
@@ -51,9 +51,9 @@ Später, wenn es so weit ist: B3 (am echten iPhone im Flugmodus).
 | ~~E15~~ | **Entschieden (04.10.2026): Java gibt es nirgendwo.** Bedrock ist die einzige Edition. Die Umschaltung Bedrock/Java in der Portal-Verwaltung ist entfernt, Handy und Board rechnen mit ±128. | – |
 | E17 | **Inhalt des Spielerprofils** (Sidebar, seit #10): Gebaut sind Name und ein runder Platzhalter. Offen: Was zeigt der Platzhalter später, ein hochgeladenes **Profilbild** oder der **Skin** aus dem Spiel? Kommt mehr dazu: eigene Beiträge in der Welt (Orte, Sammelobjekte, Banner, Sets über `erstellerId`), der Standort, die angemeldeten Geräte (sehen, sperren)? Lässt sich das Profil antippen (eigenes Sheet)? | Name + Platzhalter, nicht antippbar |
 | ~~E18~~ | **Entschieden (13.10.2026): „raus damit.“** Alles läuft über Netlify und den Pi. Entfernt sind `netzwerk.js`, das Adress-Lernen (`adresse.txt`), `start.bat`, `start.sh`, `anzeige-oeffnen.bat` und die Firewall-Skripte. Lokal gilt ohne `OEFFENTLICHE_URL` `localhost`. **Dazu entschieden:** `/app/` bekommt den Prototyp, **der aktuelle Prototyp ist der Hauptstand**; das Anzeigegerät bleibt offen (technisch egal). | – |
-| E20 | **Startseite der Domain** `mainhubv1.com` (Umbauplan, letzte offene Frage): die heutige Anzeige oder gleich das Widget-Dashboard? Fürs Dashboard reicht eine Zeile in `netlify/_redirects`. | `/` = Anzeige, `/dashboard/` = Dashboard |
+| ~~E20~~ | **Entschieden (13.10.2026, Bauplan „Sitzung“, Frage 4):** Das Dashboard wird die einzige Anzeige, `/` leitet auf `/dashboard/` um. Umgesetzt wird das in Phase S4. | bis S4: `/` = Anzeige, `/dashboard/` = Dashboard |
 | E19 | **Sammelobjekt-Karten neu** (Max, 06.10.2026): Jede Karte bekommt die **Ansicht der zugeordneten Struktur** (Dungeon oder Struktur, z. B. Außenposten, Waldanwesen, Prüfungskammer) **plus das Icon des Besatzes**; der **Kartenhintergrund wird an das Biom angeglichen**, in dem die Struktur liegt (Farbe aus `biom-ids.js`). **Max liefert die Struktur-Ansichten** (Bilder) noch. Vorbild: `companion/referenz/sammelobjekte/besaetze-fundorte-chancen-duplizieren.png`. Zu klären beim Bau: Zuordnung Struktur → Biom, wo mehrere möglich sind (Außenposten, Schiffswrack, Bastion); ob Fundchancen und Duplizier-Block aus dem Vorbild mit auf die Karte sollen (nicht im Datenmodell). | Liste mit Kennblock-Kopf je Gruppe, Karten nach Dimension eingefärbt |
-| ~~E16~~ | **Entschieden (04.10.2026): Das Board bekommt eine Sitzung.** Sie lebt, solange das Board läuft (Neustart = leere Sitzung, das gespeicherte Layout der Anzeige bleibt). Inhalte lassen sich während der Laufzeit live ändern. **„Aufs Board“** zeigt nicht mehr nur kurz groß, sondern fügt den Inhalt als **Widget an der ersten freien Stelle** ein; am Handy lässt er sich verschieben oder entfernen. | Noch nicht gebaut. Zuerst ein Bauplan „Sitzung“ zum Abnicken. Offen darin: ob `/anzeige` damit ganz wegfällt und wie QR-Code und Orte mit Kennblöcken ins Dashboard kommen. |
+| ~~E16~~ | **Entschieden (04.10.2026): Das Board bekommt eine Sitzung.** Sie lebt, solange das Board läuft (Neustart = leere Sitzung, das gespeicherte Layout der Anzeige bleibt). Inhalte lassen sich während der Laufzeit live ändern. **„Aufs Board“** zeigt nicht mehr nur kurz groß, sondern fügt den Inhalt als **Widget an der ersten freien Stelle** ein; am Handy lässt er sich verschieben oder entfernen. | **Bauplan abgenommen (13.10.2026):** [`bauplaene/Bauplan-Sitzung.md`](bauplaene/Bauplan-Sitzung.md). Entschieden: eigener Sitzungs-Layer, kein Platz → ablehnen, Karte vom Server (ohne Biom/3D vorerst), `/` leitet auf `/dashboard`, alte Anzeige wird gelöscht. Gebaut wird in S1–S4, Haltepunkte H9 und H10. |
 
 ---
 
@@ -71,7 +71,15 @@ Die Typen stehen im Register und in der Galerie, liefern aber nur einen Hinweis 
 
 ---
 
-## 5. Erinnerungen (GitHub, nur Max)
+## 5. Erinnerungen (nur Max)
 
-- **Branches löschen:** `aufraeumen/doku`, `bereich/biom-ids`, `bereich/profil` sind gemergt und liegen noch auf GitHub. Der Git-Proxy der Cloud-Sitzung darf keine Branches löschen (HTTP 403).
+**Pi und Cloudflare (Absicherung, 13.10.2026):**
+
+- [ ] **Sicherung läuft?** Am Pi `sudo -u board crontab -l` muss die Zeile `15 3 * * * /opt/companion-board/koordinaten-board/pi/sicherung.sh` zeigen; Kopien liegen unter `/var/lib/companion-board/sicherung/`.
+- [ ] **Kopie vom Pi wegholen**, sonst liegt alles auf einer SD-Karte: vom Laptop aus z. B. `rsync -a board@<pi>:/var/lib/companion-board/sicherung/ ~/companion-sicherung/` (Befehl steht in `koordinaten-board/pi/ANLEITUNG.md`, Abschnitt Sicherung).
+- [ ] **Ratenbegrenzung bei Cloudflare** für `api.mainhubv1.com/api/beitreten*` (10 je Minute und IP) unter *Security → WAF → Rate limiting rules*. Die Sperre im Server (5 Fehlversuche je Adresse, 60 s) bleibt zusätzlich.
+
+**GitHub:**
+
+- **Branches löschen:** `aufraeumen/doku`, `bereich/biom-ids`, `bereich/profil`, `claude/festive-euler-a82up2` sind gemergt und liegen noch auf GitHub. Der Git-Proxy der Cloud-Sitzung darf keine Branches löschen (HTTP 403).
 - **„Automatically delete head branches“** in den Repo-Einstellungen einschalten (Settings → General → Pull Requests), dann verschwinden gemergte Branches von selbst.

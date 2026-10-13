@@ -1,6 +1,6 @@
 # Umbauplan Companion & Board
 
-Stand: 05.10.2026 · Max
+Stand: 13.10.2026 · Max (Plan vom 05.10.2026, alle Haken gesetzt)
 
 > **Umsetzung:** Seit dem 05.10.2026 läuft der Umbau im Repo `cloud7too9/Companion-Board` (Start ohne Verlauf, der alte Verlauf liegt in `flexibel-visionboard`). Die Haken in den Phasen werden hier gesetzt; den Stand je Phase führt [`UEBERGABE.md`](UEBERGABE.md), Kapitel 1 und 9. Phasen 1–5 sind gebaut, gemergt (PRs #1–#7) und seit der Netlify-Probe am 13.10.2026 abgeschlossen; **Phase 6 ist seit dem 13.10.2026 abgeschlossen** (Pi, Tunnel, Domain `mainhubv1.com`, Probe über Mobilfunk, Aufräumen). Die Einrichtung steht in [`koordinaten-board/pi/ANLEITUNG.md`](../koordinaten-board/pi/ANLEITUNG.md).
 
@@ -160,11 +160,11 @@ Auf dem Pi bleiben genau zwei Dienste: die API (Fastify mit WebSocket, dazu SQLi
 
 ## Offene Entscheidungen und Risiken
 
-Stand 13.10.2026: Phase 6 ist abgeschlossen. Von den fünf Fragen ist nur noch die Startseite der Domain offen (auch auf der Warteliste als E20); sie blockiert nichts.
+Stand 13.10.2026: Phase 6 ist abgeschlossen. Alle fünf Fragen sind entschieden; die Startseite (E20) wird mit dem Bauplan „Sitzung“ umgesetzt.
 
 - [x] Welche Domain, und lässt der Registrar das Umstellen der Nameserver zu? *(Entschieden: `mainhubv1.com`; die API antwortet seit dem 13.10.2026 unter `https://api.mainhubv1.com/api/server` über den Tunnel.)*
 - [x] Welches Gerät zeigt das Board an (TV-Browser, Tablet, Laptop)? Der Pi fällt aus, Raspberry OS Lite hat keinen Desktop. *(Max, 13.10.2026: nicht festgelegt, bleibt offen; technisch egal, jedes Gerät mit Browser und Anzeige-Link)*
-- [ ] Startseite der Domain: heutige Anzeige oder gleich das Widget-Dashboard, das sie später ersetzen soll? *(Max; gebaut ist: `/` = Anzeige, `/dashboard/` = Dashboard. Soll das Dashboard auf `/`, reicht eine Zeile in `netlify/_redirects`.)*
+- [x] Startseite der Domain: heutige Anzeige oder gleich das Widget-Dashboard, das sie später ersetzen soll? *(Entschieden 13.10.2026 im Bauplan „Sitzung“: das Dashboard wird die einzige Anzeige, `/` leitet auf `/dashboard/` um; umgesetzt in Phase S4.)*
 - [x] Kommt nach `/app/` der Prototyp oder deine eigene `modul-a-live-karte.html`, die nicht im Repo liegt? *(Max, 13.10.2026: **der Prototyp, so wie jetzt. Der aktuelle Prototyp ist der Hauptstand.** `modul-a-live-karte.html` bleibt nur die Herkunft der Optik.)*
 - [x] Welche Node-Version läuft auf dem Pi (`node -v`)? Ab 22.13 reicht `node:sqlite`. *(Entfällt: Der Pi bekommt laut Anleitung Node 22 LTS von NodeSource, `package.json` verlangt `>=22.13`.)*
 

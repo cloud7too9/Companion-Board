@@ -38,7 +38,7 @@ Geht es mit dem Plan weiter (Widget-Dashboard, Offline, Accounts), zum Beispiel:
 
 oder
 
-> … Mach mit Offline B3 weiter (N5: eigenes Zertifikat).
+> … Mach mit Offline B3 weiter (Nachtrag im Offline-Bauplan: Live-Modus ohne Netz, IndexedDB, Nachladen).
 
 ---
 

@@ -1,6 +1,19 @@
 # Bauplan: Offline-Sync und Identität
 
-Stand: 01.10.2026 · Grundlage: Offline-Sync-und-Identitaet
+Stand: 01.10.2026 · Grundlage: Offline-Sync-und-Identitaet · Nachtrag 13.10.2026 (siehe unten)
+
+> **Stand 13.10.2026 (Nachtrag nach dem Umbau auf Netlify + Pi):**
+>
+> - **Gebaut:** Schritte 1 und 2 (B1 Datenmodell, B2 Accounts mit PIN, `werBistDu()`). Aus Schritt 3 gebaut: Service Worker `companion/sw.js` mit versioniertem Cache (`companion-<Commit>`), App-Shell vorab gecacht, Knopf „Neue Version · Aktualisieren“, Offline-Test der Shell in `companion/tests/netlify.test.mjs`.
+> - **Hinfällig ist N5** (eigenes Zertifikat am Board, iPhone-Profil): Die App kommt von Netlify unter `https://mainhubv1.com/app/`, die API läuft hinter einem Cloudflare-Tunnel. HTTPS, sicherer Kontext und installierbare PWA sind damit vorhanden. Der Service Worker liegt unter `/app/sw.js` mit Scope `/app/`, nicht unter `/sw.js`.
+> - **Schritt 3 neu zugeschnitten (B3):**
+>   1. **Live-Modus ohne Netz** statt Rückfall in den DEMO-Mock: `betriebErkennen` behandelt eine gespeicherte Verbindung (`board.verbindung`) auch ohne Antwort des Boards als „live, getrennt“. Heute zeigt eine offline gestartete PWA Beispieldaten.
+>   2. **Datenspiegel in IndexedDB:** Jeder Bereich schreibt beim Laden seinen Stand (Welten, Orte, Sammelstatus, Banner, Portale, Rüstung, Biome als Kacheln) in IndexedDB; offline startet die App daraus. Der Geräteschlüssel bleibt im `localStorage`.
+>   3. **Nachladen nach Wiederverbinden:** Server `GET /api/aenderungen?seit=<nr>` aus der Tabelle `aenderungen` (`speicher.js`, vorhanden, nicht nach außen gegeben) und `nr` in jeder `geaendert`-Nachricht; die Companion merkt sich die letzte Nummer und holt nur, was fehlt; liegt sie zu weit zurück, lädt sie alles neu.
+>   4. Playwright-Test mit `context.setOffline(true)` **mit Daten**: offline starten, Bestand sehen, wieder online, Nachladen.
+>   5. ⏸ Haltepunkt: Max am iPhone als Home-Bildschirm-App im Flugmodus, mit Daten.
+> - **Schritte 4–6 (B4, B5) unverändert.** Hinweis für B5: `PUT …/gefunden` und `…/erledigt` setzen schon einen Zielzustand, überschreiben bei Wiederholung aber `von` und `am` (`daten.js`, `sammelobjektSetzen`); idempotent heißt hier: unverändert lassen, wenn der Zustand schon stimmt.
+> - Branch bleibt `bereich/offline`.
 
 Dieser Bauplan beschreibt die technischen Entscheidungen. Die Anpassung an das konkrete Projekt (Koordinaten-Board, Companion PWA, Server) gehört nicht dazu.
 

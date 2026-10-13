@@ -56,7 +56,7 @@ sudo journalctl -u companion-board -f              # Konsole: PIN, Anzeige-Link,
 
 **Update:** `cd /opt/companion-board && sudo -u board git pull && cd koordinaten-board/server && sudo -u board npm ci --omit=dev && sudo systemctl restart companion-board`.
 
-**Sicherung:** `pi/sicherung.sh` zieht nachts eine Kopie von `daten.db` (SQLite-Backup im laufenden Betrieb). Cron als `board`: `sudo -u board crontab -e` → `15 3 * * * /opt/companion-board/koordinaten-board/pi/sicherung.sh`. Die Kopien vom Pi wegholen (Laptop oder Hetzner), z. B. `scp` oder `rsync` von außen.
+**Sicherung:** `pi/sicherung.sh` zieht nachts eine Kopie von `daten.db` (SQLite-Backup im laufenden Betrieb). Cron als `board`: `sudo -u board crontab -e` → `15 3 * * * /opt/companion-board/koordinaten-board/pi/sicherung.sh`. Die Kopien vom Pi wegholen (Laptop oder Hetzner), sonst liegt alles auf einer SD-Karte, z. B. vom Laptop: `rsync -a board@<pi>:/var/lib/companion-board/sicherung/ ~/companion-sicherung/` (Nutzer `board` hat keine Shell; dann mit dem eigenen Pi-Nutzer kopieren, der die Dateien lesen darf, oder `sudo` in einem Cron auf dem Pi, der nach außen schiebt).
 
 **RAM messen** (Umbauplan): `free -m` und `ps -o rss,cmd -C node,cloudflared` nach dem Start und nach einem Welt-Import. `MemoryMax=400M` in der Dienstdatei ist die Leitplanke.
 
@@ -77,7 +77,7 @@ sudo journalctl -u companion-board -f              # Konsole: PIN, Anzeige-Link,
 
 Cloudflare flacht den CNAME auf `@` automatisch ab (CNAME flattening). Falls Netlify stattdessen einen A-Record verlangt: `A @ 75.2.60.5`, ebenfalls Proxy aus. Die graue Wolke ist wichtig: Nur dann kann Netlify das Zertifikat für die Domain ausstellen.
 
-**Einstellungen, die man nicht braucht:** *SSL/TLS* betrifft nur den Proxy (also `api`), dort passt *Full*. Keine *Page Rules*, kein *Access*, keine Firewall-Regel nötig. Optional unter *Security → WAF → Rate limiting rules*: Anfragen an `api.mainhubv1.com/api/beitreten*` auf z. B. 10 pro Minute je IP begrenzen (Schutz vor PIN-Raten, zusätzlich zur Sperre im Server).
+**Einstellungen, die man nicht braucht:** *SSL/TLS* betrifft nur den Proxy (also `api`), dort passt *Full*. Keine *Page Rules*, kein *Access*, keine Firewall-Regel nötig. **Empfohlen** (Stand 13.10.2026 noch offen, siehe Warteliste Kapitel 5) unter *Security → WAF → Rate limiting rules*: Anfragen an `api.mainhubv1.com/api/beitreten*` auf z. B. 10 pro Minute je IP begrenzen (Schutz vor PIN-Raten, zusätzlich zur Sperre im Server).
 
 **Tunnel auf dem Pi**
 
