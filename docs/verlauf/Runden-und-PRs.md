@@ -1,0 +1,66 @@
+# Verlauf: Runden, Pull Requests, Git
+
+Archiv aus `planung/UEBERGABE.md` und `planung/WARTELISTE.md` (ausgelagert am 13.10.2026). Was heute gilt, steht dort; hier steht, wie es dazu kam.
+
+PR-Nummern bis #26 meinen das alte Repo `flexibel-visionboard`, ab dem Repo-Umzug am 05.10.2026 das Repo `Companion-Board` (dort ab #1).
+
+## Runde 13.10.2026 (Umbau abgeschlossen, Bauplan „Sitzung“) · Repo `Companion-Board`
+
+| PR | Inhalt |
+|---|---|
+| #18 | Aufräumen: Erledigtes aus `planung/` ins Archiv `docs/` (Pläne, Baupläne, Ideen, Verlauf, erledigte Haltepunkte und Entscheidungen), Test-Cache aus dem Repo, `.gitignore` im Hauptordner |
+| #17 | S4 Umschalten: Anzeige-Link aufs Dashboard, `/` und `/anzeige` leiten um (E20), `koordinaten-board/client/` und `gezeigt` entfernt, Hinweis „Dieser Anzeige-Link gilt nicht mehr“, Tests auf das Dashboard umgeschrieben; ⏸ H10 wartet auf Max |
+| #16 | S3 Widgets der Anzeige: Orte, Beitreten (QR-Code vom Server), Spieler, Zuletzt, Kopf der Anzeige, neues Standard-Layout; ⏸ H9 wartet auf Max |
+| #15 | S2 Handy und Dashboard: „Aufs Board“ mit Quelle, Sitzung im Board-Sheet, Kennblock und Absender-Chip im Dashboard, Sitzungs-Layer gesperrt, Brücke `gezeigt` bis S4; Playwright-Tests zu „Aufs Board“ laufen live vom Board |
+| #14 | S1 Sitzung am Server: `sitzung.js`, `companion/widget-groessen.mjs` gemeinsam für Server und Dashboard, „Aufs Board“ mit Quelle, `portale.verbindung` |
+| #13 | Bauplan „Sitzung und eine Anzeige“ (abgenommen), Offline neu zugeschnitten (N5 hinfällig), Checkliste Pi/Cloudflare, Fix „Fertig“ in Anordnen |
+| #12 | Umbau abgeschlossen: Netlify-Probe (H8) und Phase 6 abgehakt, Domain `mainhubv1.com` statt Platzhalter, Betrieb vom Laptop aus entfernt (E18: `netzwerk.js`, Adress-Lernen, Start- und Firewall-Skripte), Entscheidungen zu `/app/` (Prototyp = Hauptstand) und Anzeigegerät (offen) festgehalten, E20 (Startseite) neu auf der Warteliste |
+
+## Runde 05./06.10.2026 · Repo `Companion-Board`
+
+| PR | Inhalt |
+|---|---|
+| #8 | Aufräumen: alte Handy-Oberfläche aus dem Anzeige-Client, überholter Entwurf, Doku-Stand nach Umbau Phase 5, Repo-Name |
+| #9 | Biom-IDs vollständig aus Mojangs `mojang-biomes.json` (Cherry Grove 192, Pale Garden 193, Sulfur Caves 194) |
+| #10 | Companion: Spielerprofil oben in der Sidebar (Name + Platzhalter), Knopf „Neue Version · Aktualisieren“ als PWA |
+
+Neu auf der Warteliste: H7 (Farben der neuen Biome), H8 (Probe bei Netlify), N6 („Aktualisieren“ auch bei neuen Daten?), E17 (Inhalt des Spielerprofils), E18 (Heimnetz-Betrieb vom Laptop behalten?), E19 (Sammelobjekt-Karten mit Struktur-Ansicht, Besatz-Icon und Biom-Hintergrund; Max liefert die Ansichten), Kapitel 5 (Branches löschen).
+
+## Runde 04.10.2026 · altes Repo `flexibel-visionboard`
+
+| PR | Inhalt |
+|---|---|
+| #19 | Ergebnisse von Phase 1 des Biom-Plans nachgeholt: Fixture-Welt von Max, Biom-ID 195 = Dappled Forest, Höhenkarte `z*16 + x`. Lagen nur auf `bereich/karte-mcworld`. |
+| #20 | Die ganze Kette A2–A6 + B1/B2 + Anzeige-Link in einem Merge (ersetzt die gestapelten #12–#17) |
+| #21 | CI: `.github/workflows/tests.yml`, dazu ein Fix für eine Race Condition in `anzeige-link.test.mjs` |
+| #22 | Nur Bedrock: Java-Umschaltung entfernt. Entscheidungen festgehalten. Diese Übergabe. |
+
+Entscheidungen von Max (Details in `WARTELISTE.md` und `PLAN.md`, Kapitel 7):
+
+| Nr. | Entscheidung |
+|---|---|
+| N5 | HTTPS am Board mit **eigenem Zertifikat**, das iPhone vertraut ihm einmal *(hinfällig seit 13.10.2026: HTTPS über Netlify/Cloudflare)* |
+| E15 | **Nur Bedrock**, Java gibt es nirgendwo |
+| E16 | Das Board bekommt eine **Sitzung**, die lebt, solange das Board läuft. „Aufs Board“ fügt den Inhalt als **Widget an der ersten freien Stelle** ein, am Handy verschieb- und entfernbar. |
+| E8 | Themes für Sammelobjekte, Banner, Rüstung: **vertagt**, wird an anderer Stelle geklärt |
+| H1, H3–H6 | abgenommen |
+| Mergen | **nur nach Rückfrage bei Max** |
+
+Frühere Entscheidungen (01.10.2026): Strang C als ganzer Biom-Import, N1 (abgehakt wird im Bereich der Companion), N2 (Anordnen als React-Route `/dashboard/anordnen`), N4 (Board-PIN im QR-Code bleibt, Account-PIN kommt dazu), Arbeitsweise „Was Eingaben braucht, kommt auf die Warteliste, alles andere wird erledigt“.
+
+## Git: Repo-Umzug und Umbau-Branches
+
+- **Repo-Umzug (05.10.2026):** Gearbeitet wird seitdem in `cloud7too9/Companion-Board`. `main` dort ist der Stand von `flexibel-visionboard` (`main` 9d5be46, Merge von PR #26) als **ein Start-Commit ohne Verlauf**. Die 16 gemergten Branches und alle PR-Nummern bis #26 gibt es nur noch im alten Repo; löschen muss Max dort nichts mehr. Die PR-Nummern in dieser Datei meinen das alte Repo.
+- **Mitgenommen:** `bereich/karte-mcworld` als eigener Stand ohne Eltern (ältere Fassung der Biom-Phasen 2–4: Prüfseite `welt-pruefen.html`, `welt-import.test.mjs`). #7 und #19 haben den Inhalt ersetzt; der Branch ist zum Nachschlagen, ein Merge scheitert absichtlich an „unrelated histories“.
+- **Umbau:** je Phase ein Branch `umbau/<phase>` mit PR gegen `main` (`UMBAUPLAN.md`). Gemergt sind #1 (Phase 1, Branch `claude/vibrant-mccarthy-qzhzq4` in der Rolle von `umbau/server-absichern`), #2 `umbau/api-adresse`, #3 `umbau/ocr-im-browser`, #4 `umbau/sqlite`, #5 `umbau/netlify`, #6 `umbau/pi-dienste`, #7 `umbau/anleitung-trixie`. Die Branches sind nach dem Merge gelöscht.
+
+## Git: Verlauf bis 04.10.2026 (altes Repo)
+
+- #7 (Strang C), #9 (MainHub), #10 (A0), #11 (A1) wurden einzeln gemergt.
+- #8 (Anzeige-Link) wurde in `bereich/karte-welt-upload` gemergt, als der schon in `main` war. Der Anzeige-Link kam erst mit #20 nach `main` (über `9f7dee9`).
+- #12–#17 waren gestapelt (jeder PR auf seinen Vorgänger). GitHub ließ die Basis von #17 nicht auf `main` umstellen („part of a stack“). Darum brachte **#20** denselben Branch `board/identitaet` in einem Merge nach `main`; #12 hat GitHub selbst als gemergt markiert, #13–#17 sind geschlossen.
+- Commits der Kette (ohne Merges): C `84ed32f` · `5a1d02e` · `e9c1efd` · `2570c56`; Anzeige-Link `51db22f`; A0 `b6d4082`; A1 `7ab7275` · `bedcfda` · `ca7eba6`; A2 `c777042` · `5de5ccc` · `e8d03ee` · `76f9fc2`; A3 `223f46c`; A4 `e00aeea` … `876aad6`; A5 `23f3a36` … `c54583a`; A6 `0905882` · `90ba916` · `d1873ae` · `766544a`; B1/B2 `75d4f89` · `1cae081` · `c09ec0a` · `8ee1ad6`.
+
+## Pull Requests laut Warteliste (Stand 13.10.2026)
+
+**Pull Requests:** Seit dem 04.10.2026 ist alles in `main`: #7, #9–#11 und #19 einzeln, die Kette A2–A6 mit B1/B2 und dem Anzeige-Link in einem Merge über #17. #12–#16 sind darin enthalten und geschlossen (Kapitel 3 in [`planung/UEBERGABE.md`](../../planung/UEBERGABE.md); diese Nummern meinen das alte Repo). Im neuen Repo: #1–#7 Umbau Phasen 1–5, am 06.10.2026 #8 (Aufräumen), #9 (Biom-IDs) und #10 (Spielerprofil, Aktualisieren), #11 (Warteliste), am 13.10.2026 #12 (Umbau abgeschlossen, E18). **Gemergt wird nur nach Rückfrage bei Max.**

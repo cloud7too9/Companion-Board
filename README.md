@@ -1,6 +1,6 @@
 # Minecraft Companion & Koordinaten-Board
 
-> **Seit dem 05.10.2026 in diesem Repo `Companion-Board`.** Der Umbau auf Netlify + Raspberry Pi ([`planung/UMBAUPLAN.md`](planung/UMBAUPLAN.md)) hat hier ohne den alten Verlauf begonnen; die Historie bis zum Umzug liegt in [`cloud7too9/flexibel-visionboard`](https://github.com/cloud7too9/flexibel-visionboard).
+> **Seit dem 05.10.2026 in diesem Repo `Companion-Board`.** Der Umbau auf Netlify + Raspberry Pi ([`docs/plaene/UMBAUPLAN.md`](docs/plaene/UMBAUPLAN.md), abgeschlossen am 13.10.2026) hat hier ohne den alten Verlauf begonnen; die Historie bis zum Umzug liegt in [`cloud7too9/flexibel-visionboard`](https://github.com/cloud7too9/flexibel-visionboard).
 
 Zwei Projekte für eine gemeinsame Minecraft-Welt im Raum – seit dem 29.09.2026 **ein System**: Das Koordinaten-Board ist der Server der Companion und zeigt die Orte groß im Zimmer an. Jedes Projekt behält seine Technik, Tests und Doku.
 
@@ -8,8 +8,9 @@ Zwei Projekte für eine gemeinsame Minecraft-Welt im Raum – seit dem 29.09.202
 |---|---|---|
 | [`companion/`](companion/) | **Companion**: die App am Handy – Karte, Sammelobjekte, Portal-Verwaltung, Banner, Rüstung (eine HTML-Seite + `regeln.js`, Vanilla JS) | aktuelle Arbeit |
 | [`companion/widgets/`](companion/widgets/) | **Widgets**: Widget-Dashboard fürs Board unter `/dashboard` (Vite + React + TypeScript, aus MainHub): 13 Widget-Typen, Karten vom Board, Bereichs-Themes, Layout je Anzeige | A0–A6 gebaut, A7 offen |
-| [`koordinaten-board/`](koordinaten-board/) | **Koordinaten-Board**: Server der Companion (Daten, Live-Sync) und Anzeige im Zimmer (Fastify + React) | zusammengeführt |
-| [`planung/`](planung/) | **Planung**: Umbauplan Netlify + Pi ([`UMBAUPLAN.md`](planung/UMBAUPLAN.md)), Gesamtplan Widget-Dashboard, Offline-Sync, Welt-Import ([`PLAN.md`](planung/PLAN.md)) plus Ideen und Baupläne der Planungskommission | Umbau abgeschlossen (13.10.2026): Betrieb unter `mainhubv1.com`, Server auf dem Pi |
+| [`koordinaten-board/`](koordinaten-board/) | **Koordinaten-Board**: Server der Companion (Daten, Live-Sync, Sitzung der Anzeige; Fastify). Die Anzeige im Zimmer ist das Widget-Dashboard | zusammengeführt, läuft auf dem Pi |
+| [`planung/`](planung/) | **Planung, was noch offen ist**: Gesamtplan Widget-Dashboard, Offline-Sync, Welt-Import ([`PLAN.md`](planung/PLAN.md)), Übergabe, Warteliste, offene Ideen und Baupläne | Umbau abgeschlossen (13.10.2026): Betrieb unter `mainhubv1.com`, Server auf dem Pi |
+| [`docs/`](docs/README.md) | **Archiv, was erledigt ist**: abgeschlossene Pläne und Baupläne (Umbauplan, Widget-Dashboard A1–A5, Welt-Import), Verlauf der Runden und PRs, erledigte Haltepunkte und Entscheidungen | nur zum Nachschlagen |
 | [`referenz/`](referenz/) | **Gemeinsame Referenz**: Datenmodell, Seed-Map-Screenshots, Dashboard-Vorbild | – |
 
 **Neuer Chat / Weitermachen:** zuerst [`UEBERGABE.md`](UEBERGABE.md) lesen (Arbeitsweise, Zusammenspiel, offene Entscheidungen), danach die Übergabe des Projekts, um das es geht. Stand der Umsetzung des Plans: [`planung/UEBERGABE.md`](planung/UEBERGABE.md). Was auf Max wartet, steht in [`planung/WARTELISTE.md`](planung/WARTELISTE.md).

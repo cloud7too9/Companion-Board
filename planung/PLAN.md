@@ -1,7 +1,7 @@
 # Plan: Widget-Dashboard, Offline-Sync und Welt-Import
 
 > Für Claude Code · Repo `Companion-Board` (ursprünglich `flexibel-visionboard`) · Stand 01.10.2026 · Entscheidungen von Max eingearbeitet · Nachträge 13.10.2026 bei B3 und N5
-> Grundlage: die Ideen in [`ideen/`](ideen/) und die Baupläne in [`bauplaene/`](bauplaene/) aus der Planungskommission
+> Grundlage: die Ideen und Baupläne der Planungskommission. Noch offene liegen in [`ideen/`](ideen/) und [`bauplaene/`](bauplaene/), erledigte (A1–A5, Strang C) im Archiv unter [`../docs/ideen/`](../docs/ideen/) und [`../docs/bauplaene/`](../docs/bauplaene/).
 
 ---
 
@@ -211,7 +211,7 @@ Nicht jetzt: Postfach, Bestätigungs-Oberfläche, Rechte, Protokoll. Das Modell 
 
 ## 5. Strang C · Welt-Import per ZIP → `Bauplan-Welt-Import`
 
-Betrifft die Karte in `companion-prototyp.html` und `biom-welt.js`. Branch: `bereich/karte-welt-upload`. Gehört zu Phase 5 von `companion/PLAN-welt-import-biome.md`.
+Betrifft die Karte in `companion-prototyp.html` und `biom-welt.js`. Branch: `bereich/karte-welt-upload`. Gehört zu Phase 5 von `docs/plaene/PLAN-welt-import-biome.md` (früher `companion/`).
 
 > **Umfang (Max, 01.10.2026):** der ganze Biom-Import, also die Phasen 2–5 des Biom-Plans zusammen mit diesem Strang. Gebaut; der Haltepunkt nach dem Import-Sheet und die Prüfungen an echten Welten stehen in der Warteliste. Die Test-ZIPs entstehen aus künstlichen Welten (`tests/welt-bauen.mjs`), bis `fixture-seed.mcworld` da ist.
 

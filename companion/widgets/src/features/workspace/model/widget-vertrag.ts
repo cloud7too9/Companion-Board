@@ -1,6 +1,6 @@
 /**
  * Größen-Vertrag zwischen Dashboard und Widget
- * (planung/bauplaene/Bauplan-Widget-Groessensystem.md).
+ * (docs/bauplaene/Bauplan-Widget-Groessensystem.md).
  *
  * Das Dashboard legt das Raster fest (32 Spalten, Reihen je Fläche), das
  * Widget seine Größenstufen. Im Vertrag stehen nur ganze Zellen – freies

@@ -1,5 +1,7 @@
 # Bauplan: Widget-Struktur
 
+> **Erledigt · Archiv** (gebaut in Phase A3). Was noch offen ist, steht in [`planung/`](../../planung/); Übersicht über das Archiv: [`docs/README.md`](../../docs/README.md).
+
 Stand: 01.10.2026 · Grundlage: Widget-Struktur · Setzt voraus: Bauplan-Widget-Groessensystem
 
 Dieser Bauplan beschreibt die technischen Entscheidungen. Die Anpassung an das konkrete Projekt gehört nicht dazu.

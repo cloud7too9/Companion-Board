@@ -1,5 +1,5 @@
 /**
- * Register aller Widget-Typen der Companion (planung/bauplaene/Bauplan-Widget-Inhalte.md).
+ * Register aller Widget-Typen der Companion (docs/bauplaene/Bauplan-Widget-Inhalte.md).
  * Typ-IDs bleiben stabil: Eine spätere Zusammenlegung (Kandidat „Einzeleintrag“)
  * darf gespeicherte Instanzen nicht brechen.
  *

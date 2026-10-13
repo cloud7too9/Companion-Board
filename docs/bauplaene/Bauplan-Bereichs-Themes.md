@@ -1,5 +1,7 @@
 # Bauplan: Bereichs-Themes
 
+> **Erledigt · Archiv** (gebaut in Phase A5, abgenommen mit H5 am 04.10.2026; die Themes für Sammelobjekte, Banner und Rüstung (E8) sind vertagt). Was noch offen ist, steht in [`planung/`](../../planung/); Übersicht über das Archiv: [`docs/README.md`](../../docs/README.md).
+
 Stand: 01.10.2026 · Grundlage: Bereichs-Themes · Setzt voraus: Bauplan-Widget-Struktur
 
 Dieser Bauplan beschreibt die technischen Entscheidungen. Die Anpassung an das konkrete Projekt gehört nicht dazu.

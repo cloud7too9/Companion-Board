@@ -1,5 +1,7 @@
 # Bauplan: Biome aus `.mcworld` – Bereich Karte
 
+> **Erledigt · Archiv** (Phasen 1–6 gebaut bis 01.10.2026, zusammen mit Strang C des Plans; offen ist nur der Import einer Realm-Welt am iPhone). Was noch offen ist, steht in [`planung/`](../../planung/); Übersicht über das Archiv: [`docs/README.md`](../../docs/README.md).
+
 > Für Claude Code · Repo `companion-orte` · Datei `companion-prototyp.html` · Stand 29.09.2026
 >
 > **Stand 01.10.2026:** Phasen 1–6 gebaut (Branch `bereich/karte-mcworld`, dann `bereich/karte-welt-upload` zusammen mit Strang C aus `../planung/PLAN.md`). Abweichungen: Upload als `.zip` aus der Dateien-App mit Aufbauprüfung und Anleitung (Strang C); der Worker schickt die Kacheln als Base64; der Mock erzeugt seine Biome (`demoBiome()`) statt Kacheln aus der Fixture-Welt; das Board speichert je Welt in `biome/<weltId>.json`. **Phase 1 ist an der Fixture-Welt von Max abgeschlossen** (Ergebnis bei Phase 1 in Kapitel 7). Offen bleibt die Realm-Welt am iPhone; die IDs von Cherry Grove, Pale Garden und Sulfur Caves sind seit 05.10.2026 aus Mojangs eigener Liste eingetragen (Kapitel 3.6).

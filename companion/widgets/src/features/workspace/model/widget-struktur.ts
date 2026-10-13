@@ -1,5 +1,5 @@
 /**
- * Widget-Struktur (planung/bauplaene/Bauplan-Widget-Struktur.md):
+ * Widget-Struktur (docs/bauplaene/Bauplan-Widget-Struktur.md):
  * Ein Bereich der Companion ist nur eine Überkategorie zum Sortieren – aufs
  * Dashboard kommen einzelne Inhalte, die Widget-Typen. Der Datentyp erzwingt
  * das: `WidgetInstanz.typ` verweist immer auf einen Widget-Typ, nie auf einen

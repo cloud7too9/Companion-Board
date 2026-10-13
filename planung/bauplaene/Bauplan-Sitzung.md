@@ -122,7 +122,7 @@ Technisch:
 - Server: `anzeigeLink` zeigt auf `/dashboard?anzeige=…&schluessel=…`; Auslieferung von `CLIENT_DIST` und die `/anzeige`-Weiche im `setNotFoundHandler` entfallen; Konsole und `anzeige-link.txt` nennen den Dashboard-Link. Lokal liefert der Server das Dashboard aus `companion/widgets/dist` wie heute; `npm run build` im Board baut dann das Dashboard statt des Clients.
 - `koordinaten-board/client/` wird nach H10 gelöscht (entschieden, Frage 5). CI-Job „Board installieren und bauen“ entsprechend angepasst.
 - Tests, die umgeschrieben werden: `server/test/api.test.js` (Pfad `/anzeige` → `/dashboard`, Nachricht `gezeigt` → Layout), Playwright `anzeige-link`, `anzeigeschema`, `board`, `live`, `netlify` (Selektoren `.a-*`/`.g-*` → Dashboard, „Aufs Board“ prüft das Sitzungs-Widget), `widgets-anordnen` (ohne `client/dist`).
-- Doku: `koordinaten-board/README.md`, `UEBERGABE.md`, `pi/ANLEITUNG.md` (Probe-Abschnitt), `netlify.toml`-Kommentar, `UMBAUPLAN.md` (Zielbild).
+- Doku: `koordinaten-board/README.md`, `UEBERGABE.md`, `pi/ANLEITUNG.md` (Probe-Abschnitt), `netlify.toml`-Kommentar, `docs/plaene/UMBAUPLAN.md` (Zielbild).
 - **Gebaut (S4, 13.10.2026), Abweichungen:**
   - `/anzeige` fällt nicht ersatzlos weg, sondern leitet mit Query per 301 auf `/dashboard/` um (Server und Netlify). So funktionieren gespeicherte Links und Lesezeichen am Fernseher weiter; das Dashboard merkt sich den Schlüssel unter demselben Namen wie die alte Anzeige.
   - `koordinaten-board/client/` ist schon im S4-PR gelöscht, in einem eigenen Commit („Alte Anzeige entfernt“), der sich bei Problemen in H10 einzeln zurücknehmen lässt. Ausgeliefert und gebaut wird die alte Anzeige ohnehin nirgends mehr.

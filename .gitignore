@@ -1,0 +1,2 @@
+# Caches, die Werkzeuge im Hauptordner anlegen (z. B. vitest), gehören nicht ins Repo
+node_modules/

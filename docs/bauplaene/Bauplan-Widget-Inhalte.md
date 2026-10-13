@@ -1,5 +1,7 @@
 # Bauplan: Widget-Inhalte (Register)
 
+> **Erledigt · Archiv** (gebaut in Phase A4, abgenommen mit H4 am 04.10.2026; Inhalte, die noch nicht beschrieben sind, stehen in der Warteliste, Kapitel 4). Was noch offen ist, steht in [`planung/`](../../planung/); Übersicht über das Archiv: [`docs/README.md`](../../docs/README.md).
+
 Stand: 01.10.2026 · Grundlage: Widget-Inhalte · Setzt voraus: Bauplan-Widget-Struktur
 
 Dieser Bauplan beschreibt die technischen Entscheidungen. Die Anpassung an das konkrete Projekt gehört nicht dazu.
