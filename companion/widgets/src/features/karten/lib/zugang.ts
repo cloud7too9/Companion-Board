@@ -1,7 +1,7 @@
 // Anzeige-Link: http://<board>:3000/dashboard?anzeige=<id>&schluessel=<schluessel>
-// Wie bei /anzeige (koordinaten-board/client/src/lib/zugang.ts) darf ein anderes Gerät im
-// Netz damit Anzeige sein. Der Browser merkt sich den Schlüssel unter demselben Namen –
-// beide Seiten laufen vom Board, teilen sich also den Speicher.
+// Damit darf ein anderes Gerät im Netz Anzeige sein. Der Browser merkt sich den Schlüssel unter
+// demselben Namen wie früher die alte Anzeige (/anzeige, bis Bauplan „Sitzung“ S4): ein Gerät, das
+// sie geöffnet hatte, landet über die Umleitung /anzeige → /dashboard/ ohne neuen Link im Dashboard.
 const SPEICHER = "anzeige.zugang";
 
 export interface Zugang {

@@ -6,7 +6,7 @@ import { useBoardStore } from "../karten/model/board.store";
 
 /**
  * Widgets, die die Anzeige selbst aus ihrem Zustand rendert (Bauplan „Sitzung“, S3) – ohne
- * Karte von GET /api/widgets. Sie ersetzen die Blöcke der alten Anzeige (/anzeige).
+ * Karte von GET /api/widgets. Sie haben die Blöcke der alten Anzeige ersetzt (/anzeige, bis S4).
  */
 const LOKALE_WIDGETS: Record<string, (p: { gross: boolean }) => JSX.Element> = {
   "karte.orte": ({ gross }) => <OrteWidget gross={gross} />,
