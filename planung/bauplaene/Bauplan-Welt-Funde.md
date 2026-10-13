@@ -2,7 +2,7 @@
 
 Stand: 13.10.2026 · Grundlage: Frage von Max („Was kann man aus dem .mcworld-Upload alles bekommen?“, 13.10.2026) und Auswertung der Testwelt `companion/tests/daten/fixture-seed.mcworld` · Setzt voraus: Welt-Import (Strang C, im Archiv: `docs/bauplaene/Bauplan-Welt-Import.md`, `docs/plaene/PLAN-welt-import-biome.md`)
 
-> **Status: W0 gebaut (13.10.2026), Rest Entwurf.** Auf Wunsch von Max kam zuerst W0: den Weltordner direkt wählen oder hineinziehen, nur die gebrauchten Dateien behalten. W1–W3 warten auf die fünf Fragen unter „Zu entscheiden“ am Ende.
+> **Status: W0 und W1 gebaut (13.10.2026), W2 und W3 Entwurf.** Auf Wunsch von Max kam zuerst W0: den Weltordner direkt wählen oder hineinziehen, nur die gebrauchten Dateien behalten. Danach W1 („mergen und weiter“, Max 13.10.2026): Die Funde werden gelesen, die Companion zeigt sie noch nicht. Für W1 gelten bei Frage 2 und 3 vorläufig die Vorschläge; Frage 1, 4 und 5 betreffen erst W2 und W3.
 
 Dieser Bauplan beschreibt die technischen Entscheidungen. Er baut auf dem auf, was im Repo liegt (Stand `main` vom 13.10.2026).
 
@@ -44,6 +44,21 @@ Max (13.10.2026): „Als erstes ein Upload-Feld, in das man den ganzen Ordner vo
 - **Mehrere Welten:** Wer gleich `minecraftWorlds` wählt, bekommt die Welten darin mit ihrem Namen aus `levelname.txt` zur Auswahl. Ein Ordner ohne `level.dat` und `db/CURRENT` ergibt „Darin ist keine Welt …“.
 - **Gleicher Leser:** `biom-welt.js` nimmt die Ordner-Liste wie eine ZIP (`ordnerAlsEintraege`); Aufbauprüfung, Streaming und Ergebnis sind dieselben. Tests: Ordner und ZIP liefern dieselben Kacheln, auch für die Testwelt von Max; Ablage mit 150 Dateien in `db/`; Playwright wählt Ordner (`setInputFiles` mit Verzeichnis), `minecraftWorlds` und zieht eine ZIP auf die Fläche.
 
+## W1: Funde lesen (gebaut 13.10.2026)
+
+- **Wo:** `companion/nbt.js` (NBT in Little Endian, auch für `level.dat` in `biom-dekoder.js`) und `companion/welt-funde.js` (`fundeSammler`). `biom-welt.js` reicht jeden LevelDB-Eintrag an den Sammler; `weltLesen` liefert `{ meta, kacheln, funde }`, der Worker schickt `funde` mit `fertig`. Die Seite legt sie in `wi.ergebnis.funde` ab, zeigt sie aber erst ab W2. `tools/welt-pruefen.mjs` druckt die Funde mit deutschen Namen.
+- **Testwelt von Max:** genau 6 Verliese und 1 vergrabener Schatz an den bekannten Koordinaten, Spieler bei X 0 · Y 74 · Z 0, Überleben, Normal. Streaming und „komplett“ finden dasselbe.
+- **Abweichungen vom Entwurf, beim Bauen entschieden:**
+  - **Verliese:** Ein Verlies hat genau einen Spawner. Je Spawner ein Ort, die Truhen gehören zum nächsten. In der Testwelt liegen zwei Verliese nur 16 Blöcke auseinander; mit verketteter Nähe wären es 5 statt 6 gewesen.
+  - **Spawner** zählen auch für andere Strukturen: Höhlenspinne → Mine, Silberfisch → Festung, Lohe → Netherfestung, Magmawürfel → Bastionsruine.
+  - **Portal-Paare** bildet erst die Seite in W2, mit `zielSuchen` aus `board-karten.js` (nichts doppelt pflegen). W1 liefert die Liste der Portale; `welt-pruefen.mjs` zeigt die Paare schon über dieselbe Funktion.
+  - **Lederfarbe** kommt als Hex-Wert (`lederfarbe`), die nächste Farbe aus `FARBEN` wählt W2. `welt-funde.js` hängt nicht an `regeln.js` (der Worker ist ein Modul); ein Test hält Kategorien, Muster, Farben, Rüstungen und Vorlagen mit `regeln.js` zusammen.
+  - **Rüstungsständer** werden auch Sets („Rüstungsständer bei X · Z“), wie im Abschnitt Aufbau vorgesehen.
+  - **Welt-Info** heißt `tage` (vergangene Tage, `Time` ÷ 24 000) statt `tag`.
+  - **Andere Spieler** (`player_…`) werden nur gezählt (Frage 2).
+  - **Kaputte Einträge** kosten nur ihren Fund; `fehler` zählt Einträge, deren letzter Stand nicht lesbar ist.
+- **Tests:** `companion/tests/welt-funde.test.mjs` (11): NBT-Leser (alle Typen, kaputte und zu tief verschachtelte Daten, `__proto__`), Testwelt von Max, die synthetische Fundewelt aus `welt-bauen.mjs` (`fundeweltBauen`: Strukturen, Löschen und Überschreiben in der `.log`, Lebewesen auch im alten Format, Portale, Spieler, Vorlagen, Rüstung, Banner, Welt-Info), Ordner = ZIP = „komplett“, Abgleich mit `regeln.js`. Playwright `karte-mcworld`: Der Worker liefert die Funde im DEMO und live vom Board.
+
 ## Was gelesen wird
 
 | Quelle in der Welt | Was daraus wird | In der Testwelt | Phase |
@@ -53,7 +68,7 @@ Max (13.10.2026): „Als erstes ein Upload-Feld, in das man den ganzen Ordner vo
 | Lore mit Truhe (Akteur `minecraft:chest_minecart`) mit Beute-Tabelle | **Ort** „Mineshaft“ | nein | W1 |
 | Seltsamer Kies und Sand (`BrushableBlock`) mit Beute-Tabelle | **Ort** „Trail Ruins“ oder „Desert Well“ / „Desert Temple“ | nein | W1 |
 | Tresor und Prüfungs-Spawner (`Vault`, `TrialSpawner`) | **Ort** „Trial Chamber“ | nein | W1 |
-| Global `portals` (Liste der Netherportale mit Position, Dimension, Ausrichtung) | **Portal-Verbindungen**, Paare über die Prüf-Logik der Portal-Verwaltung | nein | W1 |
+| Global `portals` (Liste der Netherportale mit Position, Dimension, Ausrichtung) | **Portal-Verbindungen**, Paare über die Prüf-Logik der Portal-Verwaltung (W2) | nein | W1 |
 | `~local_player`: Inventar, Endertruhe, Rüstung | **Sammelobjekte gefunden** (Schmiedevorlagen), **Rüstungs-Set** aus der getragenen Rüstung samt Besatz | ja (leer) | W1 |
 | Gegenstände in allen Behältern (`Items`) | **Sammelobjekte gefunden** | ja | W1 |
 | Banner (Block-Entity `Banner`, `Base`, `Patterns`) | **Banner** mit Grundfarbe und Mustern | nein | W1 |
@@ -121,8 +136,8 @@ Die Beute-Tabelle steht nur in **ungeöffneten** Behältern (`loot_tables/chests
 | Phase | Inhalt | Tests |
 |---|---|---|
 | **W0** Weltordner statt ZIP · **gebaut 13.10.2026** | Ordner wählen oder hineinziehen, nur gebrauchte Dateien, Auswahl bei mehreren Welten, ZIP bleibt als Rückweg | `node --test` (Ordner = ZIP, auch Testwelt von Max; Ablage rekursiv), Playwright `karte-mcworld`. ⏸ **H11:** Max wählt am iPhone den Weltordner (und probiert das Hineinziehen aus der Dateien-App) |
-| **W1** Funde lesen | `nbt.js`, `welt-funde.js`, Sammler im Durchlauf von `biom-welt.js`, Worker und `welt-pruefen.mjs` geben Funde aus. Truhen, Spawner, Loren, Kies, Tresore, Portale, Spieler, Behälter-Inhalte, Banner, Welt-Info | `node --test`: NBT-Leser; Testwelt ergibt genau 6 Verliese und 1 Schatz an den bekannten Koordinaten; `welt-bauen.mjs` baut synthetische Welten mit Portalen, Bannern, Rüstung und Vorlagen; unbekannte Beute-Tabelle wird gemeldet. ⏸ **H12:** Max lässt `welt-pruefen.mjs` (oder Claude mit seiner Datei) über seine echte Welt laufen und vergleicht die Liste mit dem Spiel |
-| **W2** Prüfliste und Übernehmen | Abschnitte in der Prüfliste, „schon bekannt“, Übernehmen über die API, `quelle:"welt"` und Welt-Info am Server, Welt-Info im Welt-Sheet | Playwright `karte-mcworld` (DEMO) und live gegen das Board: Funde erscheinen, schon bekannte sind ausgegraut, Übernehmen legt Orte, Verbindung, Sammelobjekt, Set und Banner an, zweiter Import legt nichts doppelt an. ⏸ **H13:** Max importiert am iPhone und schaut Prüfliste und Karte an |
+| **W1** Funde lesen · **gebaut 13.10.2026** | `nbt.js`, `welt-funde.js`, Sammler im Durchlauf von `biom-welt.js`, Worker und `welt-pruefen.mjs` geben Funde aus. Truhen, Spawner, Loren, Kies, Tresore, Portale, Spieler, Behälter-Inhalte, Banner, Rüstungsständer, Welt-Info | `node --test welt-funde.test.mjs`: NBT-Leser; Testwelt ergibt genau 6 Verliese und 1 Schatz an den bekannten Koordinaten; `fundeweltBauen` mit Portalen, Bannern, Rüstung und Vorlagen; unbekannte Beute-Tabelle wird gemeldet. ⏸ **H12:** Max lässt `welt-pruefen.mjs` (oder Claude mit seiner Datei) über seine echte Welt laufen und vergleicht die Liste mit dem Spiel |
+| **W2** Prüfliste und Übernehmen | Abschnitte in der Prüfliste, „schon bekannt“, Portal-Paare (`zielSuchen` aus `board-karten.js`), Lederfarbe → `FARBEN`, Übernehmen über die API, `quelle:"welt"` und Welt-Info am Server, Welt-Info im Welt-Sheet | Playwright `karte-mcworld` (DEMO) und live gegen das Board: Funde erscheinen, schon bekannte sind ausgegraut, Übernehmen legt Orte, Verbindung, Sammelobjekt, Set und Banner an, zweiter Import legt nichts doppelt an. ⏸ **H13:** Max importiert am iPhone und schaut Prüfliste und Karte an |
 | **W3** Strukturen ohne Truhe | Strukturbereiche (Tag 57), Dörfer, End-Transittore, Bild der Welt (je nach Frage 5) | wie W1, an einer Welt von Max mit diesen Strukturen |
 
 Jede Phase ein PR gegen `main`, gemergt nach Rückfrage. Branch: der Branch der Sitzung (`claude/…`), wie bei Bauplan „Sitzung“.
@@ -138,16 +153,16 @@ Jede Phase ein PR gegen `main`, gemergt nach Rückfrage. Branch: der Branch der 
 ## Zu entscheiden (Max)
 
 1. **Übernehmen:** Prüfliste mit Haken, alles Neue vorausgewählt (Vorschlag) – oder alles ohne Rückfrage übernehmen?
-2. **Spielerdaten:** Nur der eigene Spieler der Welt (`~local_player`, Vorschlag) – oder auch die anderen Spieler einer Mehrspieler-Welt? Deren Inventar und Position wären dann für alle am Board sichtbar, und welcher Account zu welchem Spieler gehört, steht nicht in der Welt.
-3. **Sammelobjekte:** Gefunden, sobald die Vorlage irgendwo in der Welt liegt, auch in einer Truhe (Vorschlag) – oder nur, wenn der Spieler sie bei sich oder in der Endertruhe hat?
+2. **Spielerdaten** (in W1 vorläufig nach Vorschlag)**:** Nur der eigene Spieler der Welt (`~local_player`, Vorschlag) – oder auch die anderen Spieler einer Mehrspieler-Welt? Deren Inventar und Position wären dann für alle am Board sichtbar, und welcher Account zu welchem Spieler gehört, steht nicht in der Welt. Nachtrag W1: In einer heruntergeladenen Realm-Welt steht vermutlich auch der eigene Spieler nicht als `~local_player`, sondern wie alle als `player_server_…`. Dann käme nach dem Vorschlag aus einer Realm-Welt gar keine Rüstung und kein Inventar. `welt-pruefen.mjs` zeigt „Andere Spieler: N“, H12 klärt es.
+3. **Sammelobjekte** (in W1 vorläufig nach Vorschlag)**:** Gefunden, sobald die Vorlage irgendwo in der Welt liegt, auch in einer Truhe (Vorschlag) – oder nur, wenn der Spieler sie bei sich oder in der Endertruhe hat?
 4. **Portal ohne Gegenstück:** Nur als Hinweis in der Prüfliste (Vorschlag) – oder als eigener Ort, damit man es auf der Karte sieht?
 5. **Bild der Welt:** `world_icon.jpeg` mit hochladen und als Bild der Welt in Companion und Dashboard zeigen (etwa 50–150 KB je Welt) – ja oder nein?
 
 ## Reihenfolge und Git
 
 1. ~~W0 Weltordner statt ZIP~~ gebaut 13.10.2026, ⏸ H11
-2. Fragen 1–5 beantworten
-3. W1 → Commits „NBT-Leser“, „Welt-Funde lesen“, „welt-pruefen zeigt Funde“, PR, ⏸ H12
+2. Fragen 1–5 beantworten (2 und 3 vorläufig nach Vorschlag gebaut, 1, 4 und 5 vor W2)
+3. ~~W1 Funde lesen~~ gebaut 13.10.2026, ⏸ H12
 4. W2 → Commits „Prüfliste mit Funden“, „Funde übernehmen“, „Welt-Info am Server“, PR, ⏸ H13
 5. W3 → PR
 6. Danach zieht der Bauplan ins Archiv (`docs/bauplaene/`).
