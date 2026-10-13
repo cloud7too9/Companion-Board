@@ -32,6 +32,8 @@
 
 | PR | Inhalt |
 |---|---|
+| #13 | Bauplan „Sitzung und eine Anzeige“ (abgenommen), Offline neu zugeschnitten (N5 hinfällig), Checkliste Pi/Cloudflare, Fix „Fertig“ in Anordnen |
+| #14 | S1 Sitzung am Server: `sitzung.js`, `companion/widget-groessen.mjs` gemeinsam für Server und Dashboard, „Aufs Board“ mit Quelle, `portale.verbindung` |
 | #12 | Umbau abgeschlossen: Netlify-Probe (H8) und Phase 6 abgehakt, Domain `mainhubv1.com` statt Platzhalter, Betrieb vom Laptop aus entfernt (E18: `netzwerk.js`, Adress-Lernen, Start- und Firewall-Skripte), Entscheidungen zu `/app/` (Prototyp = Hauptstand) und Anzeigegerät (offen) festgehalten, E20 (Startseite) neu auf der Warteliste |
 
 ### Vorige Runde (05./06.10.2026)
