@@ -269,22 +269,36 @@ let gezeigt = null;
  * Widget in die Sitzung der Anzeige (ohne anzeigeId: die erste); { art:"verbergen", instanzId } nimmt es weg.
  * Antwort ok { anfrage, instanzId }; live geht geaendert „layout“ mit anzeigeId an alle.
  */
-function sitzungBearbeiten(op, verbindung) {
+async function sitzungBearbeiten(op, verbindung) {
   const antwortFehler = (text) => senden(verbindung.socket, { art: 'fehler', text, anfrage: op.anfrage });
   try {
     const anzeigeId = typeof op.anzeigeId === 'string' && op.anzeigeId ? op.anzeigeId : daten.anzeigenListe()[0]?.id;
     if (!anzeigeId) return antwortFehler('Es gibt keine Anzeige');
     if (op.art === 'zeigen') {
-      const { instanz } = daten.sitzungHinzufuegen(anzeigeId, { quelle: op.quelle, nutzer: verbindung.nutzer });
+      const { instanz, neu } = daten.sitzungHinzufuegen(anzeigeId, { quelle: op.quelle, nutzer: verbindung.nutzer });
+      // Karte einmal bauen: Titel für die Liste am Handy, und bis S4 auch groß auf der alten Anzeige (gezeigt)
+      const { karte } = (await widgetKarte(daten, instanz.typ, instanz.quelle ?? '')) ?? { karte: null };
+      if (karte) {
+        if (neu || !instanz.titel) daten.sitzungen.titelSetzen(anzeigeId, instanz.id, karte.titel);
+        gezeigt = { id: instanz.id, ...karte, von: instanz.von, farbe: instanz.farbe, am: instanz.am };
+        anAlle({ art: 'gezeigt', karte: gezeigt });
+      }
       anAlle({ art: 'geaendert', bereich: 'layout', weltId: null, anzeigeId });
-      senden(verbindung.socket, { art: 'ok', anfrage: op.anfrage, instanzId: instanz.id });
+      senden(verbindung.socket, { art: 'ok', anfrage: op.anfrage, instanzId: instanz.id, titel: karte?.titel ?? instanz.titel });
     } else {
-      if (daten.sitzungEntfernen(anzeigeId, op.instanzId)) anAlle({ art: 'geaendert', bereich: 'layout', weltId: null, anzeigeId });
+      if (daten.sitzungEntfernen(anzeigeId, op.instanzId)) {
+        anAlle({ art: 'geaendert', bereich: 'layout', weltId: null, anzeigeId });
+        if (gezeigt?.id === op.instanzId) {
+          gezeigt = null;
+          anAlle({ art: 'gezeigt', karte: null });
+        }
+      }
       senden(verbindung.socket, { art: 'ok', anfrage: op.anfrage });
     }
   } catch (f) {
     if (f instanceof DatenFehler) return antwortFehler(f.message);
-    throw f;
+    console.error(f);
+    antwortFehler('Das Board konnte die Karte nicht bauen');
   }
 }
 
@@ -292,7 +306,7 @@ function sitzungBearbeiten(op, verbindung) {
 function zeigenBearbeiten(op, verbindung) {
   // Neuer Weg: Quelle statt fertiger Karte (zeigen) bzw. instanzId (verbergen)
   if ((op.art === 'zeigen' && typeof op.quelle === 'string') || (op.art === 'verbergen' && typeof op.instanzId === 'string')) {
-    sitzungBearbeiten(op, verbindung);
+    void sitzungBearbeiten(op, verbindung);
     return true;
   }
   if (op.art === 'zeigen') {

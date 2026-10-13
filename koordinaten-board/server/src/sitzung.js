@@ -21,7 +21,7 @@ export class Sitzungen {
   /** groessen: das Modul widget-groessen.mjs (WIDGET_GROESSEN, rechtecke, ersteFreieStelle, STANDARD_REIHEN) */
   constructor(groessen) {
     this.groessen = groessen;
-    this.je = new Map(); // anzeigeId → { instanzen: [{ id, typ, stufe, x, y, quelle?, von, farbe, am }], aktiv }
+    this.je = new Map(); // anzeigeId → { instanzen: [{ id, typ, stufe, x, y, quelle?, herkunft, titel, von, farbe, am }], aktiv }
   }
 
   von(anzeigeId) {
@@ -52,7 +52,7 @@ export class Sitzungen {
    * Dieselbe Quelle ein zweites Mal legt kein zweites Widget an (idempotent).
    * → { instanz, neu } oder { fehler }
    */
-  hinzufuegen(anzeigeId, { typ, quelle = '', von = '', farbe = '' }, reihen) {
+  hinzufuegen(anzeigeId, { typ, quelle = '', herkunft = '', von = '', farbe = '' }, reihen) {
     const s = this.von(anzeigeId);
     const da = s.instanzen.find((i) => i.typ === typ && (i.quelle ?? '') === quelle);
     if (da) {
@@ -66,11 +66,19 @@ export class Sitzungen {
     const instanz = {
       id: randomUUID(), typ, stufe: stelle.stufe, x: stelle.x, y: stelle.y,
       ...(quelle ? { quelle } : {}),
+      herkunft: herkunft || (quelle ? `${typ}:${quelle}` : typ),   // Quelle, wie die Companion sie nennt („portal:<id>“, „sammelstand“)
+      titel: '',                                                    // Titel der Karte, trägt der Server nach dem Bauen nach
       von, farbe, am: new Date().toISOString(),
     };
     s.instanzen.push(instanz);
     s.aktiv = true;
     return { instanz: kopie(instanz), neu: true };
+  }
+
+  /** Titel der Karte nachtragen (für die Liste „Auf der Anzeige“ am Handy) */
+  titelSetzen(anzeigeId, instanzId, titel) {
+    const i = this.von(anzeigeId).instanzen.find((x) => x.id === instanzId);
+    if (i) i.titel = String(titel ?? '').slice(0, 80);
   }
 
   /** „Wegnehmen“ – true, wenn es die Instanz gab */

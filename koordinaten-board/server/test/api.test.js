@@ -409,9 +409,12 @@ test('Aufs Board als Sitzungs-Widget (Bauplan Sitzung, S1): zeigen mit Quelle, L
   let a = await antwort(1);
   assert.equal(a.art, 'ok');
   assert.ok(typeof a.instanzId === 'string' && a.instanzId.length > 10, 'ok nennt die Instanz');
+  assert.equal(a.titel, 'Hof', 'ok nennt den Titel der Karte');
   let l = (await anfrage('GET', `/api/anzeige/layout${q}`)).daten.layout;
-  assert.deepEqual([l.aktiverLayer, l.layer[0].id, l.layer[0].instanzen.map((i) => [i.typ, i.quelle, i.x, i.y, i.von])],
-    ['sitzung', 'sitzung', [['portale.verbindung', portal.id, 0, 0, 'Max']]]);
+  assert.deepEqual([l.aktiverLayer, l.layer[0].id, l.layer[0].instanzen.map((i) => [i.typ, i.quelle, i.x, i.y, i.von, i.herkunft, i.titel])],
+    ['sitzung', 'sitzung', [['portale.verbindung', portal.id, 0, 0, 'Max', `portal:${portal.id}`, 'Hof']]]);
+  // Bis S4 liegt die Karte auch groß auf der alten Anzeige
+  assert.ok(nachrichten.some((n) => n.art === 'gezeigt' && n.karte?.titel === 'Hof' && n.karte.id === a.instanzId), 'gezeigt mit derselben Instanz-ID');
   assert.ok(nachrichten.some((n) => n.art === 'geaendert' && n.bereich === 'layout' && n.anzeigeId === board.id), 'geaendert layout mit Anzeige-ID');
   assert.equal((await anfrage('GET', `/api/widgets/portale.verbindung${q}&quelle=${portal.id}`)).daten.karte.titel, 'Hof', 'das Widget hat seine Karte');
   // Dieselbe Quelle noch einmal: dieselbe Instanz. Zweite Quelle: daneben.
@@ -429,10 +432,11 @@ test('Aufs Board als Sitzungs-Widget (Bauplan Sitzung, S1): zeigen mit Quelle, L
   ws.send(JSON.stringify({ art: 'zeigen', quelle: 'sammelstand', anzeigeId: 'a_999', anfrage: 6 }));
   assert.equal((await antwort(6)).text, 'Anzeige nicht gefunden');
   // Wegnehmen
-  ws.send(JSON.stringify({ art: 'verbergen', instanzId: a.instanzId, anfrage: 7 }));
+  ws.send(JSON.stringify({ art: 'verbergen', instanzId: b.instanzId, anfrage: 7 }));
   assert.equal((await antwort(7)).art, 'ok');
   l = (await anfrage('GET', `/api/anzeige/layout${q}`)).daten.layout;
-  assert.deepEqual(l.layer[0].instanzen.map((i) => i.typ), ['sammelobjekte.status']);
+  assert.deepEqual(l.layer[0].instanzen.map((i) => i.typ), ['portale.verbindung']);
+  assert.ok(nachrichten.some((n) => n.art === 'gezeigt' && n.karte === null), 'Wegnehmen der zuletzt gezeigten Karte räumt die alte Anzeige');
   // Der alte Weg (fertige Karte → gezeigt) läuft bis S4 weiter
   ws.send(JSON.stringify({ art: 'zeigen', karte: { titel: 'Alt', dimension: null, bloecke: [{ art: 'text', text: 'noch da' }] }, anfrage: 8 }));
   assert.equal((await antwort(8)).art, 'ok');

@@ -545,8 +545,12 @@ export class Daten {
     const a = this.anzeige(anzeigeId);
     const ziel = quelleZuWidget(quelle);
     if (!ziel) fehler(400, `Unbekannte Quelle „${quelle}“`);
-    if (ziel.quelle && !widgetQuellen(this, ziel.typ).quellen.some((q) => q.id === ziel.quelle)) fehler(404, 'Die Quelle gibt es nicht mehr');
-    const ergebnis = this.sitzungen.hinzufuegen(a.id, { typ: ziel.typ, quelle: ziel.quelle, von: nutzer?.name ?? '', farbe: nutzer?.farbe ?? '' }, a.reihen ?? null);
+    if (ziel.quelle && !widgetQuellen(this, ziel.typ).quellen.some((q) => q.id === ziel.quelle)) {
+      // Gibt es die Quelle in einer anderen Welt? Dann zeigt die Anzeige gerade nicht die Welt des Handys
+      const andereWelt = this.inhalt.instanzen.some((i) => i.id === ziel.quelle) || this.inhalt.portale.some((v) => v.id === ziel.quelle);
+      fehler(andereWelt ? 409 : 404, andereWelt ? 'Die Anzeige zeigt eine andere Welt. Unter Board → „Welt auf der Anzeige“ umstellen.' : 'Die Quelle gibt es nicht mehr');
+    }
+    const ergebnis = this.sitzungen.hinzufuegen(a.id, { typ: ziel.typ, quelle: ziel.quelle, herkunft: quelle, von: nutzer?.name ?? '', farbe: nutzer?.farbe ?? '' }, a.reihen ?? null);
     if (ergebnis.fehler) fehler(409, ergebnis.fehler);
     return ergebnis;
   }
