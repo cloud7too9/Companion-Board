@@ -4,7 +4,7 @@
   "description": "Karte, Sammelobjekte, Portale, Banner und Rüstung für unsere Minecraft-Welt – mit dem Koordinaten-Board im Zimmer",
   "lang": "de",
   "start_url": "./",
-  "scope": "./",
+  "scope": "../",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0d0f13",

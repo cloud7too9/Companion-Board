@@ -653,8 +653,10 @@ select.orte-eingabe { padding-right:34px;
 .sheet-fuss .btn-primary { flex:1; }
 .knopf-raster { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
 .anzeige-anordnen { width:100%; margin-bottom:8px; }
-.konto-liste { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
-.chip.konto { cursor:pointer; background:var(--surface-2); border-color:var(--border-soft); font-weight:600; }
+.konto-zeile { display:flex; align-items:center; gap:10px; }
+.konto-zeile .text { flex:1; min-width:0; }
+.konto-zeile .knopf-reihe { display:flex; gap:6px; flex:0 0 auto; }
+.konto-zeile .knopf-reihe button { min-height:36px; padding:6px 12px; }
 .knopf-raster button { display:flex; align-items:center; justify-content:center; gap:7px; min-height:44px; }
 .btn-primary, .btn-secondary, .btn-danger { min-height:44px; }
 
@@ -1022,17 +1024,13 @@ button.switch { padding:0; }
 .status-dot { flex:0 0 auto; }
 .status-dot.warte { background:#e8b444; box-shadow:0 0 8px #e8b444; }
 .status-dot.aus { background:var(--text-faint); box-shadow:none; }
-.scanner { position:relative; width:min(100%, 44vh); aspect-ratio:1; margin:0 auto; border-radius:18px; overflow:hidden;
-  background:#000; border:1px solid var(--border-soft); }
-.scanner video { width:100%; height:100%; object-fit:cover; display:block; }
-.scanner .rahmen { position:absolute; inset:17%; border-radius:16px; border:2px solid var(--accent);
-  box-shadow:0 0 0 999px rgba(0,0,0,.38), 0 0 18px var(--accent-soft); transition:inset .25s ease; }
-.scanner .scan-text { position:absolute; left:10px; right:10px; bottom:12px; text-align:center; font-size:12.5px; font-weight:600;
-  color:#fff; text-shadow:0 1px 4px rgba(0,0,0,.8); }
-.scanner.aus { background:var(--surface-2); }
-.scanner.aus .rahmen { box-shadow:none; border-style:dashed; border-color:var(--border); }
-.scanner.aus .scan-text { top:50%; bottom:auto; transform:translateY(-50%); color:var(--text-dim); text-shadow:none; padding:0 14%; }
-.scanner.erkannt .rahmen { inset:6%; background:var(--accent-soft); }
+/* Offline-Sperre (Bauplan „Anmeldung“): nach über 30 Minuten ohne Board fragt die Companion nach der PIN */
+.sperre { position:fixed; inset:0; z-index:200; display:flex; align-items:center; justify-content:center; padding:24px;
+  background:var(--bg); }
+.sperre-karte { width:min(100%, 360px); display:flex; flex-direction:column; gap:14px; text-align:center; }
+.sperre-karte h2 { margin:0; font-size:22px; }
+.sperre-karte p { margin:0; color:var(--text-dim); font-size:13.5px; line-height:1.45; }
+.sperre-karte input { text-align:center; font-size:22px; letter-spacing:.3em; }
 .board-zeilen { display:flex; flex-direction:column; gap:10px; }
 .board-zeile { display:flex; justify-content:space-between; gap:12px; font-size:13.5px; }
 .board-zeile span:first-child { color:var(--text-dim); }
@@ -1303,11 +1301,7 @@ const CONFIG = Object.freeze({
   zoomMax: 4,
   toastMs: 2600,
   weltGrenze: WELTGRENZE,  // Minecraft-Weltgrenze ±30 Mio. (regeln.js)
-  boardPort: 3000,       // Standard-Port des Koordinaten-Boards, falls von Hand ohne Port eingetragen
-  scanTaktMs: 220,       // Kamera-Bild so oft nach einem QR-Code absuchen
-  scanMaxPx: 720,        // Bild vor der Erkennung auf diese Kantenlänge verkleinern
-  // QR-Erkennung für Geräte ohne BarcodeDetector (iPhone, Desktop-Chrome); wird erst beim Scannen geladen
-  qrBibliothek: "https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js",
+  kontaktMerkenMs: 15000,  // letzten Kontakt zum Board höchstens so oft in den localStorage schreiben
 });
 
 /* ============================================================================
@@ -1462,10 +1456,16 @@ function koordinatenErkennen(text){
 /* ============================================================================
    4 · API-VERTRAG  ·  + DEMO-Mock
    ----------------------------------------------------------------------------
-   Live liefert das Koordinaten-Board die Companion selbst aus (http://<board>/).
-   Die Pfade liegen dann unter /api, angemeldet wird per Bearer-Token aus dem
-   Beitreten (Name + PIN, siehe 9f). Umsetzung: koordinaten-board/server/src/
-   companion-api.js + daten.js, geprüft mit denselben Regeln aus regeln.js.
+   Live kommt die Companion vom Board (lokal http://<board>/app/) oder von Netlify
+   (/app/, API unter konfig.js apiAdresse). Die Pfade liegen unter /api, angemeldet wird per
+   Bearer-Token von der Anmeldeseite (Konto + Passwort, danach PIN, siehe 9f):
+   GET    /ich         → { benutzer:{ id, anzeigename, echterName, farbe }, freigegeben, pinNoetig, grund }
+   GET    /konten      → { konten:[{ id, anzeigename, echterName, freigegebenAm, freigegebenVon }] }
+   POST   /konten/:id/freigeben → { konto }      DELETE /konten/:id → { ok:true } (nur wartende)
+   POST   /abmelden    → { ok:true }   (das Gerät vergisst das Board)
+   401 = nicht angemeldet, 423 = PIN nötig, 403 { error:"freigabe" } = Konto wartet → Anmeldeseite.
+   Umsetzung: koordinaten-board/server/src/companion-api.js + identitaet.js + daten.js,
+   geprüft mit denselben Regeln aus regeln.js.
    Nach jeder Änderung meldet das Board per WebSocket { art:"geaendert", bereich,
    weltId, nr, lauf } – die Companion lädt dann den Bereich neu (liveAktualisieren).
    Offline B3: Beim Verbinden kommt { art:"stand", lauf, nr }; nach einer Unterbrechung
@@ -1487,7 +1487,7 @@ function koordinatenErkennen(text){
     sonst Banner-Anleitung „Black Base“, „Cyan Bordure“ …; im DEMO-Modus antwortet der Mock /orte/auslesen)
    IDs neuer Einträge (Orte, Portale, Banner, Rüstungs-Sets) erzeugt das Handy: id = neueEintragId()
    (UUID, regeln.js). Der Server prüft sie (400) und lehnt doppelte ab (409); ohne id vergibt er eine.
-   Er speichert dazu erstellerId (stabile Benutzer-ID, bis zu den Accounts „unbekannt“).
+   Er speichert dazu erstellerId (stabile Benutzer-ID; Einträge alter oder gelöschter Konten „unbekannt“).
    Typen:  typ = { id, kategorie, variante|null }   instanz = { id, dimensionId, featureTypeId, x, y, z }
            Biome sind keine Instanzen mehr (instanzPruefen lehnt sie ab) – sie kommen aus dem Welt-Import.
 
@@ -1539,6 +1539,8 @@ const DEMO = {
 /** Adresse des Boards (API und WebSocket): aus konfig.js (Netlify, Umbau Phase 2), sonst der Server dieser Seite */
 const BOARD_ADRESSE = String(window.COMPANION_KONFIG?.apiAdresse || "").replace(/\/+$/, "") || location.origin;
 const API_BASIS = `${BOARD_ADRESSE}/api`;
+/** Anmeldeseite (Bauplan „Anmeldung“): eine Ebene über der Companion – auf Netlify und lokal „/“ */
+const ANMELDESEITE = new URL("../", location.href).href;
 /** "live", wenn das Board antwortet; "getrennt", wenn es nicht erreichbar ist, dieses Gerät aber schon beigetreten ist
     und den Spiegel hat (Offline B3: weiter live mit dem letzten Stand statt Beispieldaten); sonst (Datei, fremder
     Server, ?demo=1, nie beigetreten) "demo" mit dem Mock */
@@ -1946,6 +1948,13 @@ async function api(path, opts){
   let data = null;
   try { data = await res.json(); } catch {}
   if(res.status === 401) anmeldungAbgelaufen();
+  else if(res.status === 423){
+    // PIN nötig: offline schon entsperrt? Dann die PIN nachreichen und die Anfrage wiederholen, sonst zur Anmeldeseite
+    if(!opts.nachPin && await pinNachreichen()) return api(path, Object.assign({}, opts, { nachPin:true }));
+    zurAnmeldung();
+  }
+  else if(res.status === 403 && data?.error === "freigabe") zurAnmeldung();
+  if(res.ok) kontaktMerken();
   if(res.ok && spiegeln && data != null) spiegelSchreiben(path, data);
   return { ok:res.ok, status:res.status, data };
 }
@@ -2472,7 +2481,6 @@ const $sidebar = document.getElementById("sidebar");
 const X_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
 
 function sheetOeffnen(art, html, dim){
-  boardScanStoppen();
   st.sheet = art;
   $sheetInhalt.innerHTML = html;
   // Sheet in der Farbe „seiner“ Dimension (z. B. Detail eines Nether-Orts)
@@ -2482,7 +2490,6 @@ function sheetOeffnen(art, html, dim){
   $scrim.classList.add("show");
 }
 function alleSchliessen(){
-  boardScanStoppen();
   st.sheet = null;
   $sheet.classList.remove("open");
   $sidebar.classList.remove("open");
@@ -2946,7 +2953,7 @@ function profilKarteRendern(){
   const name = profilName();
   $p.innerHTML = `<span class="bild" aria-hidden="true">${PROFIL_PLATZHALTER}</span>
     <span class="text"><span class="kicker">Spieler</span><span class="name">${name ? esc(name) : "Nicht angemeldet"}</span>
-      <span class="card-meta">${name ? (bd.verbindung ? "Account auf dem Board" : "Demo-Modus") : "Beitreten unter „Board“"}</span></span>`;
+      <span class="card-meta">${name ? (bd.verbindung ? "Konto auf dem Board" : "Demo-Modus") : "Nicht angemeldet"}</span></span>`;
 }
 function sidebarBauen(aktiv){
   document.getElementById("sbNav").innerHTML = BEREICHE.map((b) => {
@@ -3768,18 +3775,18 @@ document.getElementById("portalNeuBtn").addEventListener("click", () => portalEd
 document.getElementById("portalWeltBtn").addEventListener("click", () => weltOeffnen());
 
 /* ============================================================================
-   9f · BOARD-VERBINDUNG  ·  QR-Code der Anzeige scannen, beitreten, live halten
+   9f · BOARD-VERBINDUNG  ·  angemeldet über die Anmeldeseite, live halten
    ----------------------------------------------------------------------------
-   Das Koordinaten-Board zeigt einen QR-Code mit „http://<ip>:<port>/?pin=123456“ (PIN: mindestens 6 Ziffern).
-   Die Companion liest ihn (Kamera, Foto oder von Hand), tritt mit Name + PIN
-   bei und hält danach die Live-Verbindung offen:
-     POST <board>/api/beitreten  { pin, name }  → { token, name }
-     WS   <board>/ws?token=…                    → { art:"zustand"|"teilnehmer", … }
-   Das Board ist ein eigenes Gerät: Die Verbindung ist auch im DEMO-Modus echt.
-   Sie gilt nur für dieses Gerät (localStorage „board.verbindung“, „board.name“).
-   Live-Betrieb (das Board liefert diese Seite aus): Beitreten ist die Anmeldung
-   für alle Daten. Das Board ist dann immer BOARD_ADRESSE (konfig.js, sonst location.origin) – ohne Scanner, die
-   PIN kommt aus dem QR-Code (?pin=…), den die Kamera-App geöffnet hat.
+   Angemeldet wird auf der Anmeldeseite unter / (Bauplan „Anmeldung und Dashboard-Zugang“):
+   Anzeigename + Passwort, danach die PIN. Sie legt das Token im localStorage ab
+   („board.verbindung“ { adresse, token, name }, gleicher Ursprung wie die Companion).
+   Ohne Token, bei 401 (Gerät unbekannt), 423 (PIN nötig) oder 403 (Konto wartet auf
+   Freigabe) geht es live dorthin zurück. Die Companion hält danach die Live-Verbindung offen:
+     WS   <board>/ws?token=…   → { art:"zustand"|"teilnehmer"|"geaendert"|"stand", … }
+   Schließt das Board sie mit 4001 (abgemeldet), 4023 (PIN nötig) oder 4030 (wartet),
+   geht es ebenfalls zur Anmeldeseite. Ohne Netz (Offline B3) zählt die Companion die
+   30 Minuten selbst („board.kontakt“) und prüft die PIN gegen den lokalen Hash
+   („board.pinLokal“, regeln.js pinLokalHashen). Im DEMO-Modus gibt es kein Board.
 
    „Aufs Board“ (Bauplan „Sitzung“, S2): Das Handy schickt nur die Quelle, das Board baut
    die Karte selbst und legt sie als Widget in die Sitzung der Anzeige (Layer „Sitzung“,
@@ -3803,257 +3810,156 @@ const bd = {
   status: "aus",                             // aus · verbindet · verbunden · getrennt
   teilnehmer: [], orte: null,
   socket: null, timer: null, wartezeit: 500,
-  scan: null,                                // { stream } solange die Kamera läuft
   sitzung: null,                             // { anzeigeId, instanzen:[{ id, typ, herkunft, titel, von, farbe }] } – Widgets von „Aufs Board“ (Bauplan Sitzung)
   einstellungen: null,                       // Live: { titel, qrZeigen, aktiveWelt, aktiv } der Anzeige
   anzeigen: null,                            // Live: Geräte mit Anzeige-Link [{ id, name, link }]
   anzeigeQr: null, anzeigeFrage: null, anzeigeUmbenennen: null,   // offener QR-Code, „Neuer Schlüssel?“, Umbenennen
   ich: null,                                 // Live: { id, anzeigename, rolle } aus IDENTITAET.werBistDu()
-  konten: [],                                // Beitreten: Accounts zum Auswählen [{ id, name }]
+  konten: null,                              // Live: alle Konten [{ id, anzeigename, echterName, freigegebenAm, freigegebenVon }]
+  kontoFrage: null,                          // „Wirklich ablehnen?“ für diese Konto-ID
+  kontaktGemerkt: 0,                         // zuletzt in „board.kontakt“ geschrieben (ms)
+  weg: false,                                // schon unterwegs zur Anmeldeseite
   offen: new Map(), zaehler: 0,              // gesendete Nachrichten, die auf „ok“ warten
 };
 const adresseKurz = (a) => String(a || "").replace(/^https?:\/\//, "");
 
-/** Inhalt des Board-QR-Codes lesen: „http://192.168.8.184:3000/?pin=123456“ → { adresse, pin } */
-function boardQrLesen(text){
-  let url;
-  try { url = new URL(String(text || "").trim()); } catch { return null; }
-  const pin = url.searchParams.get("pin") || "";
-  if(!/^https?:$/.test(url.protocol) || !/^\d{6,}$/.test(pin)) return null;
-  return { adresse:url.origin, pin };
-}
-/** Adresse von Hand: „192.168.8.184“ oder „192.168.8.184:3000“ → „http://192.168.8.184:3000“ */
-function boardAdresseLesen(text){
-  let t = String(text || "").trim().replace(/\/+$/, "");
-  if(!t) return null;
-  if(!/^https?:\/\//i.test(t)) t = "http://" + t;
-  let url;
-  try { url = new URL(t); } catch { return null; }
-  if(!url.port && url.protocol === "http:") url.port = String(CONFIG.boardPort);
-  return url.origin;
-}
-
-// --- QR-Erkennung: BarcodeDetector (Android-Chrome), sonst jsQR nachladen -----
-let qrLeserZusage = null;
-function skriptLaden(src){
-  return new Promise((ok, fehler) => {
-    const s = document.createElement("script");
-    s.src = src; s.onload = ok; s.onerror = () => { s.remove(); fehler(new Error("Skript nicht geladen")); };
-    document.head.appendChild(s);
-  });
-}
-/** Liefert eine Funktion (Video, Bild oder ImageBitmap) → Text des QR-Codes oder null */
-function qrLeser(){
-  if(!qrLeserZusage) qrLeserZusage = (async () => {
-    if("BarcodeDetector" in window){
-      try {
-        if((await BarcodeDetector.getSupportedFormats()).includes("qr_code")){
-          const d = new BarcodeDetector({ formats:["qr_code"] });
-          return async (quelle) => (await d.detect(quelle))[0]?.rawValue || null;
-        }
-      } catch {}
-    }
-    if(!window.jsQR) await skriptLaden(CONFIG.qrBibliothek);
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d", { willReadFrequently:true });
-    return async (quelle) => {
-      const w0 = quelle.videoWidth || quelle.width, h0 = quelle.videoHeight || quelle.height;
-      if(!w0 || !h0) return null;
-      const f = Math.min(1, CONFIG.scanMaxPx / Math.max(w0, h0));
-      const w = Math.round(w0 * f), h = Math.round(h0 * f);
-      canvas.width = w; canvas.height = h;
-      ctx.drawImage(quelle, 0, 0, w, h);
-      return window.jsQR(ctx.getImageData(0, 0, w, h).data, w, h)?.data || null;
-    };
-  })();
-  qrLeserZusage.catch(() => { qrLeserZusage = null; });  // nächster Versuch lädt neu
-  return qrLeserZusage;
-}
-
-// --- Kamera ------------------------------------------------------------------
-async function boardScanStarten(){
-  boardScanStoppen();
-  const $box = document.getElementById("boardScanner"), $text = document.getElementById("boardScanText");
-  const $video = document.getElementById("boardVideo");
-  if(!$box) return;
-  $box.classList.remove("aus", "erkannt");
-  const aus = (text) => { $box.classList.add("aus"); $text.textContent = text; };
-  if(!navigator.mediaDevices?.getUserMedia)
-    return aus(window.isSecureContext ? "Keine Kamera gefunden – Foto oder Adresse nutzen"
-                                      : "Kamera nur über https – Foto oder Adresse nutzen");
-  const scan = { stream:null };
-  bd.scan = scan;
-  $text.textContent = "Kamera startet …";
-  try {
-    scan.stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:"environment" }, audio:false });
-  } catch(e){
-    if(bd.scan !== scan) return;
-    bd.scan = null;
-    return aus(e?.name === "NotAllowedError" ? "Kamera nicht erlaubt – Foto oder Adresse nutzen"
-                                             : "Keine Kamera gefunden – Foto oder Adresse nutzen");
-  }
-  // Sheet inzwischen geschlossen → Kamera gleich wieder aus
-  if(bd.scan !== scan){ scan.stream.getTracks().forEach((t) => t.stop()); return; }
-  $video.srcObject = scan.stream;
-  try { await $video.play(); } catch {}
-  let lesen;
-  try { lesen = await qrLeser(); }
-  catch { boardScanStoppen(); return aus("QR-Erkennung nicht geladen – Foto oder Adresse nutzen"); }
-  if(bd.scan !== scan) return;
-  $text.textContent = "QR-Code der Anzeige in den Rahmen halten";
-  const runde = async () => {
-    if(bd.scan !== scan) return;
-    if($video.readyState >= 2){
-      const text = await lesen($video).catch(() => null);
-      if(bd.scan !== scan) return;
-      if(text && boardTreffer(text)) return;
-    }
-    setTimeout(runde, CONFIG.scanTaktMs);
-  };
-  runde();
-}
-function boardScanStoppen(){
-  const s = bd.scan; bd.scan = null;
-  s?.stream?.getTracks().forEach((t) => t.stop());
-}
-
-/** Gelesener QR-Text – true, wenn es der Code eines Boards war */
-function boardTreffer(text){
-  const qr = boardQrLesen(text);
-  const $text = document.getElementById("boardScanText");
-  if(!qr){
-    if(bd.scan && $text) $text.textContent = "Das ist kein QR-Code vom Board";
-    return false;
-  }
-  boardScanStoppen();
-  document.getElementById("boardScanner")?.classList.add("erkannt");
-  if($text) $text.textContent = "Erkannt";
-  document.getElementById("boardAdresse").value = adresseKurz(qr.adresse);
-  document.getElementById("boardPin").value = qr.pin;
-  banner(document.getElementById("boardBanner"), "ok", `QR-Code erkannt · ${adresseKurz(qr.adresse)}`);
-  boardKontenLaden(qr.adresse, qr.pin);
-  // Name und eigene PIN schon da → gleich beitreten, sonst ins fehlende Feld
-  const $name = document.getElementById("boardName"), $kontoPin = document.getElementById("boardKontoPin");
-  if($name.value.trim() && /^\d{4,8}$/.test($kontoPin.value)) boardBeitretenKlick();
-  else ($name.value.trim() ? $kontoPin : $name).focus();
-  return true;
-}
-async function boardFotoLesen(datei){
-  const $b = document.getElementById("boardBanner");
-  let text = null;
-  try {
-    const bild = await createImageBitmap(datei);
-    text = await (await qrLeser())(bild);
-    bild.close?.();
-  } catch { return banner($b, "bad", "Foto konnte nicht gelesen werden – Adresse und PIN von Hand eintragen."); }
-  if(!text) return banner($b, "bad", "Auf dem Foto ist kein QR-Code zu erkennen.");
-  if(!boardTreffer(text)) banner($b, "bad", "Das ist kein QR-Code vom Koordinaten-Board.");
-}
-
-// --- Identität (Strang B) --------------------------------------------------------
-/* Wer bin ich? Gekapselt hinter werBistDu(), damit später ein richtiges Login dahinter
-   stehen kann, ohne die Daten anzufassen – alle Einträge hängen an der Benutzer-ID
-   (erstellerId). Heute: Account + eigene PIN beim Beitreten, das Token ist der
-   Geräteschlüssel. Der Server prüft mit derselben Schnittstelle (identitaet.js). */
+// --- Identität ---------------------------------------------------------------
+/* Wer bin ich? Gekapselt hinter werBistDu(): Alle Einträge hängen an der Benutzer-ID
+   (erstellerId), nie am Namen. Der Server prüft mit derselben Schnittstelle (identitaet.js). */
 const IDENTITAET = Object.freeze({
-  /** → { id, anzeigename, rolle:"Besitzer" } oder null (nicht angemeldet, Account oder Gerät unbekannt) */
+  /** → { id, anzeigename, echterName, rolle:"Besitzer" } oder null (nicht angemeldet, PIN nötig, wartet auf Freigabe) */
   async werBistDu(){
     const r = await api("/ich");
-    return r.ok ? { id:r.data.id, anzeigename:r.data.name, rolle:"Besitzer" } : null;
+    if(!r.ok) return null;
+    // Altes Board (vor dem Pi-Update) antwortet noch mit { id, name }
+    const b = r.data.benutzer ?? { id:r.data.id, anzeigename:r.data.name };
+    if(r.data.pinNoetig || r.data.freigegeben === false){ zurAnmeldung(); return null; }
+    return { id:b.id, anzeigename:b.anzeigename, echterName:b.echterName ?? null, rolle:"Besitzer" };
   },
 });
 
-// --- Beitreten + Live-Verbindung -----------------------------------------------
-function boardNetzFehler(adresse){
-  if(location.protocol === "https:" && adresse.startsWith("http:"))
-    return "Der Browser blockiert die Verbindung: Die Companion läuft über https, das Board über http.";
-  return "Board nicht erreichbar – gleiches WLAN? Läuft das Board noch?";
+// --- Anmeldung: Anmeldeseite, PIN-Sperre ohne Netz -------------------------------------
+/** Zur Anmeldeseite (PIN, Freigabe oder neu anmelden); die zeigt, was fehlt */
+function zurAnmeldung(){
+  if(DEMO.enabled || bd.weg) return;
+  bd.weg = true;
+  boardSocketZu();
+  location.replace(ANMELDESEITE);
 }
-/** Beitreten (Strang B): Board-PIN, dann Account wählen oder anlegen – Name + eigene PIN.
-    Gibt es den Namen schon, meldet die PIN dort an; sonst entsteht ein neuer Account. */
-async function boardBeitreten(adresse, pin, name, kontoPin){
-  let res, data = null;
-  try {
-    res = await fetch(`${adresse}/api/beitreten`, { method:"POST",
-      headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ pin, name, kontoPin }) });
-    data = await res.json().catch(() => null);
-  } catch { return { fehler:boardNetzFehler(adresse) }; }
-  if(!res.ok) return { fehler:data?.fehler || `Fehler ${res.status}` };
-  return { verbindung:{ adresse, token:data.token, name:data.name }, neu:data.neu };
-}
-/** Accounts des Boards zum Auswählen (nur mit der Board-PIN) → Knöpfe über dem Namen */
-let boardPinTimer = null;
-async function boardKontenLaden(adresse, pin){
-  bd.konten = [];
-  try {
-    const res = await fetch(`${adresse}/api/beitreten/konten`, { method:"POST",
-      headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ pin }) });
-    if(res.ok) bd.konten = (await res.json()).konten || [];
-  } catch { /* Board nicht erreichbar – der Knopf „Beitreten“ meldet das */ }
-  const $l = document.getElementById("boardKonten");
-  if(!$l) return;
-  $l.innerHTML = bd.konten.map((k) => `<button class="chip konto" data-aktion="board-konto" data-name="${esc(k.name)}">${esc(k.name)}</button>`).join("");
-  $l.hidden = !bd.konten.length;
-  boardKontoHinweis();
-}
-/** Unter dem Namen: Anmelden bei einem bestehenden Account oder neuen anlegen? */
-function boardKontoHinweis(){
-  const $h = document.getElementById("boardKontoHinweis"), name = document.getElementById("boardName")?.value.trim() || "";
-  if(!$h) return;
-  const konto = (bd.konten || []).find((k) => k.name.toLocaleLowerCase("de") === name.toLocaleLowerCase("de"));
-  $h.textContent = !name ? "" : konto ? `Anmelden als ${konto.name} – mit deiner PIN` : `Neuer Account „${name}“ – wähl dir eine PIN`;
-}
-function boardKontoHtml(name){
-  return `<div class="field-group"><div class="field-group-label">Wer bist du?</div>
-      <div class="konto-liste" id="boardKonten" hidden></div>
-      <input class="orte-eingabe" id="boardName" maxlength="24" autocomplete="username" placeholder="Name, z. B. Max" value="${esc(name)}">
-      <div class="result-hint" id="boardKontoHinweis"></div></div>
-    <div class="field-group"><div class="field-group-label">Deine PIN</div>
-      <input class="orte-eingabe mono" id="boardKontoPin" type="password" inputmode="numeric" maxlength="8" autocomplete="current-password" placeholder="4 bis 8 Ziffern">
-      <div class="result-hint">Deine eigene PIN – damit meldest du dich auch auf einem neuen Handy an. Das Board speichert sie nicht im Klartext.</div></div>`;
-}
-async function boardBeitretenKlick(){
-  const $b = document.getElementById("boardBanner"), $knopf = $sheet.querySelector('[data-aktion="board-beitreten"]');
-  const roh = document.getElementById("boardAdresse").value;
-  const ausQr = boardQrLesen(roh);
-  const adresse = ausQr?.adresse || boardAdresseLesen(roh);
-  const pin = document.getElementById("boardPin").value.trim() || ausQr?.pin || "";
-  const name = document.getElementById("boardName").value.trim();
-  const kontoPin = document.getElementById("boardKontoPin").value.trim();
-  if(!adresse) return banner($b, "bad", "Adresse fehlt – QR-Code scannen oder eintragen.");
-  if(!/^\d{6,}$/.test(pin)) return banner($b, "bad", "Die PIN hat mindestens 6 Ziffern und steht auf der Anzeige.");
-  if(!name) return banner($b, "bad", "Wie heißt du? Der Name steht auf dem Board bei deinen Einträgen.");
-  if(!/^\d{4,8}$/.test(kontoPin)) return banner($b, "bad", "Deine eigene PIN hat 4 bis 8 Ziffern – damit meldest du dich auch auf neuen Geräten an.");
-  lsSchreiben("board.name", name);
-  $knopf.disabled = true; $knopf.textContent = "Verbinde …";
-  const r = await boardBeitreten(adresse, pin, name, kontoPin);
-  const offen = st.sheet === "board" && $knopf.isConnected;   // Sheet evtl. schon zu
-  if(r.fehler){
-    if(!offen) return;
-    $knopf.disabled = false; $knopf.textContent = "Beitreten";
-    return banner($b, "bad", r.fehler);
-  }
-  bd.verbindung = r.verbindung; lsSchreiben("board.verbindung", r.verbindung);
-  if(!DEMO.enabled){
-    // PIN nicht in der Adresszeile stehen lassen; Sheet zu, bevor die Verbindung es neu zeichnen würde
-    const q = new URLSearchParams(location.search); q.delete("pin");
-    history.replaceState(null, "", location.pathname + (q.toString() ? `?${q}` : ""));
-    alleSchliessen();
-    boardVerbinden();
-    toast(r.neu ? `Account „${r.verbindung.name}“ angelegt – willkommen` : `Willkommen, ${r.verbindung.name}`);
-    return datenStarten();
-  }
-  boardVerbinden();
-  if(offen) boardSheetRendern();
-  toast("Mit dem Board verbunden");
-}
-
-/** Live: Token abgelehnt (Board neu eingerichtet, Gerät gesperrt, Token von vor den Accounts) → neu beitreten */
+/** Live: Token abgelehnt (Gerät abgemeldet oder abgelehnt, Board neu eingerichtet) → nichts behalten, neu anmelden */
 function anmeldungAbgelaufen(){
   if(DEMO.enabled || !bd.verbindung) return;
   boardTrennen();
-  toast("Bitte neu anmelden – Name und deine PIN", true);
-  boardSheetRendern();
+  zurAnmeldung();
+}
+/** Kontakt zum Board: zählt die 30 Minuten der Offline-Sperre (höchstens alle 15 s in den localStorage) */
+function kontaktMerken(){
+  const t = Date.now();
+  if(t - bd.kontaktGemerkt < CONFIG.kontaktMerkenMs) return;
+  bd.kontaktGemerkt = t;
+  lsSchreiben("board.kontakt", t);
+}
+// Solange die Live-Verbindung steht, läuft kein Timer (am Server zählt das Pong, hier dieser Takt)
+setInterval(() => { if(bd.status === "verbunden") kontaktMerken(); }, 60000);
+
+/* Ohne Netz zählt die Companion die Zeit selbst: nach über OFFLINE_MINUTEN.konto ohne Kontakt sperrt sie sich und
+   prüft die PIN gegen den lokalen Hash. Online entscheidet das Board (423 → Anmeldeseite). Die offline eingegebene PIN
+   bleibt im Speicher und wird nachgereicht, sobald das Board wieder antwortet – dann fragt es nicht ein zweites Mal. */
+const sperre = { pin:null, offen:false, nachreichen:null };
+const offlineAbgelaufen = () => Date.now() - (Number(lsLesen("board.kontakt")) || 0) > OFFLINE_MINUTEN.konto * 60000;
+/** → Promise, die erst nach der richtigen PIN erfüllt ist (ohne lokalen Hash: erst mit dem Board) */
+function offlineSperre(){
+  if(sperre.offen) return sperre.offen;
+  const hash = lsLesen("board.pinLokal");
+  const name = bd.verbindung?.name || "";
+  const passt = hash && hash.salz && globalThis.crypto?.subtle;
+  const $s = document.createElement("div");
+  $s.className = "sperre"; $s.id = "offlineSperre";
+  $s.innerHTML = `<form class="sperre-karte" novalidate>
+      <h2>Hallo${name ? `, ${esc(name)}` : ""}</h2>
+      <p>Seit über ${OFFLINE_MINUTEN.konto} Minuten ohne Verbindung zum Board. ${passt ? "Bitte bestätige mit deiner PIN." : "Ohne Verbindung lässt sich die Companion nur mit einer PIN entsperren, die auf diesem Gerät schon einmal eingegeben wurde."}</p>
+      ${passt ? `<input class="orte-eingabe mono" id="sperrePin" type="password" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="PIN">
+      <div class="banner" id="sperreMeldung" hidden></div>
+      <button class="btn-primary" type="submit">Entsperren</button>` : ""}
+      <button class="btn-secondary" type="button" data-sperre="neu">Erneut verbinden</button>
+    </form>`;
+  document.body.appendChild($s);
+  sperre.offen = new Promise((fertig) => {
+    $s.querySelector('[data-sperre="neu"]').addEventListener("click", () => location.reload());
+    $s.querySelector("form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const pin = $s.querySelector("#sperrePin").value.trim();
+      if(KONTO_PIN.test(pin) && await pinLokalPasst(pin, hash)){
+        sperre.pin = pin; sperre.offen = null;
+        bd.kontaktGemerkt = 0; kontaktMerken();
+        $s.remove();
+        return fertig();
+      }
+      $s.querySelector("#sperrePin").value = "";
+      banner($s.querySelector("#sperreMeldung"), "bad", `Falsche PIN für ${name}`);
+    });
+    $s.querySelector("#sperrePin")?.focus();
+  });
+  return sperre.offen;
+}
+/** Offline und zu lange ohne Kontakt? Dann sperren (beim Start, beim Zurückkehren in die App, jede Minute) */
+function offlinePruefen(){
+  if(!DEMO.enabled && bd.verbindung && bd.status !== "verbunden" && offlineAbgelaufen()) return offlineSperre();
+}
+setInterval(offlinePruefen, 60000);
+/** PIN aus der Offline-Sperre ans Board → true, wenn es sie angenommen hat (einmal gleichzeitig) */
+function pinNachreichen(){
+  if(!sperre.pin || !bd.verbindung) return Promise.resolve(false);
+  return sperre.nachreichen ??= (async () => {
+    try {
+      const res = await fetch(`${API_BASIS}/pin`, { method:"POST", headers:{ "Content-Type":"application/json", ...authHeaders() },
+        body:JSON.stringify({ pin:sperre.pin }) });
+      if(res.ok) kontaktMerken();
+      return res.ok;
+    } catch { return false; }
+    finally { sperre.pin = null; sperre.nachreichen = null; }
+  })();
+}
+
+// --- Konten: Freigabe neuer Konten im Board-Sheet (L19, ⚠ AN14) ------------------
+async function boardKontenLaden(){
+  if(DEMO.enabled || !bd.verbindung) return;
+  const r = await api("/konten");
+  if(r.ok){ bd.konten = r.data.konten; boardAnzeigen(); }
+}
+function boardKontenHtml(){
+  if(DEMO.enabled || !bd.konten) return "";
+  const wartend = bd.konten.filter((k) => !k.freigegebenAm), frei = bd.konten.filter((k) => k.freigegebenAm);
+  const zeile = (k, knoepfe) => `<div class="card konto-zeile" data-konto="${esc(k.id)}">
+      <span class="text"><span class="card-title">${esc(k.anzeigename)}</span>
+        <span class="card-meta" style="display:block">${esc(k.echterName || "")}${k.freigegebenVon ? ` · freigegeben von ${esc(k.freigegebenVon)}` : ""}</span></span>
+      ${knoepfe}</div>`;
+  return `<div class="field-group"><div class="field-group-label">Konten</div>
+    ${wartend.length ? `<div class="list-stack">${wartend.map((k) => zeile(k, `<span class="knopf-reihe">
+        <button class="btn-primary" data-aktion="konto-freigeben" data-id="${esc(k.id)}">Freigeben</button>
+        <button class="btn-secondary" data-aktion="konto-ablehnen" data-id="${esc(k.id)}">${bd.kontoFrage === k.id ? "Wirklich?" : "Ablehnen"}</button></span>`)).join("")}</div>
+      <div class="result-hint">${wartend.length === 1 ? "Ein neues Konto wartet" : `${wartend.length} neue Konten warten`} auf Freigabe. Erst danach kommen sie in die Companion.</div>` : ""}
+    <div class="list-stack">${frei.map((k) => zeile(k, "")).join("")}</div>
+  </div>`;
+}
+async function kontoFreigeben(id){
+  const r = await api(`/konten/${encodeURIComponent(id)}/freigeben`, { method:"POST" });
+  if(!r.ok) return toast(meldungAus(r), true);
+  toast(`${r.data.konto.anzeigename} ist freigegeben`);
+  boardKontenLaden();
+}
+async function kontoAblehnen(id){
+  bd.kontoFrage = null;
+  const r = await api(`/konten/${encodeURIComponent(id)}`, { method:"DELETE" });
+  if(!r.ok) return toast(meldungAus(r), true);
+  toast("Konto abgelehnt");
+  boardKontenLaden();
+}
+/** Auf diesem Gerät abmelden: das Board vergisst das Gerät, hier bleibt nichts vom Konto */
+async function boardAbmelden(){
+  if(!DEMO.enabled && bd.verbindung) await api("/abmelden", { method:"POST" }).catch(() => {});
+  boardTrennen();
+  zurAnmeldung();
 }
 
 /** Live: Ein Handy hat etwas geändert (auch dieses) → nur den betroffenen Bereich neu laden */
@@ -4064,6 +3970,7 @@ async function liveAktualisieren({ bereich, weltId }){
   if(bereich === "einstellungen") return boardEinstellungenLaden();
   if(bereich === "anzeigen"){ await boardAnzeigenLaden(); return boardSitzungLaden(); }   // Liste frisch, danach die Sitzung der ersten Anzeige
   if(bereich === "layout") return boardSitzungLaden();
+  if(bereich === "konten") return bd.konten ? boardKontenLaden() : undefined;
   if(bereich === "welten"){ await weltenAuffrischen(); return boardEinstellungenLaden(); }
   if(weltId && weltId !== st.weltId) return weltenAuffrischen();
   if(bereich === "orte") return orteAuffrischen();
@@ -4119,9 +4026,10 @@ function boardVerbinden(){
   try { ws = new WebSocket(`${v.adresse.replace(/^http/, "ws")}/ws?token=${encodeURIComponent(v.token)}`); }
   catch { bd.status = "getrennt"; boardAnzeigen(); return; }   // z. B. ws:// von einer https-Seite
   bd.socket = ws;
-  ws.onopen = () => { if(bd.socket !== ws) return; bd.status = "verbunden"; bd.wartezeit = 500; boardAnzeigen(); };
+  ws.onopen = () => { if(bd.socket !== ws) return; bd.status = "verbunden"; bd.wartezeit = 500; kontaktMerken(); boardAnzeigen(); };
   ws.onmessage = (e) => {
     let n; try { n = JSON.parse(e.data); } catch { return; }
+    kontaktMerken();
     if((n.art === "ok" || n.art === "fehler") && n.anfrage){
       const w = bd.offen.get(n.anfrage); bd.offen.delete(n.anfrage);
       return n.art === "ok" ? w?.ok() : w?.fehler(n.text || "Board hat abgelehnt");
@@ -4140,11 +4048,11 @@ function boardVerbinden(){
     if(bd.socket !== ws) return;             // absichtlich geschlossen oder ersetzt
     bd.socket = null;
     boardOffeneAbbrechen();
-    if(e.code === 4001){                     // Token abgelehnt, z. B. Board neu eingerichtet
-      if(!DEMO.enabled) return anmeldungAbgelaufen();
-      boardTrennen();
-      return toast("Das Board kennt dieses Gerät nicht mehr – bitte neu scannen", true);
+    if(e.code === 4001) return anmeldungAbgelaufen();   // Token abgelehnt: abgemeldet, abgelehnt, Board neu eingerichtet
+    if(e.code === 4023){                     // PIN nötig: offline schon entsperrt → nachreichen, sonst Anmeldeseite
+      return pinNachreichen().then((ok) => ok ? boardVerbinden() : zurAnmeldung());
     }
+    if(e.code === 4030) return zurAnmeldung();   // Konto wartet auf Freigabe
     bd.status = "getrennt"; boardAnzeigen();
     bd.timer = setTimeout(boardVerbinden, bd.wartezeit);
     bd.wartezeit = Math.min(bd.wartezeit * 2, 8000);
@@ -4244,8 +4152,8 @@ function boardZeigenKnoepfe(){
 function boardTrennen(){
   boardSocketZu();
   Object.assign(bd, { verbindung:null, status:"aus", teilnehmer:[], orte:null, sitzung:null, anzeigen:null, einstellungen:null, wartezeit:500, warVerbunden:false });
-  lsSchreiben("board.verbindung", null);
-  lsSchreiben("board.stand", null); spiegelLeeren();   // Offline B3: nichts vom Board bleibt auf dem Gerät
+  for(const k of ["board.verbindung", "board.stand", "board.pinLokal", "board.kontakt"]) lsSchreiben(k, null);
+  spiegelLeeren();   // Offline B3: nichts vom Board bleibt auf dem Gerät
   Object.assign(SPIEGEL, { aus:false, seit:null, gemeldet:false });
   boardAnzeigen();
 }
@@ -4282,6 +4190,7 @@ function boardOeffnen(){
   boardSheetRendern();
   boardEinstellungenLaden();
   boardAnzeigenLaden();
+  boardKontenLaden();
 }
 
 // --- Live: Einstellungen der Anzeige im Zimmer (aktive Welt, Titel, QR-Code) ------
@@ -4378,6 +4287,7 @@ function boardSheetRendern(){
       </div>
       ${boardEinstellungenHtml()}
       ${boardAnzeigenHtml()}
+      ${boardKontenHtml()}
       <div class="field-group"><div class="field-group-label">Auf der Anzeige</div>
         ${bd.sitzung?.instanzen.length ? `<div class="list-stack">${bd.sitzung.instanzen.map((i) => `<div class="card board-gezeigt" style="flex-direction:row" data-instanz="${esc(i.id)}">
             <span class="text"><span class="card-title">${esc(i.titel || BOARD_KARTEN[(i.herkunft || "").split(":")[0]]?.titel || i.typ)}</span>
@@ -4388,56 +4298,23 @@ function boardSheetRendern(){
           : `<div class="banner info">Gerade liegt nichts auf dem Board. Im Detail eines Ortes, Sammelobjekts, Portals oder Banners „Aufs Board“ antippen.</div>`}
       </div>
       <div class="sheet-fuss">
-        <button class="btn-secondary" data-aktion="board-trennen">${DEMO.enabled ? "Trennen" : "Abmelden"}</button>
+        <button class="btn-secondary" data-aktion="board-abmelden">Abmelden</button>
         <button class="btn-primary" data-aktion="schliessen">Fertig</button>
       </div>
     </div>`);
     return;
   }
-  const name = lsLesen("board.name") || (DEMO.enabled ? MOCK.ich : "");
-  if(!DEMO.enabled){
-    const pin = new URLSearchParams(location.search).get("pin") || "";
-    sheetOeffnen("board", kopfHtml("Beitreten", `Koordinaten-Board · ${esc(adresseKurz(BOARD_ADRESSE))}`) + `<div class="orte-inhalt">
-      <div class="banner info">Alle im Raum sehen dieselben Orte, Sammelobjekte, Portale und Banner. Die PIN steht auf der Anzeige unter dem QR-Code.</div>
-      <div class="banner" id="boardBanner" hidden></div>
-      <input type="hidden" id="boardAdresse" value="${esc(BOARD_ADRESSE)}">
-      <div class="field-group"><div class="field-group-label">PIN</div>
-        <input class="orte-eingabe mono" id="boardPin" inputmode="numeric" maxlength="8" autocomplete="one-time-code" placeholder="123456" value="${esc(pin)}"></div>
-      ${boardKontoHtml(name)}
-      <div class="sheet-fuss"><button class="btn-primary" data-aktion="board-beitreten">Beitreten</button></div>
-    </div>`);
-    document.getElementById(pin ? "boardName" : "boardPin").focus();
-    if(/^\d{6,}$/.test(pin)) boardKontenLaden(BOARD_ADRESSE, pin);
-    boardKontoHinweis();
-    return;
-  }
-  sheetOeffnen("board", kopfHtml("Mit Board verbinden", "QR-Code auf der Anzeige im Zimmer scannen") + `<div class="orte-inhalt">
-    <div class="scanner" id="boardScanner">
-      <video id="boardVideo" playsinline muted></video>
-      <div class="rahmen"></div>
-      <div class="scan-text" id="boardScanText"></div>
-    </div>
-    <div class="knopf-raster">
-      <button class="btn-secondary" data-aktion="board-foto">Foto vom QR-Code</button>
-      <button class="btn-secondary" data-aktion="board-kamera">Kamera neu starten</button>
-    </div>
-    <input type="file" accept="image/*" id="boardFoto" hidden>
-    <div class="banner" id="boardBanner" hidden></div>
-    <div class="field-group"><div class="field-group-label">Oder von Hand – steht unter dem QR-Code</div>
-      <div class="field-grid" style="grid-template-columns:2fr 1fr">
-        <label class="field"><span class="field-label">Adresse</span>
-          <input id="boardAdresse" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="192.168.8.184:3000"></label>
-        <label class="field"><span class="field-label">PIN</span>
-          <input id="boardPin" type="text" inputmode="numeric" maxlength="8" autocomplete="one-time-code" placeholder="123456"></label>
-      </div></div>
-    ${boardKontoHtml(name)}
-    <div class="sheet-fuss"><button class="btn-primary" data-aktion="board-beitreten">Beitreten</button></div>
+  // Ohne Verbindung gibt es das Sheet nur im DEMO-Modus: live führt init() vorher zur Anmeldeseite
+  sheetOeffnen("board", kopfHtml("Board", "Demo-Modus") + `<div class="orte-inhalt">
+    <div class="banner info">Die Companion zeigt Beispieldaten, nichts davon geht an ein Board. Mit einem Board verbindet sie sich, wenn sie vom Board kommt: Anmeldeseite öffnen, mit Anzeigename und Passwort anmelden.</div>
+    <div class="sheet-fuss"><button class="btn-primary" data-aktion="schliessen">Fertig</button></div>
   </div>`);
-  boardScanStarten();
 }
-// Handy aus dem Standby zurück → sofort neu verbinden statt den Backoff abzuwarten
+// Handy aus dem Standby zurück → sofort neu verbinden statt den Backoff abzuwarten; offline zu lange weg → PIN
 document.addEventListener("visibilitychange", () => {
-  if(document.visibilityState === "visible" && bd.verbindung && !bd.socket){ bd.wartezeit = 500; boardVerbinden(); }
+  if(document.visibilityState !== "visible") return;
+  offlinePruefen();
+  if(bd.verbindung && !bd.socket){ bd.wartezeit = 500; boardVerbinden(); }
 });
 
 /* ============================================================================
@@ -5657,14 +5534,12 @@ $sheet.addEventListener("click", async (e) => {
       if(a.dataset.sicher !== "1"){ a.dataset.sicher = "1"; a.textContent = "Wirklich löschen?"; return; }
       ruestungLoeschen(id); break;
     case "zum-sammelobjekt": samDetailOeffnen(id); break;
-    // Board-Verbindung
-    case "board-beitreten": boardBeitretenKlick(); break;
-    case "board-kamera": boardScanStarten(); break;
-    case "board-foto": document.getElementById("boardFoto").click(); break;
-    case "board-trennen":
-      boardTrennen();
-      if(!DEMO.enabled) return location.replace(location.pathname);   // abgemeldet → neu beitreten
-      alleSchliessen(); toast("Vom Board getrennt"); break;
+    // Board-Verbindung, Konten
+    case "board-abmelden": boardAbmelden(); break;
+    case "konto-freigeben": kontoFreigeben(id); break;
+    case "konto-ablehnen":
+      if(bd.kontoFrage !== id){ bd.kontoFrage = id; boardSheetRendern(); break; }
+      kontoAblehnen(id); break;
     case "board-zeigen": boardZeigen(a.dataset.boardQuelle); break;
     case "board-qr": boardEinstellungenAendern({ qrZeigen:!bd.einstellungen?.qrZeigen }); break;
     case "anheften": {
@@ -5682,13 +5557,6 @@ $sheet.addEventListener("click", async (e) => {
     case "anzeige-kopieren": {
       const anz = bd.anzeigen?.find((x) => x.id === id); if(!anz) break;
       try { await kopieren(anz.link); toast("Anzeige-Link kopiert"); } catch { toast("Kopieren nicht möglich", true); }
-      break;
-    }
-    case "board-konto": {
-      // Account gewählt → Name übernehmen, weiter mit der eigenen PIN
-      document.getElementById("boardName").value = a.dataset.name;
-      boardKontoHinweis();
-      document.getElementById("boardKontoPin").focus();
       break;
     }
     case "anzeige-anordnen":
@@ -5733,23 +5601,6 @@ $sheet.addEventListener("input", (e) => {
     return;
   }
   if(t.id === "formNeu"){ form.neu = t.value; return; }
-  if(t.id === "boardPin"){
-    t.value = t.value.replace(/\D/g, "").slice(0, 8);
-    // Mit vollständiger Board-PIN (mindestens 6 Ziffern) die Accounts zum Auswählen holen – kurz warten,
-    // falls die PIN länger ist, sonst zählte jede Zwischenstufe als Fehlversuch (Sperre)
-    const adresse = DEMO.enabled ? (boardQrLesen(document.getElementById("boardAdresse").value)?.adresse || boardAdresseLesen(document.getElementById("boardAdresse").value)) : BOARD_ADRESSE;
-    clearTimeout(boardPinTimer);
-    if(t.value.length >= 6 && adresse) boardPinTimer = setTimeout(() => boardKontenLaden(adresse, t.value), 500);
-    return;
-  }
-  if(t.id === "boardKontoPin"){ t.value = t.value.replace(/\D/g, "").slice(0, 8); return; }
-  if(t.id === "boardName"){ boardKontoHinweis(); return; }
-  if(t.id === "boardAdresse"){
-    // Ganze Beitritts-Adresse eingefügt („…/?pin=123456“) → in Adresse und PIN aufteilen
-    const qr = boardQrLesen(t.value);
-    if(qr){ t.value = adresseKurz(qr.adresse); document.getElementById("boardPin").value = qr.pin; }
-    return;
-  }
   if(t.id === "formEinfuegen" || t.id === "standortEinfuegen"){
     const k = koordinatenErkennen(t.value); if(!k) return;
     const p = t.id === "formEinfuegen" ? "f" : "s";
@@ -5762,7 +5613,6 @@ $sheet.addEventListener("input", (e) => {
   }
 });
 $sheet.addEventListener("change", (e) => {
-  if(e.target.id === "boardFoto"){ const d = e.target.files[0]; e.target.value = ""; if(d) boardFotoLesen(d); return; }
   if(e.target.id === "boardWelt") return boardEinstellungenAendern({ aktiveWelt:e.target.value });
   if(e.target.id === "boardTitel") return boardEinstellungenAendern({ titel:e.target.value });
   if(e.target.id === "formKategorie"){ form.kategorie = e.target.value; form.variante = ""; formularRendern(true); }
@@ -5774,7 +5624,7 @@ function uhr(){ document.getElementById("uhr").textContent = new Date().toLocale
 
 /** Daten laden und in den gewünschten Bereich springen (?modul=…) */
 async function datenStarten(){
-  // Live: Gilt das Token noch? Tokens von vor den Accounts nicht – dann öffnet api() das Beitreten
+  // Live: Gilt das Token noch, ist das Konto frei, fehlt die PIN? Sonst geht es zur Anmeldeseite (api(), werBistDu)
   if(!DEMO.enabled && !(bd.ich = await IDENTITAET.werBistDu())) return;
   profilKarteRendern();
   if(!(await weltenLaden())) return;
@@ -5793,12 +5643,15 @@ async function init(){
   if(!DEMO.enabled){
     // Live: Das Board ist BOARD_ADRESSE – eine Verbindung zu einem anderen gilt hier nicht
     if(bd.verbindung && bd.verbindung.adresse !== BOARD_ADRESSE) bd.verbindung = null;
+    // Ohne Anmeldung geht es zur Anmeldeseite (auch alte QR-Codes mit ?pin=…)
+    if(!bd.verbindung) return zurAnmeldung();
     renderStatus();
+    // Offline gestartet und zu lange ohne Board: erst die PIN (gegen den lokalen Hash)
+    if(betrieb === "getrennt" && offlineAbgelaufen()) await offlineSperre();
   }
   boardKnopfRendern();
   profilKarteRendern();
   if(bd.verbindung) boardVerbinden();
-  if(!DEMO.enabled && !bd.verbindung) return boardSheetRendern();   // erst beitreten, dann Daten
   datenStarten();
 }
 /** Als PWA installierbar (Umbau Phase 5): nur, wenn konfig.js es sagt (Netlify) – Manifest einhängen, Service Worker starten.

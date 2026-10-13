@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Baut die Netlify-Seite (Umbau Phase 5) nach netlify/dist:
-#   /dashboard/  Anzeige = Widget-Dashboard (companion/widgets, Vite); / und /anzeige leiten dorthin (_redirects, S4)
+#   /            Anmeldeseite (companion/anmeldung.html, Bauplan „Anmeldung“); sie lädt app/konfig.js und app/regeln.js
+#   /dashboard/  Anzeige = Widget-Dashboard (companion/widgets, Vite); /anzeige leitet dorthin (_redirects, S4)
 #   /app/        Companion-PWA (companion/, statische Dateien)     /icons/   Kennblöcke für das Dashboard
 # API_URL (z. B. https://api.mainhubv1.com) landet in VITE_API_URL (Dashboard) und in app/konfig.js (Companion).
 # Lokal: API_URL=http://127.0.0.1:3000 bash netlify/bauen.sh  → dann netlify/dist mit einem statischen Server ausliefern.
@@ -30,6 +31,8 @@ cp companion/regeln.js companion/board-karten.js companion/texterkennung.js \
    companion/biom-import.worker.js \
    companion/manifest.webmanifest companion/sw.js "$ZIEL/app/"
 cp -r companion/icons companion/vendor companion/ruestungs-baukasten "$ZIEL/app/"
+# Anmeldeseite als Startseite
+cp companion/anmeldung.html "$ZIEL/index.html"
 # Kennblöcke für das Dashboard (es lädt /icons/…)
 cp -r companion/icons "$ZIEL/icons"
 # konfig.js: Adresse der API, PWA an, Stand für den Cache des Service Workers

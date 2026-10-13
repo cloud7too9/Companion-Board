@@ -19,10 +19,12 @@ export type AnordnenStatus =
   | { art: "bereit"; anzeige: { id: string; name: string }; reihen: number; reihenGemeldet: boolean; vollbild: string | null };
 
 const meldung = (status: number) =>
-  status === 401 ? "Anmeldung abgelaufen – in der Companion neu beitreten."
-    : status === 404 ? "Diese Anzeige gibt es nicht (mehr)."
-      : status === 422 ? "Das Board hat die Änderung abgelehnt."
-        : "Board nicht erreichbar.";
+  status === 401 ? "Anmeldung abgelaufen – in der Companion neu anmelden."
+    : status === 423 ? "PIN nötig – erst in der Companion mit deiner PIN bestätigen."
+      : status === 403 ? "Dein Konto wartet noch auf Freigabe."
+        : status === 404 ? "Diese Anzeige gibt es nicht (mehr)."
+          : status === 422 ? "Das Board hat die Änderung abgelehnt."
+            : "Board nicht erreichbar.";
 
 /**
  * Anordnen am Handy (A6): lädt das Layout einer Anzeige in den Workspace-Store und schickt jede

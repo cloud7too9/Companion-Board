@@ -452,3 +452,26 @@ function kontoPruefen(k){
 /** Gültigkeit aus der Auswahl: Minuten oder null (dauerhaft) → Fehlertext oder null */
 const gueltigkeitPruefen = (minuten) => minuten === null || (Number.isInteger(minuten) && minuten > 0 && minuten <= 60 * 24 * 365)
   ? null : "Ungültige Gültigkeit";
+
+/* ---- Lokaler PIN-Hash (nur im Browser, AN12) ------------------------------
+   Für die PIN-Sperre ohne Netz legt das Gerät einen Hash der Konto-PIN im
+   localStorage ab, sobald die PIN dort einmal richtig eingegeben wurde
+   (Registrieren, PIN-Sperre, PIN zurücksetzen). PBKDF2 mit SHA-256 statt scrypt,
+   weil der Browser scrypt nicht eingebaut hat. Ohne sicheren Kontext (kein
+   crypto.subtle) gibt es keinen Hash; dann entsperrt erst wieder das Board. */
+const PIN_LOKAL_RUNDEN = 200000;
+const base64Aus = (bytes) => btoa(String.fromCharCode(...new Uint8Array(bytes)));
+const base64Zu = (text) => Uint8Array.from(atob(text), (z) => z.charCodeAt(0));
+/** → { salz, hash, runden } oder null (kein WebCrypto) */
+async function pinLokalHashen(pin, salz = null, runden = PIN_LOKAL_RUNDEN){
+  if(!globalThis.crypto?.subtle) return null;
+  const s = salz ? base64Zu(salz) : crypto.getRandomValues(new Uint8Array(16));
+  const roh = await crypto.subtle.importKey("raw", new TextEncoder().encode(String(pin)), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits({ name:"PBKDF2", hash:"SHA-256", salt:s, iterations:runden }, roh, 256);
+  return { salz:base64Aus(s), hash:base64Aus(bits), runden };
+}
+async function pinLokalPasst(pin, gespeichert){
+  if(!gespeichert?.salz || !gespeichert?.hash) return false;
+  const neu = await pinLokalHashen(pin, gespeichert.salz, gespeichert.runden || PIN_LOKAL_RUNDEN);
+  return Boolean(neu) && neu.hash === gespeichert.hash;
+}

@@ -29,9 +29,8 @@ export interface BoardZustand {
   version: number;
 }
 
-/** GET /api/anzeige: QR-Code zum Beitreten (SVG kommt von GET /api/anzeige/qr) */
+/** GET /api/anzeige: QR-Code zur Anmeldeseite (SVG kommt von GET /api/anzeige/qr) */
 export interface Beitritt {
   beitrittsUrl: string;
   adresse: string;
-  pin: string;
 }
