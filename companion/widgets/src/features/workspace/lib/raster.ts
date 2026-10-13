@@ -6,11 +6,10 @@
  * Pixel entstehen erst beim Zeichnen.
  */
 import { useLayoutEffect, useState } from "react";
+import { RASTER_SPALTEN, STANDARD_REIHEN } from "../../../../../widget-groessen.mjs";
 
-export const RASTER_SPALTEN = 32;
-
-/** Reihen, bis die Fläche gemessen ist (16:9 wie ein Fernseher). */
-export const STANDARD_REIHEN = 18;
+/** 32 Spalten und die Reihen bis zur Messung (16:9) kommen aus companion/widget-groessen.mjs, gemeinsam mit dem Server */
+export { RASTER_SPALTEN, STANDARD_REIHEN };
 
 export interface Raster {
   spalten: typeof RASTER_SPALTEN;

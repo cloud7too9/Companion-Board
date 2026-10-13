@@ -211,8 +211,9 @@ await app.register(companionApi, {
   prefix: '/api',
   daten,
   nutzer: (req) => ident.werBistDu(req),
-  geaendert: (bereich, weltId = null) => {
-    anAlle({ art: 'geaendert', bereich, weltId });
+  geaendert: (bereich, weltId = null, anzeigeId = null) => {
+    // anzeigeId (Bauplan „Sitzung“): beim Bereich layout, damit nur die betroffene Anzeige neu lädt
+    anAlle({ art: 'geaendert', bereich, weltId, ...(anzeigeId ? { anzeigeId } : {}) });
     if (['welten', 'orte', 'einstellungen'].includes(bereich)) anAlle({ art: 'zustand', zustand: anzeigeSicht(daten) });
     if (bereich === 'anzeigen') {
       veralteteAnzeigenTrennen();
@@ -259,12 +260,41 @@ function anAlle(nachricht) {
   for (const v of verbindungen) if (v.socket.readyState === 1) v.socket.send(text);
 }
 
-// Karte, die gerade groß auf der Anzeige liegt („Auf die Anzeige werfen“).
+// Karte, die gerade groß auf der alten Anzeige liegt („Auf die Anzeige werfen“, Weg bis S4).
 // Nur im Speicher: Nach einem Neustart ist die Anzeige wieder frei.
 let gezeigt = null;
 
+/**
+ * „Aufs Board“ neu (Bauplan „Sitzung“, S1): { art:"zeigen", quelle, anzeigeId?, anfrage } legt die Quelle als
+ * Widget in die Sitzung der Anzeige (ohne anzeigeId: die erste); { art:"verbergen", instanzId } nimmt es weg.
+ * Antwort ok { anfrage, instanzId }; live geht geaendert „layout“ mit anzeigeId an alle.
+ */
+function sitzungBearbeiten(op, verbindung) {
+  const antwortFehler = (text) => senden(verbindung.socket, { art: 'fehler', text, anfrage: op.anfrage });
+  try {
+    const anzeigeId = typeof op.anzeigeId === 'string' && op.anzeigeId ? op.anzeigeId : daten.anzeigenListe()[0]?.id;
+    if (!anzeigeId) return antwortFehler('Es gibt keine Anzeige');
+    if (op.art === 'zeigen') {
+      const { instanz } = daten.sitzungHinzufuegen(anzeigeId, { quelle: op.quelle, nutzer: verbindung.nutzer });
+      anAlle({ art: 'geaendert', bereich: 'layout', weltId: null, anzeigeId });
+      senden(verbindung.socket, { art: 'ok', anfrage: op.anfrage, instanzId: instanz.id });
+    } else {
+      if (daten.sitzungEntfernen(anzeigeId, op.instanzId)) anAlle({ art: 'geaendert', bereich: 'layout', weltId: null, anzeigeId });
+      senden(verbindung.socket, { art: 'ok', anfrage: op.anfrage });
+    }
+  } catch (f) {
+    if (f instanceof DatenFehler) return antwortFehler(f.message);
+    throw f;
+  }
+}
+
 /** Nachrichten zum Zeigen – true, wenn die Nachricht damit erledigt ist */
 function zeigenBearbeiten(op, verbindung) {
+  // Neuer Weg: Quelle statt fertiger Karte (zeigen) bzw. instanzId (verbergen)
+  if ((op.art === 'zeigen' && typeof op.quelle === 'string') || (op.art === 'verbergen' && typeof op.instanzId === 'string')) {
+    sitzungBearbeiten(op, verbindung);
+    return true;
+  }
   if (op.art === 'zeigen') {
     const { karte, fehler } = kartePruefen(op.karte);
     if (fehler) {

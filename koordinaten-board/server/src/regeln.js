@@ -7,7 +7,7 @@
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const HIER = path.dirname(fileURLToPath(import.meta.url));
 
@@ -37,3 +37,6 @@ export function regelnLaden(datei = path.join(COMPANION_ORDNER, 'regeln.js')) {
 export const regeln = regelnLaden();
 /** Anzeigeschemas aus companion/board-karten.js (braucht regeln.js im selben Kontext) */
 export const karten = scriptsLaden([path.join(COMPANION_ORDNER, 'regeln.js'), path.join(COMPANION_ORDNER, 'board-karten.js')], KARTEN_NAMEN);
+/** Größenstufen der Widgets und Passt-Prüfung aus companion/widget-groessen.mjs (ES-Modul, Bauplan „Sitzung“):
+    dieselben Zahlen, mit denen das Dashboard zeichnet – der Server rechnet damit die erste freie Stelle */
+export const groessen = await import(pathToFileURL(path.join(COMPANION_ORDNER, 'widget-groessen.mjs')).href);

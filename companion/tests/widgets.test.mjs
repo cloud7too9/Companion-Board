@@ -116,8 +116,8 @@ try {
   await p.getByRole("button", { name: "Widget hinzufügen" }).first().click();
   await p.waitForSelector("[data-widget-typ]");
   const gruppen = await p.$$eval("section[data-bereich]", (l) => l.map((s) => [s.dataset.bereich, s.querySelectorAll("[data-widget-typ]").length]));
-  pruefe(JSON.stringify(gruppen) === JSON.stringify([["karte", 3], ["sammelobjekte", 4], ["portale", 1], ["handbuch", 2], ["bauplaene", 1], ["banner", 1], ["ruestung", 1]]),
-    `Galerie mit allen 13 Typen nach Bereich: ${JSON.stringify(gruppen)}`);
+  pruefe(JSON.stringify(gruppen) === JSON.stringify([["karte", 3], ["sammelobjekte", 4], ["portale", 2], ["handbuch", 2], ["bauplaene", 1], ["banner", 1], ["ruestung", 1]]),
+    `Galerie mit allen 13 Typen plus Portal-Verbindung (Bauplan Sitzung) nach Bereich: ${JSON.stringify(gruppen)}`);
   const vorschau = await p.$eval('[data-widget-typ="portale.verbindungen"] [data-testid="vorschau"]', (e) => [e.offsetWidth, e.offsetHeight]);
   pruefe(vorschau[0] === 90 && vorschau[1] === 54, `Vorschau in der kleinsten Stufe (10×6 Zellen → ${vorschau.join("×")} px)`);
   await p.screenshot({ path: `${DIR}/w4-galerie.png` });

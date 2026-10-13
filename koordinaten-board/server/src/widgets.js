@@ -22,12 +22,36 @@ export const WIDGETS = Object.freeze({
   'sammelobjekte.einzelobjekt': { art: 'sammel', quelle: 'sammel' },
   'sammelobjekte.status': { art: 'sammelstand' },
   'portale.verbindungen': { art: 'portalliste' },
+  'portale.verbindung': { art: 'portal', quelle: 'portal' },
   'handbuch.eintrag': { hinweis: 'Bereich geplant' },
   'handbuch.materialliste': { hinweis: 'Bereich geplant' },
   'bauplaene.bauplan': { hinweis: 'Bereich geplant' },
   'banner.banner': { art: 'banner', quelle: 'banner' },
   'ruestung.set': { art: 'ruestung', quelle: 'ruestung' },
 });
+
+/**
+ * „Aufs Board“ (Bauplan „Sitzung“): Quelle „<art>:<id>“ bzw. „sammelstand“ aus der Companion → Widget-Typ.
+ * quelleZuWidget("portal:p_3") → { typ: "portale.verbindung", quelle: "p_3" }; null bei unbekannter Art.
+ */
+export const QUELLE_ZU_TYP = Object.freeze({
+  ort: 'karte.einzelkoordinate',
+  sammel: 'sammelobjekte.einzelobjekt',
+  sammelstand: 'sammelobjekte.status',
+  portal: 'portale.verbindung',
+  banner: 'banner.banner',
+  ruestung: 'ruestung.set',
+});
+export function quelleZuWidget(quelle) {
+  if (typeof quelle !== 'string') return null;
+  const [art, ...rest] = quelle.split(':');
+  const typ = QUELLE_ZU_TYP[art];
+  if (!typ) return null;
+  const id = rest.join(':');
+  const w = WIDGETS[typ];
+  if (w.quelle ? !id : id) return null;   // Arten mit Quelle brauchen eine ID, die anderen keine
+  return { typ, quelle: id };
+}
 
 /** RGBA → PNG als Data-URL (für die Banner-Vorschau; in der Companion malt das ein Canvas) */
 export function pngDaten(breite, hoehe, rgba) {
@@ -77,6 +101,11 @@ function quellenVon(art, ctx) {
       return ctx.banner.map((b) => ({ id: b.id, name: b.name }));
     case 'ruestung':
       return ctx.ruestung.map((s) => ({ id: s.id, name: s.name }));
+    case 'portal':
+      return ctx.verbindungen.map((v) => ({
+        id: v.id, name: v.name,
+        unter: `O ${karten.zahl(v.oberwelt.x)} / ${karten.zahl(v.oberwelt.z)} ↔ N ${karten.zahl(v.nether.x)} / ${karten.zahl(v.nether.z)}`,
+      }));
     default:
       return [];
   }
