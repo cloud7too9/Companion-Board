@@ -129,8 +129,8 @@ Git: Push löst bei Netlify einen Vorschau-Build für den PR aus, dort testen, d
 
 ### Phase 6: Pi, Tunnel, Domain
 
-- [ ] Repo auf dem Pi klonen, nur `koordinaten-board/server` installieren, als systemd-Dienst starten *(vorbereitet: `koordinaten-board/pi/companion-board.service`, `companion-board.env`, `sicherung.sh`, Befehle in `pi/ANLEITUNG.md`; ausführen muss Max am Pi)*
-- [ ] `cloudflared` installieren, benannten Tunnel anlegen, `api.deinedomain.de` zuordnen, ebenfalls als Dienst *(vorbereitet: `pi/cloudflared-config.yml`, Befehle in `pi/ANLEITUNG.md`)*
+- [x] Repo auf dem Pi klonen, nur `koordinaten-board/server` installieren, als systemd-Dienst starten *(13.10.2026: läuft bei Max. Vorbereitet war: `koordinaten-board/pi/companion-board.service`, `companion-board.env`, `sicherung.sh`, Befehle in `pi/ANLEITUNG.md`; ausführen muss Max am Pi)*
+- [x] `cloudflared` installieren, benannten Tunnel anlegen, `api.deinedomain.de` zuordnen, ebenfalls als Dienst *(13.10.2026: läuft bei Max. Vorbereitet war: `pi/cloudflared-config.yml`, Befehle in `pi/ANLEITUNG.md`)*
 - [ ] Domain auf Cloudflare-DNS umstellen und Netlify zuordnen (Abschnitt „Eine Domain, drei Adressen“) *(Schritte in `pi/ANLEITUNG.md`, Abschnitt 3)*
 - [ ] Probe über Mobilfunk statt WLAN: QR scannen, beitreten, Ort anlegen, Board aktualisiert sich
 - [ ] Aufräumen nach der Probe: `netzwerk.js`, Adress-Lernen und Firewall-Skripte braucht der Pi nicht mehr; sie bleiben für den Betrieb im Heimnetz vom Laptop aus (`pi/ANLEITUNG.md`, letzter Abschnitt). Entscheiden, ob dieser Betrieb noch gebraucht wird, sonst entfernen
