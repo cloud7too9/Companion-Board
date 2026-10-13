@@ -1,6 +1,6 @@
 # Bauplan: Anmeldung und Dashboard-Zugang
 
-> Für Claude Code · Repo `Companion-Board` · Stand 13.10.2026 · Entscheidungen von Max (Chat vom 13.10.2026)
+> Für Claude Code · Repo `Companion-Board` · Stand 13.10.2026 · Entscheidungen von Max (Chat vom 13.10.2026), Nachfragen AN1–AN3, AN5–AN7 und AN10–AN12 beantwortet (L15–L18, Kapitel 9)
 > Grundlage: Klick-Prototyp [`companion/entwuerfe/anmeldung-prototyp.html`](../../companion/entwuerfe/anmeldung-prototyp.html) (Mock, im Browser öffnen) und das SQL-Referenzschema [`planung/schema/`](../schema/README.md) (Tabellen `benutzer`, `geraete`, `zugaenge`, `anzeige_geraete` mit ihren Sichten)
 >
 > Er nennt Dateien, Routen und Branches und baut auf dem Stand von `main` vom 13.10.2026 auf (Netlify + Pi, SQLite, Bauplan „Sitzung“, B3). Er setzt Strang B aus [`PLAN.md`](../PLAN.md) fort (B1/B2 gebaut, B3 gebaut).
@@ -12,7 +12,7 @@
 1. Lies `UEBERGABE.md`, `planung/UEBERGABE.md`, `koordinaten-board/UEBERGABE.md` und `koordinaten-board/pi/ANLEITUNG.md`. Öffne den Prototyp im Browser und klick ihn einmal durch (Knopf „Simulation“ oben rechts).
 2. Arbeite die Phasen in Kapitel 7 der Reihe nach ab. Jede Phase endet mit Tests, README-Notiz und Commit.
 3. **Haltepunkte (⏸):** stoppen, Max Screenshots zeigen, erst nach seinem OK weiter.
-4. Was in Kapitel 9 als **Nachfrage** (AN1–AN12) steht, baust du nicht vorweg. Steht eine Annahme (⚠) dabei, baust du die Annahme und meldest es Max.
+4. Was in Kapitel 9 als **offene Nachfrage** (AN4, AN13) steht, baust du nicht vorweg. Steht eine Annahme (⚠) dabei, baust du die Annahme und meldest es Max.
 5. Konventionen wie immer: Deutsch in Code, UI und Commits · nach jedem Commit `Commit erstellt: …` · ansagen, wann gepusht wird · **gemergt wird nur nach Rückfrage bei Max** · Datenmodell minimal.
 
 ---
@@ -49,7 +49,11 @@ Die **Anmeldeseite wird der Einstieg** unter `/` – das, was man über die Doma
 | L11 | Anzeige-Gerät | Code → Dashboard-PIN → Layout wählen. Das Gerät **merkt sich die Anmeldung**: beim nächsten Öffnen direkt „Layout wählen“ |
 | L13 | Nach der Anmeldung | **Direkt in den Startbereich der Companion** (`/app/`). Keine Zwischenseite |
 | L14 | Nach dem Registrieren | Zuerst eine **Willkommenskarte**, danach weiter in die Companion. Den Inhalt der Karte fügt Max später hinzu (AN11) |
-| L12 | PIN am Anzeige-Gerät | Nach über **15 Minuten** ohne Kontakt (eine Konstante, siehe AN6). Während die Anzeige verbunden ist, läuft kein Timer |
+| L12 | PIN am Anzeige-Gerät | Nach über **15 Minuten** ohne Kontakt (eine Konstante, AN6). Während die Anzeige verbunden ist, läuft kein Timer |
+| L15 | Board-PIN | **Fällt weg** (AN1). Angemeldet wird nur noch mit Anzeigename + Passwort, danach PIN |
+| L16 | Bestehende Konten | Werden **neu angelegt** (AN2). Die bisherigen Konten (ohne Passwort und echten Namen) entfallen bei der Migration samt ihren Geräten |
+| L17 | Anzeige-Link | Wird durch **„Code generieren“** ersetzt (AN3), kein Parallelbetrieb |
+| L18 | Echter Name | Sichtbar für **alle Konten** des Boards (AN10) |
 
 ---
 
@@ -60,13 +64,13 @@ Die **Anmeldeseite wird der Einstieg** unter `/` – das, was man über die Doma
 | Einstieg `/` | `netlify/_redirects` | leitet auf `/dashboard/` um (S4) | liefert die **Anmeldeseite** `companion/anmeldung.html`; `/anzeige` leitet weiter aufs Dashboard |
 | Companion | Netlify `/app/` (`netlify/bauen.sh`), lokal vom Board unter `/` | Beitreten im Sheet „Beitreten“ mit Board-PIN aus dem QR-Code (`?pin=`, 6 Ziffern) + Name + Konto-PIN | Anmeldung über die Anmeldeseite; Konto-Token wie heute im `localStorage` |
 | API | `api.mainhubv1.com` (Pi hinter Cloudflare-Tunnel), CORS in `server.js` | Bearer-Token, `FUER_COMPANION`-Pfade | neue Routen aus Kapitel 5 in die CORS-Liste |
-| Beitreten | `/api/beitreten`, `identitaet.js` | Board-PIN + Name + Konto-PIN, Sperre je IP (`CF-Connecting-IP`) | Anmelden mit Anzeigename + Passwort, danach PIN (AN1 zur Board-PIN) |
+| Beitreten | `/api/beitreten`, `identitaet.js` | Board-PIN + Name + Konto-PIN, Sperre je IP (`CF-Connecting-IP`) | Anmelden mit Anzeigename + Passwort, danach PIN; die Board-PIN fällt weg (L15) |
 | Tokens | `identitaet.js` | HMAC-signiert `{ b, g, f }`, Gerät fragt nie wieder | bleibt; zusätzlich prüft der Server bei jeder Anfrage die 30-Minuten-Regel |
 | Speicher | `speicher.js` (SQLite, `daten.db`) | je Sammlung eine Tabelle `(id, version, reihenfolge, daten JSON)`, Liste `SAMMLUNGEN` | neue Sammlungen `zugaenge`, `anzeigeGeraete` in `SAMMLUNGEN`; neue Felder landen im JSON |
 | Konten | `daten.js` → `benutzer` | `{ id, anzeigename, pinHash, rolle }` | + `echterName`, `passwortHash`, `pinGeaendertAm` |
 | Geräte | `daten.js` → `geraete` | `{ id, freigeschaltet, typ, profilId }` | + `freigeschaltetAm`, `letzterKontakt`, `pinBestaetigtAm` |
 | Sperre | `sperre.js` | gegen Durchprobieren der PINs | auch für Passwort, Zugangs-Code und Dashboard-PIN |
-| Anzeige | `/dashboard/`, Anzeige-Link `?anzeige=…&schluessel=…`, Sitzung je Anzeige (`sitzung.js`) | Anzeige nur mit Link (Umbau Phase 1) | Anzeige-Geräte melden sich per Dashboard-Login an (AN3: Link ablösen oder parallel) |
+| Anzeige | `/dashboard/`, Anzeige-Link `?anzeige=…&schluessel=…`, Sitzung je Anzeige (`sitzung.js`) | Anzeige nur mit Link (Umbau Phase 1) | Anzeige-Geräte melden sich per Dashboard-Login an; der Link fällt weg (L17) |
 | Layouts | `anzeigen[].layout` | pro Anzeige ein Layout (E5) | sind die „Anzeige-Layouts“, aus denen das Anzeige-Gerät wählt |
 | Offline | `sw.js`, Spiegel in IndexedDB (B3) | Companion läuft ohne Netz aus dem Spiegel | die 30-Minuten-Regel zählt auch am Handy (Kapitel 6.2) |
 
@@ -117,7 +121,7 @@ anzeigeGeraete: [{     // per Dashboard-Login angemeldete Anzeigen (TV, Tablet �
 - `GUELTIGKEITEN = [20, 5, 60, 1440, null]` (Minuten, `null` = dauerhaft; Standard ist der erste Eintrag)
 - `OFFLINE_MINUTEN = { konto: 30, anzeige: 15 }`
 
-**Migration beim Laden** (`daten.js`, wie bei B1): fehlende Felder ergänzen (`pinGeaendertAm = am`, `letzterKontakt = jetzt`, `zugaenge: []`, `anzeigeGeraete: []`). Konten ohne `passwortHash` und `echterName` siehe AN2.
+**Migration beim Laden** (`daten.js`, wie bei B1): fehlende Felder ergänzen (`pinGeaendertAm = am`, `letzterKontakt = jetzt`, `zugaenge: []`, `anzeigeGeraete: []`). Konten ohne `passwortHash` – das sind alle bisherigen – werden **entfernt**, ebenso ihre Geräte (L16); alle legen sich neu an. Was sie angelegt haben, bleibt stehen, der Name in `von` auch (wie im Referenzschema).
 
 ---
 
@@ -129,7 +133,7 @@ anzeigeGeraete: [{     // per Dashboard-Login angemeldete Anzeigen (TV, Tablet �
 |---|---|---|
 | POST | `/api/anmelden` | `{ anzeigename, passwort }` → `{ token }`, legt ein Gerät an. Fehlertext immer „Anzeigename oder Passwort stimmt nicht“ |
 | POST | `/api/registrieren` | `{ echterName, anzeigename, passwort, pin }` → `{ token }` |
-| GET | `/api/ich` | `{ benutzer, pinNoetig, grund }` mit `grund` = `offline:<Minuten>` oder `pinwechsel` |
+| GET | `/api/ich` | `{ benutzer, pinNoetig, grund }` mit `grund` = `offline:<Minuten>` oder `pinwechsel`. Wo Konten anderer erscheinen, gehört der echte Name dazu (L18) |
 | POST | `/api/pin` | `{ pin }` → setzt `pinBestaetigtAm` und `letzterKontakt` |
 | POST | `/api/pin/zuruecksetzen` | `{ passwort, neuePin }` → neue PIN, `pinGeaendertAm = jetzt`, **dieses** Gerät gilt sofort als bestätigt |
 | POST | `/api/abmelden` | Gerät löschen |
@@ -149,7 +153,7 @@ Alle neuen Pfade kommen in die CORS-Liste in `server.js`, weil Anmeldeseite (Net
 |---|---|---|---|
 | POST | `/api/dashboard/zugaenge` | Konto | `{ minuten \| null, pin }` → `{ id, code, gueltigBis }`. Code eindeutig unter allen Zugängen |
 | GET | `/api/dashboard/zugaenge` | Konto | Liste mit Code, Gültigkeit, Ersteller und Zahl der angemeldeten Anzeigen |
-| DELETE | `/api/dashboard/zugaenge/:id` | Konto | Widerrufen. Meldet alle damit angemeldeten Anzeigen ab (⚠ AN5) |
+| DELETE | `/api/dashboard/zugaenge/:id` | Konto | Widerrufen. Meldet alle damit angemeldeten Anzeigen ab (AN5) |
 | POST | `/api/dashboard/code` | offen | `{ code }` → `{ ticket }` (signiert, 5 Minuten gültig). **410**, wenn der Code abgelaufen ist |
 | POST | `/api/dashboard/freischalten` | Ticket | `{ ticket, pin }` → `{ anzeigeToken }`, legt ein Anzeige-Gerät an |
 | GET | `/api/dashboard/sitzung` | Anzeige-Token | `{ pinNoetig, offline }` oder `{ anzeigeId, layouts: [{ id, name, inhalt, widgets }] }` |
@@ -157,7 +161,7 @@ Alle neuen Pfade kommen in die CORS-Liste in `server.js`, weil Anmeldeseite (Net
 | PUT | `/api/dashboard/layout` | Anzeige-Token | `{ anzeigeId }` → gewähltes Layout speichern |
 | POST | `/api/dashboard/abmelden` | Anzeige-Token | Anzeige-Gerät löschen |
 
-- **Ablauf eines Codes** (⚠ AN5): Ein abgelaufener Code schaltet **keine neuen** Geräte frei. Bereits angemeldete Anzeigen laufen weiter, ihre Anmeldung hängt an der Dashboard-PIN.
+- **Ablauf eines Codes** (AN5): Ein abgelaufener Code schaltet **keine neuen** Geräte frei. Bereits angemeldete Anzeigen laufen weiter, ihre Anmeldung hängt an der Dashboard-PIN.
 - **15-Minuten-Regel** wie 5.1, nur mit `OFFLINE_MINUTEN.anzeige` und ohne PIN-Wechsel. Herzschlag über `/ws` mit Rolle `anzeige`.
 - Die Anzeige-Verbindung (`/ws` Rolle `anzeige`, `/api/anzeige/*`) ist erlaubt mit gültigem **Anzeige-Token** – zusätzlich zu `localhost` und `ANZEIGE_OFFEN=1` wie heute.
 - **Sperre** (`sperre.js`): Code je IP, Dashboard-PIN je Zugang bzw. Anzeige-Gerät, Passwort je Anzeigename. Wie heute: 5 Fehlversuche, dann warten.
@@ -180,12 +184,12 @@ Alle neuen Pfade kommen in die CORS-Liste in `server.js`, weil Anmeldeseite (Net
 
 ### 6.2 Companion (`companion-prototyp.html`)
 
-- Läuft weiter unter **`/app/`** (Netlify) bzw. lokal unter `/app`. Alte QR-Codes mit `?pin=…` führen auf die Anmeldeseite (AN1).
+- Läuft weiter unter **`/app/`** (Netlify) bzw. lokal unter `/app`. Alte QR-Codes mit `?pin=…` führen auf die Anmeldeseite (L15).
 - Beim Laden `/api/ich`: kein Token → `/`. `pinNoetig` → `/` (die Anmeldeseite zeigt die PIN-Sperre).
 - Antwortet eine Anfrage mit **423**, gilt dasselbe. `anmeldungAbgelaufen()` gibt es schon, sie bekommt diesen Fall dazu. Das Sheet „Beitreten“ entfällt.
-- **Offline (B3):** Ohne Netz zählt die Companion die 30 Minuten selbst (Zeitpunkt des letzten Server-Kontakts im `localStorage`) und sperrt sich mit der PIN-Abfrage. Die PIN prüft sie dann gegen einen lokalen Hash, den sie bei der letzten Anmeldung abgelegt hat (⚠ AN12).
-- **Dashboard-Bereich** (⚠ AN7: im Board-Sheet unter „Anzeigen“): Formular „Anzeige-Gerät anmelden“ mit „Code gültig“ (Auswahl aus `GUELTIGKEITEN`), Dashboard-PIN, PIN wiederholen und „Code generieren“. Der neue Code steht groß darüber, mit Gültigkeit. Darunter „Erzeugte Codes“ mit **Widerrufen per zweitem Tippen** („Wirklich?“).
-- Der Abschnitt „Anzeige-Link“ entfällt nach AN3.
+- **Offline (B3):** Ohne Netz zählt die Companion die 30 Minuten selbst (Zeitpunkt des letzten Server-Kontakts im `localStorage`) und sperrt sich mit der PIN-Abfrage. Die PIN prüft sie dann gegen einen lokalen Hash, den sie bei der letzten Anmeldung abgelegt hat (scrypt-Hash im `localStorage`, AN12).
+- **Dashboard-Bereich** im Board-Sheet unter „Anzeigen“ (AN7): Formular „Anzeige-Gerät anmelden“ mit „Code gültig“ (Auswahl aus `GUELTIGKEITEN`), Dashboard-PIN, PIN wiederholen und „Code generieren“. Der neue Code steht groß darüber, mit Gültigkeit. Darunter „Erzeugte Codes“ mit **Widerrufen per zweitem Tippen** („Wirklich?“).
+- Der Abschnitt „Anzeige-Link“ entfällt; „Code generieren“ ersetzt ihn (L17).
 
 ### 6.3 Dashboard (`companion/widgets`)
 
@@ -201,7 +205,7 @@ Branch: **`board/anmeldung`** für alles. Nach jeder Phase pushen.
 ### Phase L1 · Datenmodell und Regeln
 
 - Kapitel 4: neue Felder und Sammlungen in `daten.js`, Migration beim Laden, Regeln in `regeln.js`.
-- Tests (`node --test`): Migration vorhandener Konten und Geräte, Eindeutigkeit des Anzeigenamens (`Max` = `MAX`), Regeln für Passwort, PIN und Code.
+- Tests (`node --test`): Migration (alte Konten ohne Passwort und ihre Geräte fallen weg, Einträge bleiben), Eindeutigkeit des Anzeigenamens (`Max` = `MAX`), Regeln für Passwort, PIN und Code.
 - Commit: „Datenmodell: Passwort, Geräte-Kontakt, Dashboard-Zugänge“
 
 ### Phase L2 · Konten am Server
@@ -241,9 +245,9 @@ Branch: **`board/anmeldung`** für alles. Nach jeder Phase pushen.
 - Commits: „Companion: Code für Anzeige-Geräte generieren“, „Dashboard-Login auf der Anmeldeseite“
 - ⏸ **Haltepunkt:** Max am TV bzw. Tablet eine Anzeige mit Code anmelden lassen (nach Pi-Update).
 
-### Phase L6 · Aufräumen (nach AN1 und AN3)
+### Phase L6 · Aufräumen (L15, L17)
 
-- Board-PIN im QR-Code und Anzeige-Link mit Schlüssel abbauen oder als Übergang behalten, je nach Antwort.
+- Board-PIN abbauen (QR-Code mit `?pin=`, `/api/beitreten`, Sheet „Beitreten“) und den Anzeige-Link mit Schlüssel (`?anzeige=…&schluessel=…`, Abschnitt „Anzeige-Link“).
 - README, `UEBERGABE.md`, `planung/UEBERGABE.md` und `koordinaten-board/pi/ANLEITUNG.md` nachziehen: Einstieg `/`, Ablauf der Anmeldung, Pi-Update.
 - Commit: „Alte Zugänge abgebaut: Board-PIN, Anzeige-Link“
 
@@ -262,15 +266,16 @@ Branch: **`board/anmeldung`** für alles. Nach jeder Phase pushen.
 
 | Nr. | Frage | Annahme bis zur Antwort | blockiert |
 |---|---|---|---|
-| AN1 | Bleibt die **Board-PIN im QR-Code**, wenn die Anmeldeseite über eine Domain erreichbar ist? Sie steht in der URL und schützt dann wenig. | bleibt vorerst bestehen, wird aber nicht mehr gebraucht | L6 |
-| AN2 | **Bestehende Konten** haben weder Passwort noch echten Namen. Beim nächsten Anmelden mit der alten PIN beides nachtragen lassen („Konto vervollständigen“), oder Konten neu anlegen? | – | L1 |
-| AN3 | Wird der **Anzeige-Link mit Schlüssel** durch den Dashboard-Login ersetzt oder bleibt er parallel? | parallel bis L6 | L6 |
+| ~~AN1~~ | **Entschieden (Max, 13.10.2026): Die Board-PIN fällt weg** (L15), Abbau in L6. | – | – |
+| ~~AN2~~ | **Entschieden (Max, 13.10.2026): Konten werden neu angelegt** (L16). Die Migration entfernt die alten Konten samt Geräten. | – | – |
+| ~~AN3~~ | **Entschieden (Max, 13.10.2026): Der Anzeige-Link wird durch „Code generieren“ ersetzt** (L17), Abbau in L6. | – | – |
 | AN4 | Zeigen zwei Geräte **dasselbe Layout** bei unterschiedlicher Bildschirmgröße, passen die gemeldeten `reihen` nicht für beide. Layout pro Gerät kopieren oder mit der kleineren Reihenzahl arbeiten? | – | L5 |
-| AN5 | ⚠ Laufen bereits angemeldete Anzeigen **nach Ablauf des Codes** weiter? Meldet **Widerrufen** alle Anzeigen des Codes ab? | ja und ja (so im Prototyp) | – |
-| AN6 | 15 oder 30 Minuten für Anzeige-Geräte? | 15 (`OFFLINE_MINUTEN.anzeige`) | – |
-| AN7 | ⚠ Wo genau liegt der **Dashboard-Bereich** in der Companion: im Board-Sheet unter „Anzeigen“ oder als eigener Eintrag in der Sidebar? | Board-Sheet unter „Anzeigen“ | – |
+| ~~AN5~~ | **Bestätigt (Max, 13.10.2026): ja und ja.** Angemeldete Anzeigen laufen nach Ablauf des Codes weiter; Widerrufen meldet alle Anzeigen des Codes ab. | – | – |
+| ~~AN6~~ | **Bestätigt (Max, 13.10.2026): 15 Minuten** (`OFFLINE_MINUTEN.anzeige`). | – | – |
+| ~~AN7~~ | **Bestätigt (Max, 13.10.2026): im Board-Sheet** unter „Anzeigen“. | – | – |
 | ~~AN8~~ | **Domain:** erledigt durch den Umbau – Seiten unter `mainhubv1.com` (Netlify), API unter `api.mainhubv1.com` (Pi, Tunnel), beides mit HTTPS. | – | – |
 | ~~AN9~~ | **Entschieden (Max, 13.10.2026):** Die verwechselbaren Zeichen `0 O 1 l I` werden beim Erzeugen weggelassen, siehe L7. | – | – |
-| AN10 | Wer sieht den **echten Namen** – nur der Nutzer selbst oder alle Konten des Boards? | nur der Nutzer selbst | L3 |
-| AN11 | **Inhalt der Willkommenskarte** nach dem Registrieren | Platzhalter mit „Willkommen, <Anzeigename>“ und „Weiter zur Companion“ | – |
-| AN12 | ⚠ **PIN offline prüfen:** Darf die Companion einen Hash der Konto-PIN lokal ablegen, damit die 30-Minuten-Sperre auch ohne Netz greift? Ohne ihn kann sie offline nur sperren, aber nicht entsperren. | lokaler scrypt-Hash im `localStorage` | L3 |
+| ~~AN10~~ | **Entschieden (Max, 13.10.2026): alle Konten des Boards** sehen den echten Namen (L18). | – | – |
+| ~~AN11~~ | **Bestätigt (Max, 13.10.2026): Platzhalter** mit „Willkommen, <Anzeigename>“ und „Weiter zur Companion“, bis Max den Inhalt liefert. | – | – |
+| ~~AN12~~ | **Bestätigt (Max, 13.10.2026): ja**, lokaler scrypt-Hash der Konto-PIN im `localStorage`. | – | – |
+| AN13 | **Neu durch L15:** Ohne Board-PIN kann sich jeder registrieren, der `mainhubv1.com` erreicht. Registrieren offen lassen, nur mit einer Einladung (z. B. einem Code wie beim Dashboard, erzeugt in der Companion) oder neue Konten erst nach Freigabe durch ein bestehendes Konto? | – | L2 |
