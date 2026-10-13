@@ -23,6 +23,7 @@
   2. **Offline B3–B5**, neu zugeschnitten (13.10.2026): B3 = Live-Modus ohne Netz, IndexedDB, Nachladen über `/api/aenderungen` (Nachtrag im Offline-Bauplan).
   3. A7 (Größenstufen je Widget): Planungsrunde mit Max
   4. Inhalte, die noch nicht beschrieben sind (Warteliste, Kapitel 4)
+  5. **Bauplan „Welt-Funde“** (erweiterter Welt-Import, E21): [`bauplaene/Bauplan-Welt-Funde.md`](bauplaene/Bauplan-Welt-Funde.md). **W0 gebaut** (13.10.2026): Weltordner direkt wählen oder hineinziehen, nur die gebrauchten Dateien gehen an den Worker; ⏸ H11 am iPhone. W1–W3 warten auf die Antworten zu fünf Fragen.
 - **Git:** Gearbeitet wird im Repo `cloud7too9/Companion-Board` (seit 05.10.2026). **Gemergt wird nur nach Rückfrage bei Max**, auch wenn Claude den Merge ausführt. Die Runden mit allen PRs: `docs/verlauf/Runden-und-PRs.md`.
 - **Tests:** alle grün in `main`, lokal und in der CI (Kapitel 6).
 
@@ -154,6 +155,8 @@ Voraussetzungen für die Playwright-Tests:
 ## 8. Was auf Max wartet (Details in `WARTELISTE.md`)
 
 - **H10:** Probe nach dem Umschalten auf das Dashboard.
+- **H11:** Weltordner am iPhone wählen (Welt-Import, W0).
+- **E21:** Bauplan „Welt-Funde“ abnicken, fünf Fragen beantworten.
 - **A7/E6:** Planungsrunde zu den Größenstufen je Widget und `seitenleistenBreite`.
 - **Inhalte beschreiben:**
   - Koordinatensammlung, Eigene Liste
@@ -173,4 +176,5 @@ Voraussetzungen für die Playwright-Tests:
    - Danach B4 (Offline-Regel, Warteschlange je Account) und B5 (Zustandswechsel, zuerst beim Abhaken der Sammelobjekte; `von`/`am` bei Wiederholung nicht überschreiben).
 3. **Nach A7:** echte Stufen statt der Platzhalter im Register, `SEITENLEISTEN_BREITE` setzen, größte Rasterstufe bauen.
 4. **Inhalte**, sobald beschrieben: Typen mit Quelle bekommen ihre Quelle in `widgets.js` (`quellenVon`) und ein Anzeigeschema in `board-karten.js`.
-5. **E8**, wenn an anderer Stelle geklärt: die Platzhalter-Themes in `themes.css` ersetzen. Am Widget-Code ändert sich nichts.
+5. **Welt-Funde (E21):** W0 (Weltordner) ist gebaut, ⏸ H11. Nach dem OK zu den fünf Fragen: W1 Funde lesen (⏸ H12 an einer echten Welt), W2 Prüfliste und Übernehmen (⏸ H13 am iPhone), W3 Strukturen ohne Truhe. Einzelheiten im Bauplan.
+6. **E8**, wenn an anderer Stelle geklärt: die Platzhalter-Themes in `themes.css` ersetzen. Am Widget-Code ändert sich nichts.

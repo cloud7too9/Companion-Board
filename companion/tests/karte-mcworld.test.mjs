@@ -1,10 +1,11 @@
-// Welt-Import (Biome aus .zip/.mcworld) in der Karte: Anleitung, Aufbauprüfung, Bestätigung mit
+// Welt-Import (Biome aus dem Weltordner, .zip oder .mcworld) in der Karte: Ordner wählen oder hineinziehen
+// (nur die gebrauchten Dateien), mehrere Welten zur Auswahl, Anleitung, Aufbauprüfung, Bestätigung mit
 // Weltname und Seed, Lesen im Worker, Prüfliste, Übernehmen, Biom-Ebene, Löschen – im DEMO über http,
 // als Datei und live gegen ein echtes Board. Die Welten baut welt-bauen.mjs (synthetisch); eine echte
 // Welt von Max (tests/daten/fixture-seed.mcworld) gibt es noch nicht.
 import { chromium } from "playwright";
 import { fileURLToPath } from "node:url";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -36,6 +37,17 @@ const DATEIEN = {
     ["db/CURRENT", new TextEncoder().encode("MANIFEST-000001\n")]])) },
 };
 
+// Weltordner wie in der Dateien-App am iPhone (mit Paketen, world_icon.jpeg, level.dat_old, LOCK, LOG)
+const ORDNER = mkdtempSync(path.join(tmpdir(), "weltordner-"));
+const ordnerSchreiben = (ziel, dateien) => { for (const [p, b] of dateien) { mkdirSync(path.dirname(path.join(ziel, p)), { recursive: true }); writeFileSync(path.join(ziel, p), b); } };
+const EINE_WELT = path.join(ORDNER, "z2l2cn0rmkA=");
+ordnerSchreiben(EINE_WELT, testweltBauen({ levelname: "Unsere Welt", beiwerk: true }).dateien);
+const ALLE_WELTEN = path.join(ORDNER, "minecraftWorlds");
+ordnerSchreiben(path.join(ALLE_WELTEN, "AAAA="), testweltBauen({ levelname: "Unsere Welt", beiwerk: true }).dateien);
+ordnerSchreiben(path.join(ALLE_WELTEN, "BBBB="), testweltBauen({ levelname: "Kreativ", seed: "-123456789" }).dateien);
+const KEINE_WELT = path.join(ORDNER, "db");
+ordnerSchreiben(KEINE_WELT, testweltBauen().dateien.filter(([p]) => p.startsWith("db/")).map(([p, b]) => [p.slice(3), b]));
+
 const browser = await chromium.launch(CHROMIUM_OPTIONEN);
 const fehler = [];
 async function handy() {
@@ -48,7 +60,7 @@ async function handy() {
 const text = (p, sel) => p.$eval(sel, (e) => e.textContent.replace(/\s+/g, " ").trim()).catch(() => "");
 const warteAuf = (p, fn, arg, ms = 8000) => p.waitForFunction(fn, arg, { timeout: ms }).then(() => true, () => false);
 const sheet = (p) => text(p, "#orteSheetInhalt");
-/** Datei wählen wie am Handy (die versteckte Eingabe hinter „Archiv.zip auswählen“) */
+/** Datei wählen wie am Handy (die versteckte Eingabe hinter „ZIP oder .mcworld wählen“) */
 const hochladen = (p, datei) => p.setInputFiles("#weltDatei", datei);
 /** Bildschirmposition einer Blockkoordinate auf der Karte */
 const anStelle = (p, x, z) => p.evaluate(([x, z]) => {
@@ -117,14 +129,53 @@ try {
   let s = await sheet(p);
   pruefe(s.includes("Weltordner aus der Dateien-App hochladen") && s.includes("iPhone") && s.includes("minecraftWorlds")
     && (await p.$$eval(".wi-anleitung li", (l) => l.length)) === 3, "Anleitung: drei Schritte, nur iPhone");
+  pruefe(s.includes("Weltordner hierher ziehen") && s.includes("Weltordner wählen") && s.includes("ZIP oder .mcworld wählen")
+    && await p.$eval("#weltOrdner", (i) => i.webkitdirectory), "Ablage-Fläche, „Weltordner wählen“ (webkitdirectory) und ZIP als Rückweg");
   pruefe(s.includes("Stand28.9.2026") && s.includes("Import löschen") && s.includes("nur in Gebieten, die schon jemand besucht hat"),
     "Stand des Imports, Löschen, Hinweis auf besuchte Gebiete");
   await p.screenshot({ path: `${DIR}/m4-import-start.png` });
 
+  // ---- Weltordner wählen: nur die gebrauchten Dateien, dann bestätigen ----
+  await p.setInputFiles("#weltOrdner", EINE_WELT);
+  pruefe(await warteAuf(p, () => wi.schritt === "bestaetigen"), "Weltordner gewählt → Bestätigung");
+  s = await sheet(p);
+  pruefe(s.includes("Unsere Welt") && s.includes(`${SEED} ✔`) && s.includes("Ordnerz2l2cn0rmkA=/")
+    && (await text(p, '[data-testid="wi-dateien"]')).startsWith("Gebraucht8 von 17 Dateien ·")
+    && await p.evaluate(() => wi.quelle.map((e) => e.pfad).sort().join()) === "db/000008.ldb,db/000011.ldb,db/000013.ldb,db/000014.log,db/CURRENT,db/MANIFEST-000015,level.dat,levelname.txt",
+    `Nur die gebrauchten Dateien gehen an den Worker: ${await text(p, '[data-testid="wi-dateien"]')}`);
+  await p.screenshot({ path: `${DIR}/m6b-weltordner.png` });
+  await p.click('[data-aktion="wi-neu"]');
+  pruefe(await warteAuf(p, () => wi.schritt === "start" && wi.quelle === null), "„Andere Welt“ → zurück zum Start");
+
+  // ---- minecraftWorlds gewählt: zwei Welten zur Auswahl ----
+  await p.setInputFiles("#weltOrdner", ALLE_WELTEN);
+  pruefe(await warteAuf(p, () => wi.schritt === "waehlen"), "minecraftWorlds → Auswahl der Welt");
+  pruefe((await p.$$eval('[data-aktion="wi-welt-waehlen"] .card-title', (l) => l.map((e) => e.textContent))).join() === "Kreativ,Unsere Welt",
+    "Beide Welten mit ihrem Namen aus levelname.txt");
+  await p.screenshot({ path: `${DIR}/m6c-welt-waehlen.png` });
+  await p.click('[data-aktion="wi-welt-waehlen"][data-nr="1"]');
+  pruefe(await warteAuf(p, () => wi.schritt === "bestaetigen" && wi.dateiname === "AAAA=/"), "Gewählte Welt wird geprüft");
+  await p.click('[data-aktion="wi-neu"]');
+  await p.setInputFiles("#weltOrdner", KEINE_WELT);
+  pruefe(await warteAuf(p, () => document.querySelector("#orteSheetInhalt .banner.bad")?.textContent.startsWith("Darin ist keine Welt.")),
+    "Nur db/ gewählt → „Darin ist keine Welt …“");
+
+  // ---- Hineinziehen: eine ZIP auf die Fläche ----
+  await p.evaluate(async (b64) => {
+    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const dt = new DataTransfer();
+    dt.items.add(new File([bytes], "Archiv.zip", { type: "application/zip" }));
+    const ziel = document.querySelector(".wi-ablage");
+    ziel.dispatchEvent(new DragEvent("dragover", { dataTransfer: dt, bubbles: true, cancelable: true }));
+    ziel.dispatchEvent(new DragEvent("drop", { dataTransfer: dt, bubbles: true, cancelable: true }));
+  }, DATEIEN.korrekt.buffer.toString("base64"));
+  pruefe(await warteAuf(p, () => wi.schritt === "bestaetigen" && wi.dateiname === "Archiv.zip"), "ZIP auf die Fläche gezogen → Bestätigung");
+  await p.click('[data-aktion="wi-neu"]');
+
   // ---- Aufbauprüfung ----
   await hochladen(p, DATEIEN.keinZip);
-  pruefe(await warteAuf(p, () => document.querySelector("#orteSheetInhalt .banner.bad")?.textContent === "Bitte die erzeugte Archiv.zip auswählen."),
-    "Keine ZIP → „Bitte die erzeugte Archiv.zip auswählen.“");
+  pruefe(await warteAuf(p, () => document.querySelector("#orteSheetInhalt .banner.bad")?.textContent === "Das ist keine ZIP. Bitte den Weltordner wählen oder eine .zip/.mcworld-Datei."),
+    "Keine ZIP → „Das ist keine ZIP …“");
   await hochladen(p, DATEIEN.ohneDb);
   pruefe(await warteAuf(p, () => document.querySelector("#orteSheetInhalt .banner.bad")?.textContent === "Das sieht nicht nach einem Minecraft-Weltordner aus."),
     "Ohne db/ → „Das sieht nicht nach einem Minecraft-Weltordner aus.“");
@@ -288,4 +339,5 @@ try {
   await server?.schliessen();
   if (board) { board.kill("SIGTERM"); await new Promise((r) => board.once("exit", r)); }
   if (tmp) rmSync(tmp, { recursive: true, force: true });
+  rmSync(ORDNER, { recursive: true, force: true });
 }

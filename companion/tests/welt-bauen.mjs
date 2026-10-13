@@ -223,10 +223,11 @@ function oberweltData3d(id, { mischung = null } = {}) {
  *   000014.log  am neuesten: (2,2) → Fluss, (3,3) gelöscht, Textschlüssel als Fehlalarme
  * optionen: ordner (Präfix im ZIP, z. B. „Meine Welt/“ wie von Hand gezippt am iPhone),
  *           altesManifest (zweites, veraltetes MANIFEST nach dem gültigen im ZIP),
- *           levelname (Inhalt von levelname.txt), ohne (Pfade mit diesem Anfang weglassen, z. B. "db/")
- * → { zip, erwartet: Map<"dim:cx:cz", id> }
+ *           levelname (Inhalt von levelname.txt), ohne (Pfade mit diesem Anfang weglassen, z. B. "db/"),
+ *           beiwerk (was ein echter Weltordner noch enthält: Pakete, world_icon.jpeg, level.dat_old, LOCK, LOG)
+ * → { zip, dateien: [[pfad, bytes]], erwartet: Map<"dim:cx:cz", id> }
  */
-export function testweltBauen({ ordner = "", altesManifest = false, seed = SEED, levelname = "Testwelt", ohne = [] } = {}) {
+export function testweltBauen({ ordner = "", altesManifest = false, seed = SEED, levelname = "Testwelt", ohne = [], beiwerk = false } = {}) {
   const erwartet = new Map();
   const alt = [];
   for (let cx = -40; cx < 40; cx++) for (let cz = -8; cz < 8; cz++) {
@@ -280,6 +281,14 @@ export function testweltBauen({ ordner = "", altesManifest = false, seed = SEED,
   ];
   // Veraltetes MANIFEST dahinter: kennt 000008 noch als gültig und 000011 gar nicht
   if (altesManifest) dateien.push(["db/MANIFEST-000004", manifestBauen({ neu: [{ level: 0, nr: 8 }, { level: 0, nr: 13 }], logNr: 3 })]);
-  const bleiben = dateien.filter(([p]) => !ohne.some((anfang) => p.startsWith(anfang)));
-  return { zip: zipBauen(bleiben.map(([p, b]) => [ordner + p, b])), erwartet };
+  // Wie im Weltordner am iPhone (Screenshot von Max, 13.10.2026): Pakete, Bild, alte level.dat, Sperrdatei und Protokoll der LevelDB
+  if (beiwerk) {
+    const text = (t) => new TextEncoder().encode(t);
+    dateien.push(["level.dat_old", levelDatBauen({ seed })], ["world_icon.jpeg", new Uint8Array(2048)],
+      ["world_behavior_packs.json", text("[]")], ["world_resource_packs.json", text("[]")],
+      ["behavior_packs/paket/manifest.json", text("{}")], ["resource_packs/paket/manifest.json", text("{}")],
+      ["db/LOCK", new Uint8Array(0)], ["db/LOG", text("Protokoll")], ["db/LOG.old", text("altes Protokoll")]);
+  }
+  const bleiben = dateien.filter(([p]) => !ohne.some((anfang) => p.startsWith(anfang))).map(([p, b]) => [ordner + p, b]);
+  return { zip: zipBauen(bleiben), dateien: bleiben, erwartet };
 }
