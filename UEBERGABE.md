@@ -4,7 +4,7 @@ Stand: 13.10.2026 · Einstieg für einen neuen Chat
 
 > **Repo-Umzug (05.10.2026):** Dieses Repo `Companion-Board` hat mit dem Stand von `flexibel-visionboard` (`main` 9d5be46) als einem Start-Commit begonnen. Der alte Verlauf, die alten Branches und die alten PR-Nummern liegen weiter in [`flexibel-visionboard`](https://github.com/cloud7too9/flexibel-visionboard). Mitgenommen wurde nur `bereich/karte-mcworld` als eigener Stand ohne Eltern (nicht mergen, nur nachschlagen).
 >
-> **Umbau auf Netlify + Raspberry Pi:** Plan und Haken in [`planung/UMBAUPLAN.md`](planung/UMBAUPLAN.md), Stand der Phasen in [`planung/UEBERGABE.md`](planung/UEBERGABE.md). Phasen 1–5 sind gebaut und abgeschlossen (Netlify-Probe am 13.10.2026); was Max für Cloudflare und den Pi tun muss, steht in [`koordinaten-board/pi/ANLEITUNG.md`](koordinaten-board/pi/ANLEITUNG.md).
+> **Umbau auf Netlify + Raspberry Pi:** Plan und Haken in [`planung/UMBAUPLAN.md`](planung/UMBAUPLAN.md), Stand der Phasen in [`planung/UEBERGABE.md`](planung/UEBERGABE.md). Phasen 1–5 sind abgeschlossen, Phase 6 ist seit dem 13.10.2026 in Betrieb (Pi, Tunnel, Domain `mainhubv1.com`; offen ist nur das Aufräumen, E18). Die Einrichtung steht in [`koordinaten-board/pi/ANLEITUNG.md`](koordinaten-board/pi/ANLEITUNG.md).
 
 > **Stand der Umsetzung von `planung/PLAN.md`** (Widget-Dashboard, Welt-Import, Accounts): [`planung/UEBERGABE.md`](planung/UEBERGABE.md) – was gebaut ist, Branches, Starten, Tests, nächste Schritte. Was auf Max wartet: [`planung/WARTELISTE.md`](planung/WARTELISTE.md).
 

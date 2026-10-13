@@ -2,7 +2,7 @@
 
 Stand: 05.10.2026 · Max
 
-> **Umsetzung:** Seit dem 05.10.2026 läuft der Umbau im Repo `cloud7too9/Companion-Board` (Start ohne Verlauf, der alte Verlauf liegt in `flexibel-visionboard`). Die Haken in den Phasen werden hier gesetzt; den Stand je Phase führt [`UEBERGABE.md`](UEBERGABE.md), Kapitel 1 und 9. Phasen 1–5 sind gebaut, gemergt (PRs #1–#7) und seit der Netlify-Probe am 13.10.2026 abgeschlossen; Phase 6 wartet auf Max, die Schritte stehen in [`koordinaten-board/pi/ANLEITUNG.md`](../koordinaten-board/pi/ANLEITUNG.md).
+> **Umsetzung:** Seit dem 05.10.2026 läuft der Umbau im Repo `cloud7too9/Companion-Board` (Start ohne Verlauf, der alte Verlauf liegt in `flexibel-visionboard`). Die Haken in den Phasen werden hier gesetzt; den Stand je Phase führt [`UEBERGABE.md`](UEBERGABE.md), Kapitel 1 und 9. Phasen 1–5 sind gebaut, gemergt (PRs #1–#7) und seit der Netlify-Probe am 13.10.2026 abgeschlossen; Phase 6 läuft seit dem 13.10.2026 (Pi, Tunnel, Domain, Probe über Mobilfunk bestanden); offen ist nur noch das Aufräumen (E18). Die Schritte stehen in [`koordinaten-board/pi/ANLEITUNG.md`](../koordinaten-board/pi/ANLEITUNG.md).
 
 ## Zielbild
 
@@ -131,8 +131,8 @@ Git: Push löst bei Netlify einen Vorschau-Build für den PR aus, dort testen, d
 
 - [x] Repo auf dem Pi klonen, nur `koordinaten-board/server` installieren, als systemd-Dienst starten *(13.10.2026: läuft bei Max. Vorbereitet war: `koordinaten-board/pi/companion-board.service`, `companion-board.env`, `sicherung.sh`, Befehle in `pi/ANLEITUNG.md`; ausführen muss Max am Pi)*
 - [x] `cloudflared` installieren, benannten Tunnel anlegen, `api.mainhubv1.com` zuordnen, ebenfalls als Dienst *(13.10.2026: läuft bei Max. Vorbereitet war: `pi/cloudflared-config.yml`, Befehle in `pi/ANLEITUNG.md`)*
-- [ ] Domain auf Cloudflare-DNS umstellen und Netlify zuordnen (Abschnitt „Eine Domain, drei Adressen“) *(Schritte in `pi/ANLEITUNG.md`, Abschnitt 3)*
-- [ ] Probe über Mobilfunk statt WLAN: QR scannen, beitreten, Ort anlegen, Board aktualisiert sich
+- [x] Domain auf Cloudflare-DNS umstellen und Netlify zuordnen (Abschnitt „Eine Domain, drei Adressen“) *(13.10.2026: `mainhubv1.com` liegt bei Cloudflare, Netlify liefert `/`, `/app/` und `/dashboard/` mit Zertifikat; `app/konfig.js` zeigt `apiAdresse: "https://api.mainhubv1.com"`, `pwa: true`. Schritte in `pi/ANLEITUNG.md`, Abschnitt 3)*
+- [x] Probe über Mobilfunk statt WLAN: QR scannen, beitreten, Ort anlegen, Board aktualisiert sich *(13.10.2026: bestanden. Beitreten über `https://mainhubv1.com/app/` ohne CORS-Fehler, QR-Code zeigt auf `/app/?pin=…`, Anzeige aktualisiert sich live)*
 - [ ] Aufräumen nach der Probe: `netzwerk.js`, Adress-Lernen und Firewall-Skripte braucht der Pi nicht mehr; sie bleiben für den Betrieb im Heimnetz vom Laptop aus (`pi/ANLEITUNG.md`, letzter Abschnitt). Entscheiden, ob dieser Betrieb noch gebraucht wird, sonst entfernen
 
 Git: Dienstdateien (`*.service`) und eine kurze Anleitung ins Repo, damit der Pi jederzeit neu aufsetzbar ist.

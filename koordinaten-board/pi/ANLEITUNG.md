@@ -2,7 +2,7 @@
 
 Stand: 13.10.2026 · gehört zu [`../../planung/UMBAUPLAN.md`](../../planung/UMBAUPLAN.md)
 
-Der Code für die Phasen 1 bis 5 ist fertig und lokal geprüft. Ab hier braucht es Konten, die Domain und den Pi, also Max. Die Domain ist `mainhubv1.com` (seit 13.10.2026; API unter `api.mainhubv1.com`).
+**Stand 13.10.2026: alles eingerichtet und über Mobilfunk geprobt.** Diese Anleitung bleibt, damit der Pi jederzeit neu aufsetzbar ist. Ab hier braucht es Konten, die Domain und den Pi, also Max. Die Domain ist `mainhubv1.com` (seit 13.10.2026; API unter `api.mainhubv1.com`).
 
 ## Reihenfolge (wann was)
 

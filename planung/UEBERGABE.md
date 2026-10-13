@@ -17,7 +17,7 @@
   - **Nur Bedrock (E15):** Java gibt es nirgendwo mehr, auch nicht bei den Portalen
 - **Umbau Netlify + Pi (`UMBAUPLAN.md`), Phasen 1–5 gebaut** (05.10.2026): Server abgesichert (Anzeige nur mit Link, `HOST`, `CF-Connecting-IP`, CORS, 6-stellige PIN), API-Adresse konfigurierbar (`konfig.js`, `VITE_API_URL`), Texterkennung am Handy (`texterkennung.js`, tesseract.js im Browser), SQLite (`daten.db`, `speicher.js`), Netlify-Build mit PWA (`netlify.toml`, `sw.js`). **Für Max:** neue 6-stellige PIN (QR-Code neu scannen); der Kiosk öffnet die Anzeige über `server/daten/anzeige-link.txt`; der Server braucht Node 22.13+; `daten.json` wird beim ersten Start nach `daten.db` übernommen.
 - **Als Nächstes** (Kapitel 9):
-  0. **Umbau:** Phasen 1–5 sind gebaut (PRs #1–#5) und abgeschlossen; die Netlify-Probe (H8) hat Max am 13.10.2026 bestanden. Phase 6 läuft: Pi und Tunnel laufen seit dem 13.10.2026, offen sind Domain/Netlify-Zuordnung, die Probe über Mobilfunk und das Aufräumen: alles, was Max tun muss, steht in `koordinaten-board/pi/ANLEITUNG.md`. Offen im Code: nach der Probe `netzwerk.js`, Adress-Lernen und Firewall-Skripte für den Pi aufräumen (Phase 6, letzter Punkt).
+  0. **Umbau:** Phasen 1–5 sind gebaut (PRs #1–#5) und abgeschlossen; die Netlify-Probe (H8) hat Max am 13.10.2026 bestanden. Phase 6 ist seit dem 13.10.2026 in Betrieb: Pi, Tunnel, Domain `mainhubv1.com`, Probe über Mobilfunk bestanden. Offen ist nur noch das Aufräumen (letzter Haken, hängt an E18). Die Einrichtung steht in alles, was Max tun muss, steht in `koordinaten-board/pi/ANLEITUNG.md`. Offen im Code: nach der Probe `netzwerk.js`, Adress-Lernen und Firewall-Skripte für den Pi aufräumen (Phase 6, letzter Punkt).
   1. **Bauplan „Sitzung“** (E16) schreiben und mit Max abnicken
   2. **Offline B3–B5** mit HTTPS am Board (N5 ist entschieden: eigenes Zertifikat)
   3. A7 (Größenstufen je Widget): Planungsrunde mit Max
@@ -211,7 +211,7 @@ Voraussetzungen für die Playwright-Tests:
 
 ## 9. Nächste Schritte
 
-0. **Umbau auf Netlify + Raspberry Pi** nach `UMBAUPLAN.md`: Phasen 1–5 sind gebaut und abgeschlossen (Netlify-Probe am 13.10.2026). Offen ist Phase 6 (Pi, Tunnel, Domain) bei Max nach `koordinaten-board/pi/ANLEITUNG.md`; dazu die vier offenen Entscheidungen im Umbauplan (Domain, Board-Gerät, Startseite, `/app/`-Inhalt). Danach der letzte Punkt von Phase 6 (Aufräumen von `netzwerk.js` und Co., falls der Heimnetz-Betrieb vom Laptop aus nicht mehr gebraucht wird).
+0. **Umbau auf Netlify + Raspberry Pi** nach `UMBAUPLAN.md`: Phasen 1–5 sind gebaut und abgeschlossen (Netlify-Probe am 13.10.2026). Phase 6 ist seit dem 13.10.2026 in Betrieb (Pi, Tunnel, Domain `mainhubv1.com`, Probe über Mobilfunk bestanden; Einrichtung in `koordinaten-board/pi/ANLEITUNG.md`); offen sind drei Entscheidungen im Umbauplan (Board-Gerät, Startseite, `/app/`-Inhalt; die Domain ist entschieden). Danach der letzte Punkt von Phase 6 (Aufräumen von `netzwerk.js` und Co., falls der Heimnetz-Betrieb vom Laptop aus nicht mehr gebraucht wird).
 1. **Bauplan „Sitzung“ (E16)** als `planung/bauplaene/Bauplan-Sitzung.md`, dann Max fragen. Fest steht:
    - Die Sitzung lebt, solange das Board läuft. Ein Neustart beginnt leer; das gespeicherte Layout der Anzeige (A6) bleibt.
    - Inhalte lassen sich während der Laufzeit live ändern.
