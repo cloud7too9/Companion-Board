@@ -3,7 +3,7 @@
 import Fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
 import fastifyWebsocket from '@fastify/websocket';
-import { randomBytes, randomInt, randomUUID } from 'node:crypto';
+import { randomBytes, randomInt } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
@@ -14,7 +14,6 @@ import QRCode from 'qrcode';
 import { companionApi } from './companion-api.js';
 import { anzeigeSicht } from './sicht.js';
 import { COMPANION_ORDNER } from './regeln.js';
-import { kartePruefen } from './zeigen.js';
 import { widgetKarte, widgetQuellen } from './widgets.js';
 
 const HIER = path.dirname(fileURLToPath(import.meta.url));
@@ -28,8 +27,7 @@ const OEFFENTLICHE_URL = (process.env.OEFFENTLICHE_URL ?? `http://localhost:${PO
 // Pfad der Companion unter OEFFENTLICHE_URL (Umbau Phase 5): lokal liefert der Server sie unter / aus, auf Netlify liegt sie unter /app/
 const COMPANION_PFAD = `/${(process.env.COMPANION_PFAD ?? '/').replace(/^\/+|\/+$/g, '')}/`.replace('//', '/');
 const DATEN = path.resolve(process.env.DATEN_ORDNER ?? path.join(HIER, '..', 'daten'));
-const CLIENT_DIST = path.resolve(HIER, '..', '..', 'client', 'dist');
-// Widget-Dashboard (companion/widgets, `npm run build` → dist/), ausgeliefert unter /dashboard
+// Widget-Dashboard (companion/widgets, `npm run build` → dist/), ausgeliefert unter /dashboard: die Anzeige (Bauplan „Sitzung“, S4)
 const DASHBOARD_DIST = path.join(COMPANION_ORDNER, 'widgets', 'dist');
 // Seite der Companion, die unter / ausgeliefert wird (später z. B. modul-a-live-karte.html)
 const COMPANION_DATEI = process.env.COMPANION_DATEI ?? 'companion-prototyp.html';
@@ -81,8 +79,8 @@ const anzeigeZugang = (req) => {
   return { erlaubt: Boolean(mitLink), anzeige: mitLink };
 };
 
-/** Anzeige-Link – dieselbe Adresse wie im QR-Code der Handys; ohne ihn ist kein Gerät Anzeige, auch das Board-Gerät nicht */
-const anzeigeLink = (a) => `${OEFFENTLICHE_URL}/anzeige?anzeige=${encodeURIComponent(a.id)}&schluessel=${encodeURIComponent(a.schluessel)}`;
+/** Anzeige-Link aufs Dashboard – dieselbe Adresse wie im QR-Code der Handys; ohne ihn ist kein Gerät Anzeige, auch das Board-Gerät nicht */
+const anzeigeLink = (a) => `${OEFFENTLICHE_URL}/dashboard?anzeige=${encodeURIComponent(a.id)}&schluessel=${encodeURIComponent(a.schluessel)}`;
 
 // ---------- Daten ----------
 
@@ -267,12 +265,8 @@ function anAlle(nachricht) {
   for (const v of verbindungen) if (v.socket.readyState === 1) v.socket.send(text);
 }
 
-// Karte, die gerade groß auf der alten Anzeige liegt („Auf die Anzeige werfen“, Weg bis S4).
-// Nur im Speicher: Nach einem Neustart ist die Anzeige wieder frei.
-let gezeigt = null;
-
 /**
- * „Aufs Board“ neu (Bauplan „Sitzung“, S1): { art:"zeigen", quelle, anzeigeId?, anfrage } legt die Quelle als
+ * „Aufs Board“ (Bauplan „Sitzung“): { art:"zeigen", quelle, anzeigeId?, anfrage } legt die Quelle als
  * Widget in die Sitzung der Anzeige (ohne anzeigeId: die erste); { art:"verbergen", instanzId } nimmt es weg.
  * Antwort ok { anfrage, instanzId }; live geht geaendert „layout“ mit anzeigeId an alle.
  */
@@ -283,23 +277,13 @@ async function sitzungBearbeiten(op, verbindung) {
     if (!anzeigeId) return antwortFehler('Es gibt keine Anzeige');
     if (op.art === 'zeigen') {
       const { instanz, neu } = daten.sitzungHinzufuegen(anzeigeId, { quelle: op.quelle, nutzer: verbindung.nutzer });
-      // Karte einmal bauen: Titel für die Liste am Handy, und bis S4 auch groß auf der alten Anzeige (gezeigt)
+      // Karte einmal bauen: ihr Titel steht in der Liste am Handy
       const { karte } = (await widgetKarte(daten, instanz.typ, instanz.quelle ?? '')) ?? { karte: null };
-      if (karte) {
-        if (neu || !instanz.titel) daten.sitzungen.titelSetzen(anzeigeId, instanz.id, karte.titel);
-        gezeigt = { id: instanz.id, ...karte, von: instanz.von, farbe: instanz.farbe, am: instanz.am };
-        anAlle({ art: 'gezeigt', karte: gezeigt });
-      }
+      if (karte && (neu || !instanz.titel)) daten.sitzungen.titelSetzen(anzeigeId, instanz.id, karte.titel);
       anAlle({ art: 'geaendert', bereich: 'layout', weltId: null, anzeigeId });
       senden(verbindung.socket, { art: 'ok', anfrage: op.anfrage, instanzId: instanz.id, titel: karte?.titel ?? instanz.titel });
     } else {
-      if (daten.sitzungEntfernen(anzeigeId, op.instanzId)) {
-        anAlle({ art: 'geaendert', bereich: 'layout', weltId: null, anzeigeId });
-        if (gezeigt?.id === op.instanzId) {
-          gezeigt = null;
-          anAlle({ art: 'gezeigt', karte: null });
-        }
-      }
+      if (daten.sitzungEntfernen(anzeigeId, op.instanzId)) anAlle({ art: 'geaendert', bereich: 'layout', weltId: null, anzeigeId });
       senden(verbindung.socket, { art: 'ok', anfrage: op.anfrage });
     }
   } catch (f) {
@@ -311,26 +295,13 @@ async function sitzungBearbeiten(op, verbindung) {
 
 /** Nachrichten zum Zeigen – true, wenn die Nachricht damit erledigt ist */
 function zeigenBearbeiten(op, verbindung) {
-  // Neuer Weg: Quelle statt fertiger Karte (zeigen) bzw. instanzId (verbergen)
   if ((op.art === 'zeigen' && typeof op.quelle === 'string') || (op.art === 'verbergen' && typeof op.instanzId === 'string')) {
     void sitzungBearbeiten(op, verbindung);
     return true;
   }
-  if (op.art === 'zeigen') {
-    const { karte, fehler } = kartePruefen(op.karte);
-    if (fehler) {
-      senden(verbindung.socket, { art: 'fehler', text: fehler, anfrage: op.anfrage });
-      return true;
-    }
-    gezeigt = { id: randomUUID(), ...karte, von: verbindung.nutzer.name, farbe: verbindung.nutzer.farbe, am: new Date().toISOString() };
-  } else if (op.art === 'verbergen') {
-    // Mit id nur genau diese Karte – sonst nähme ein spätes „Weg“ eine neuere Karte mit
-    if (gezeigt && (!op.id || op.id === gezeigt.id)) gezeigt = null;
-  } else {
-    return false;
-  }
-  anAlle({ art: 'gezeigt', karte: gezeigt });
-  senden(verbindung.socket, { art: 'ok', anfrage: op.anfrage });
+  if (op.art !== 'zeigen' && op.art !== 'verbergen') return false;
+  // Alter Weg mit fertiger Karte (bis S4): eine Companion aus dem Cache, die noch nicht neu geladen ist
+  senden(verbindung.socket, { art: 'fehler', text: 'Die Companion ist veraltet – bitte neu laden', anfrage: op.anfrage });
   return true;
 }
 
@@ -355,7 +326,6 @@ app.get('/ws', { websocket: true }, (socket, req) => {
 
   verbindungen.add(verbindung);
   senden(socket, { art: 'zustand', zustand: anzeigeSicht(daten) });
-  senden(socket, { art: 'gezeigt', karte: gezeigt });
   teilnehmerMelden();
 
   socket.on('message', (roh) => {
@@ -382,7 +352,7 @@ setInterval(() => {
   for (const v of verbindungen) if (v.socket.readyState === 1) v.socket.ping();
 }, 25_000).unref();
 
-// ---------- Ausliefern: Companion unter /, Anzeige unter /anzeige ----------
+// ---------- Ausliefern: Companion unter /, Anzeige (Widget-Dashboard) unter /dashboard ----------
 
 const OHNE_CACHE = { 'cache-control': 'no-cache' };
 app.get('/', (req, reply) => reply.headers(OHNE_CACHE).sendFile(COMPANION_DATEI, COMPANION_ORDNER));
@@ -400,10 +370,6 @@ await app.register(fastifyStatic, {
   root: path.join(COMPANION_ORDNER, 'ruestungs-baukasten'), prefix: '/ruestungs-baukasten/', maxAge: '7d', decorateReply: false,
 });
 
-if (existsSync(CLIENT_DIST)) {
-  // Baut nur noch die Anzeige; ihre Dateien liegen unter /assets/
-  await app.register(fastifyStatic, { root: CLIENT_DIST, prefix: '/', index: false, wildcard: false, decorateReply: false });
-}
 function dashboardSeite(reply) {
   if (!existsSync(path.join(DASHBOARD_DIST, 'index.html'))) {
     return reply.code(404).type('text/plain; charset=utf-8')
@@ -418,12 +384,16 @@ app.get('/dashboard', (req, reply) => {
   return reply.redirect(`/dashboard/${query === -1 ? '' : req.url.slice(query)}`);   // Anzeige-Link behält ?anzeige=…&schluessel=…
 });
 app.get('/dashboard/', (req, reply) => dashboardSeite(reply));
+// Die alte Anzeige gibt es nicht mehr (Bauplan „Sitzung“, S4): alte Anzeige-Links führen aufs Dashboard, mit Schlüssel
+const zumDashboard = (req, reply) => {
+  const query = req.url.indexOf('?');
+  return reply.redirect(`/dashboard/${query === -1 ? '' : req.url.slice(query)}`, 301);
+};
+app.get('/anzeige', zumDashboard);
+app.get('/anzeige/*', zumDashboard);
 
 app.setNotFoundHandler((req, reply) => {
   const pfad = req.url.split('?')[0];
-  if (req.method === 'GET' && /^\/anzeige(\/|$)/.test(pfad) && existsSync(CLIENT_DIST)) {
-    return reply.sendFile('index.html', CLIENT_DIST);
-  }
   if (req.method === 'GET' && pfad.startsWith('/dashboard/') && !pfad.startsWith('/dashboard/assets/')) return dashboardSeite(reply);
   return reply.code(404).send({ fehler: 'Nicht gefunden' });
 });
@@ -448,10 +418,8 @@ anzeigeLinkMerken();
 console.log(`\n  Koordinaten-Board läuft (lauscht auf ${HOST}:${PORT})`);
 console.log(`  Companion (Handys):      ${OEFFENTLICHE_URL}${COMPANION_PFAD === '/' ? '' : COMPANION_PFAD}   PIN ${PIN}`);
 const anzeigen = daten.anzeigenListe();
-for (const a of anzeigen) {
-  console.log(`  Anzeige${anzeigen.length > 1 ? ` „${a.name}“` : ''}: ${anzeigeLink(a)}`);
-  if (existsSync(DASHBOARD_DIST)) console.log(`  Widget-Dashboard${anzeigen.length > 1 ? ` „${a.name}“` : ''}: ${anzeigeLink(a).replace('/anzeige?', '/dashboard?')}`);
-}
+for (const a of anzeigen) console.log(`  Anzeige${anzeigen.length > 1 ? ` „${a.name}“` : ''}: ${anzeigeLink(a)}`);
+if (!existsSync(path.join(DASHBOARD_DIST, 'index.html'))) console.log('  (Dashboard nicht gebaut: npm run dashboard:installieren && npm run dashboard:build)');
 console.log(`  (Auch das Board-Gerät selbst braucht den Anzeige-Link; er steht in ${ANZEIGE_LINK_DATEI})`);
 if (!process.env.OEFFENTLICHE_URL) {
   console.log('  (QR-Code und Anzeige-Link zeigen auf localhost. Sollen andere Geräte beitreten: OEFFENTLICHE_URL setzen, z. B. https://mainhubv1.com)');

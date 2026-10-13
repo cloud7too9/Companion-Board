@@ -18,24 +18,23 @@ Zwei Projekte für eine gemeinsame Minecraft-Welt im Raum – seit dem 29.09.202
 
 - Das **Board** liefert die Companion unter `/` aus und hält alle Daten (`koordinaten-board/server/daten/daten.db`, SQLite). Handys scannen den QR-Code der Anzeige und treten mit der Board-PIN und ihrem Account (Name + eigene PIN) bei; Änderungen kommen bei allen live an.
 - Handy und Server prüfen mit **derselben Datei** `companion/regeln.js` und bauen Karten mit derselben Datei `companion/board-karten.js`.
-- Die **Anzeige** (`/anzeige`) zeigt die Orte der aktiven Welt; jeder Inhalt der Companion lässt sich per „Aufs Board“ groß darauf werfen (Anzeigeschema in `BOARD_KARTEN`).
-- Das **Widget-Dashboard** (`/dashboard`, in Arbeit) zeigt je Anzeige ihr Layout aus Widgets; die Inhalte sind Karten, die das Board mit denselben Anzeigeschemas baut.
+- Die **Anzeige** ist das **Widget-Dashboard** (`/dashboard`, seit Bauplan „Sitzung“ die einzige Anzeige): je Anzeige ein Layout aus Widgets, dazu Orte der aktiven Welt, QR-Code zum Beitreten und Spieler. Jeder Inhalt der Companion lässt sich per „Aufs Board“ als Widget in die Sitzung legen; die Karten baut das Board mit den Anzeigeschemas aus `BOARD_KARTEN`.
 - Seed-Map-Screenshots und Banner-Anleitungen liest die Companion seit Umbau Phase 3 am Handy selbst aus (`companion/texterkennung.js`, tesseract.js im Browser).
 - Beide nutzen dieselbe Optik (Dimensions-Themes aus `modul-a-live-karte.html`) und dieselben Seed-Map-Screenshots als Grundlage.
 - `modul-a-live-karte.html`, die Hauptdatei der Companion-PWA, liegt **nicht** in diesem Repo. Max pflegt sie selbst; das Board kann sie später statt des Prototyps ausliefern (`COMPANION_DATEI`).
 
 ## Netlify (Umbau Phase 5)
 
-`netlify.toml` baut die Seite aus diesem Repo: Anzeige unter `/`, Companion-PWA unter `/app/`, Widget-Dashboard unter `/dashboard/` (`netlify/bauen.sh`, Routen in `netlify/_redirects`). In Netlify: Site aus dem GitHub-Repo anlegen (Branch `main`), unter *Site configuration → Environment variables* `API_URL` auf die Adresse der API setzen (`https://api.mainhubv1.com`; ohne sie laufen die Seiten im DEMO-/Beispiel-Modus). Der Build wird lokal geprüft: `companion/tests/netlify.test.mjs`. Schritte für Domain, Tunnel und Pi: [`koordinaten-board/pi/ANLEITUNG.md`](koordinaten-board/pi/ANLEITUNG.md).
+`netlify.toml` baut die Seite aus diesem Repo: Companion-PWA unter `/app/`, die Anzeige (Widget-Dashboard) unter `/dashboard/`; `/` und alte Links auf `/anzeige` leiten dorthin (`netlify/bauen.sh`, Routen in `netlify/_redirects`). In Netlify: Site aus dem GitHub-Repo anlegen (Branch `main`), unter *Site configuration → Environment variables* `API_URL` auf die Adresse der API setzen (`https://api.mainhubv1.com`; ohne sie laufen die Seiten im DEMO-/Beispiel-Modus). Der Build wird lokal geprüft: `companion/tests/netlify.test.mjs`. Schritte für Domain, Tunnel und Pi: [`koordinaten-board/pi/ANLEITUNG.md`](koordinaten-board/pi/ANLEITUNG.md).
 
 ## Schnellstart
 
 ```bash
 # Alles zusammen: Board starten, dann am Handy den QR-Code der Anzeige scannen
 cd koordinaten-board && npm run installieren && npm run build && npm start   # lokal; der Betrieb läuft auf dem Pi, siehe koordinaten-board/pi/ANLEITUNG.md
-#   Companion: http://<ip>:3000/?pin=<PIN>   Anzeige: Anzeige-Link aus der Konsole (auch am Board-Gerät, Umbau Phase 1)
+#   Companion: http://<ip>:3000/?pin=<PIN>   Anzeige (Dashboard): Anzeige-Link aus der Konsole (auch am Board-Gerät, Umbau Phase 1)
 #   Anzeige auf einem anderen Gerät (TV, Tablet): Anzeige-Link aus der Konsole oder Companion → Board → Anzeigen
-#   Widget-Dashboard (in Arbeit): npm run dashboard:installieren && npm run dashboard:build, dann der Anzeige-Link mit /dashboard statt /anzeige
+#   npm run build baut das Dashboard (die Anzeige); installieren holt dessen Pakete mit
 
 # Companion ohne Board (DEMO-Mock mit Beispielwelt)
 open companion/companion-prototyp.html

@@ -1,6 +1,6 @@
 /**
  * Zustand der Anzeige vom Board (koordinaten-board/server/src/sicht.js → `zustand` über /ws),
- * dieselbe Form wie bei der alten Anzeige (client/src/lib/typen.ts). Die Widgets der Anzeige
+ * dieselbe Form wie bei der alten Anzeige (bis S4). Die Widgets der Anzeige
  * (Bauplan „Sitzung“, S3: Orte, Beitreten, Spieler, Zuletzt) rendern daraus, ohne Karte vom Server.
  */
 export type Dimension = "oberwelt" | "nether" | "ende";

@@ -34,7 +34,7 @@ Geht es um den Betrieb (Netlify, Pi, Tunnel), zum Beispiel:
 
 Geht es mit dem Plan weiter (Widget-Dashboard, Offline, Accounts), zum Beispiel:
 
-> Lies `UEBERGABE.md`, danach `planung/UEBERGABE.md` und `planung/WARTELISTE.md`. Schreib den Bauplan „Sitzung“ (E16) und leg ihn mir vor.
+> Lies `UEBERGABE.md`, danach `planung/UEBERGABE.md` und `planung/WARTELISTE.md`. Wie steht H10 (Probe nach dem Umschalten auf das Dashboard)?
 
 oder
 
@@ -103,8 +103,8 @@ Handy ──http──▶ Board-Server :3000
                 ├─ /regeln.js, /icons/…, /ruestungs-baukasten/…  aus companion/
                 ├─ /biom-*.js, /vendor/…  Welt-Import (Worker im Browser des Handys)
                 ├─ /api/…            Companion-API (daten.js) + Beitreten
-                ├─ /ws               Live: geaendert, zustand, gezeigt, teilnehmer
-                └─ /anzeige          React-Anzeige (nur mit Anzeige-Link): Orte der aktiven Welt
+                ├─ /ws               Live: geaendert, zustand, teilnehmer
+                └─ /dashboard        die Anzeige: Widget-Dashboard (nur mit Anzeige-Link); /anzeige leitet hierher
 Daten: koordinaten-board/server/daten/daten.db (SQLite; daten.json bleibt als Sicherung vom Umzug)
 ```
 
@@ -115,8 +115,8 @@ Daten: koordinaten-board/server/daten/daten.db (SQLite; daten.json bleibt als Si
 - **Welt-Import**: Biome kommen nur noch aus dem Weltordner (`.zip` aus der Dateien-App oder `.mcworld`). Die Companion liest ihn am Handy im Web Worker und schickt die Biome als Kacheln ans Board (`/api/welten/:id/biome`), je Welt ein Import. Einzelheiten in `companion/README.md` → Welt-Import.
 - **Anzeige steuern** (Board-Sheet der Companion): Welt auf der Anzeige, Titel, QR-Code; Orte anheften.
 - **Anzeige-Link**: Die Anzeige kann auf jedem Gerät im WLAN laufen (TV-Browser, Tablet). Jede Anzeige hat einen Link mit eigenem Schlüssel; die Companion zeigt ihn unter Board → Anzeigen (kopieren, QR-Code, umbenennen, neuer Schlüssel), die Konsole beim Start.
-- **Aufs Board**: Die Companion wirft Inhalte groß auf die Anzeige (Variante B, wie Chromecast). **Jeder Inhalt hat ein Anzeigeschema** (Wunsch von Max): `BOARD_KARTEN` übersetzt Ort, Sammelobjekt, Sammel-Fortschritt, Portal-Verbindung, Banner und Rüstungs-Set in allgemeine Karten (Titel + Blöcke `koordinaten`/`zeilen`/`text`/`bild`, optional `typ` für den Kennblock), geprüft in `koordinaten-board/server/src/zeigen.js`. Das Board kennt keine Bereiche; neue Bereiche tragen ihr Schema ein.
-- **Kennblöcke**: liegen nur noch in `companion/icons/`; die Anzeige lädt sie über den Server unter `/icons/`.
+- **Aufs Board**: Die Companion legt Inhalte als Widget in die Sitzung der Anzeige (Bauplan „Sitzung“, seit 13.10.2026; vorher groß über die alte Anzeige geworfen). **Jeder Inhalt hat ein Anzeigeschema** (Wunsch von Max): `BOARD_KARTEN` übersetzt Ort, Sammelobjekt, Sammel-Fortschritt, Portal-Verbindung, Banner und Rüstungs-Set in allgemeine Karten (Titel + Blöcke `koordinaten`/`zeilen`/`text`/`bild`, optional `typ` für den Kennblock), geprüft in `koordinaten-board/server/src/zeigen.js`. Das Board kennt keine Bereiche; neue Bereiche tragen ihr Schema ein.
+- **Kennblöcke**: liegen nur noch in `companion/icons/`; das Dashboard lädt sie über den Server (oder Netlify) unter `/icons/`.
 - **Dashboard**: Das Board ist das Raum-Dashboard. Jeder Companion-Bereich bekommt eigene Dashboard-Ansichten (Widgets), die dort laufen sollen.
   - Vorbild ist das **iOS-Kontrollzentrum**, siehe `referenz/dashboard/`: Ansichten in festen Rastergrößen 1×1, 2×1 und 2×2 auf 4 Spalten, Galerie „Ansicht hinzufügen“ nach Bereich gruppiert mit Suche, Bearbeiten-Modus mit „−“ und Griff zum Vergrößern.
   - Im Companion-Code vorbereitet: Der Modul-Vertrag in `BEREICHE` sieht `ansichten: [{ key, titel, groessen, render(el, groesse) }]` vor. Bisher nur dokumentiert. Die Anzeigeschemas sind ein möglicher Baustein dafür.
@@ -129,7 +129,7 @@ Daten: koordinaten-board/server/daten/daten.db (SQLite; daten.json bleibt als Si
 - `minecraft_tool_datenmodell.md`: das minimale Datenmodell
   - DATABASE: World (id, seed) → Dimension (overworld/nether/end) → FeatureInstance (x, y?, z)
   - STATIC: Biome, Group, FeatureCategory, FeatureType
-  - Der Board-Server speichert danach (`daten.js`), mit den Erweiterungen am Ende der Datei. Die Anzeige bekommt davon ihre einfache `Ort`-Form (`sicht.js` → `client/src/lib/typen.ts`).
+  - Der Board-Server speichert danach (`daten.js`), mit den Erweiterungen am Ende der Datei. Die Anzeige bekommt davon ihre einfache `Ort`-Form (`sicht.js` → `companion/widgets/src/features/anzeige/anzeige.types.ts`).
 - `seedmap/`: Chunkbase-Screenshots (Oberwelt, Nether, End, Feature-Liste, Stronghold-Popup). Grundlage für die Texterkennung der Companion (seit Umbau Phase 3 am Handy).
 - `banner/rezept-beispiel.jpg`: Banner-Anleitung von Max (Schritte „Black Base“ … „Black Base Sinister Canton“). Grundlage und Testbild für die Banner-Erkennung.
 - `dashboard/`: iOS-Kontrollzentrum als Vorbild für die Dashboard-Ansichten.
@@ -150,7 +150,7 @@ Daten: koordinaten-board/server/daten/daten.db (SQLite; daten.json bleibt als Si
    - Eine Seite pro Bereich (wie die Kontrollzentrum-Seiten)?
    - Wird am Handy oder an der Anzeige im Zimmer bearbeitet?
    - Welche Ansichten bekommt jeder Bereich? (wird beim jeweiligen Bereich geklärt)
-3. ~~Aufs Board~~ – **entschieden (04.10.2026):** Das Board bekommt eine Sitzung, die lebt, solange das Board läuft. „Aufs Board“ fügt den Inhalt als Widget an der ersten freien Stelle ein, am Handy verschieb- und entfernbar. Noch nicht gebaut (`planung/WARTELISTE.md`, E16).
+3. ~~Aufs Board~~ – **entschieden (04.10.2026):** Das Board bekommt eine Sitzung, die lebt, solange das Board läuft. „Aufs Board“ fügt den Inhalt als Widget an der ersten freien Stelle ein, am Handy verschieb- und entfernbar. **Gebaut (13.10.2026)** nach `planung/bauplaene/Bauplan-Sitzung.md`, S1–S4; das Dashboard ist die einzige Anzeige.
 4. **Aus der früheren Board-Steuerung** noch nicht übernommen: Notiz zu einem Ort, Kartenausschnitt als Bild, Export als JSON. Erweitert das Datenmodell.
 5. **Hetzner später**: Soll die Companion auch von unterwegs erreichbar sein (https, PWA installierbar)? Dann läuft derselbe Server dort, oder das Board verbindet sich nach außen.
 6. ~~Edition als Eigenschaft der Welt~~ – **entschieden (04.10.2026):** Es gibt nur Bedrock. Die Umschaltung Bedrock/Java in der Portal-Verwaltung ist entfernt.

@@ -4,6 +4,7 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { networkInterfaces } from "node:os";
 
 const HIER = fileURLToPath(new URL(".", import.meta.url));
 export const COMPANION = path.join(HIER, "..");
@@ -44,8 +45,14 @@ export async function anzeigeLinkQuery(datenOrdner) {
   throw new Error(`Anzeige-Link fehlt: ${datei}`);
 }
 
+// Steht ein Proxy in der Umgebung (https_proxy), schickt Chromium auch ws:// darüber – auch an die Netzwerkadresse
+// dieses Rechners, mit der die Tests ein Gerät „von außen“ nachstellen. Diese Adressen gehen direkt (no_proxy).
+const EIGENE_ADRESSEN = Object.values(networkInterfaces()).flat().filter((n) => n && !n.internal).map((n) => n.address);
+const OHNE_PROXY = [process.env.no_proxy ?? process.env.NO_PROXY, ...EIGENE_ADRESSEN].filter(Boolean).join(",");
+
 /** Chromium mit Software-WebGL (SwiftShader), damit die 3D-Figur auch ohne GPU läuft */
 export const CHROMIUM_OPTIONEN = {
   ...(process.env.CHROMIUM ? { executablePath: process.env.CHROMIUM } : {}),
   args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"],
+  env: { ...process.env, no_proxy: OHNE_PROXY, NO_PROXY: OHNE_PROXY },
 };

@@ -39,7 +39,7 @@ Eine Domain reicht völlig: Subdomains wie `api.` kosten nichts extra. Die Haupt
 
 | Adresse | Zeigt auf | Inhalt |
 | --- | --- | --- |
-| `mainhubv1.com` | Netlify | Board (heute `/anzeige`, später das Widget-Dashboard) |
+| `mainhubv1.com` | Netlify | Board: das Widget-Dashboard unter `/dashboard/`, `/` leitet dorthin (seit Bauplan „Sitzung“, S4) |
 | `mainhubv1.com/app/` | Netlify | Companion-PWA, Ziel des QR-Codes |
 | `api.mainhubv1.com` | Cloudflare Tunnel → Pi | REST-API und WebSocket |
 
@@ -61,7 +61,7 @@ Heute ist der Board-Server alles auf einmal: Webserver für alle Seiten, Datenha
 | Baustein | Heute | Nach dem Umbau |
 | --- | --- | --- |
 | Companion (`companion-prototyp.html`, `regeln.js`, `icons/`, `ruestungs-baukasten/`, `biom-*.js`, `vendor/`) | vom Server unter `/` | Netlify unter `/app/` |
-| Anzeige (`koordinaten-board/client`) | Server unter `/anzeige` | Netlify unter `/` |
+| Anzeige (`koordinaten-board/client`, seit S4 des Bauplans „Sitzung“ gelöscht) | Server unter `/anzeige` | ~~Netlify unter `/`~~ ersetzt durch das Widget-Dashboard |
 | Widget-Dashboard (`companion/widgets`) | Server unter `/dashboard` | Netlify unter `/dashboard/` |
 | Daten | `daten.json`, komplett im RAM, als Ganzes neu geschrieben (`daten.js`) | SQLite auf dem Pi |
 | Biome | `biome/<weltId>.json`, Upload bis 64 MB | SQLite, je Kachel eine Zeile |
@@ -160,11 +160,11 @@ Auf dem Pi bleiben genau zwei Dienste: die API (Fastify mit WebSocket, dazu SQLi
 
 ## Offene Entscheidungen und Risiken
 
-Stand 13.10.2026: Phase 6 ist abgeschlossen. Alle fünf Fragen sind entschieden; die Startseite (E20) wird mit dem Bauplan „Sitzung“ umgesetzt.
+Stand 13.10.2026: Phase 6 ist abgeschlossen. Alle fünf Fragen sind entschieden; die Startseite (E20) ist mit dem Bauplan „Sitzung“ (S4) umgesetzt.
 
 - [x] Welche Domain, und lässt der Registrar das Umstellen der Nameserver zu? *(Entschieden: `mainhubv1.com`; die API antwortet seit dem 13.10.2026 unter `https://api.mainhubv1.com/api/server` über den Tunnel.)*
 - [x] Welches Gerät zeigt das Board an (TV-Browser, Tablet, Laptop)? Der Pi fällt aus, Raspberry OS Lite hat keinen Desktop. *(Max, 13.10.2026: nicht festgelegt, bleibt offen; technisch egal, jedes Gerät mit Browser und Anzeige-Link)*
-- [x] Startseite der Domain: heutige Anzeige oder gleich das Widget-Dashboard, das sie später ersetzen soll? *(Entschieden 13.10.2026 im Bauplan „Sitzung“: das Dashboard wird die einzige Anzeige, `/` leitet auf `/dashboard/` um; umgesetzt in Phase S4.)*
+- [x] Startseite der Domain: heutige Anzeige oder gleich das Widget-Dashboard, das sie später ersetzen soll? *(Entschieden 13.10.2026 im Bauplan „Sitzung“: das Dashboard wird die einzige Anzeige, `/` leitet auf `/dashboard/` um; umgesetzt in Phase S4, 13.10.2026.)*
 - [x] Kommt nach `/app/` der Prototyp oder deine eigene `modul-a-live-karte.html`, die nicht im Repo liegt? *(Max, 13.10.2026: **der Prototyp, so wie jetzt. Der aktuelle Prototyp ist der Hauptstand.** `modul-a-live-karte.html` bleibt nur die Herkunft der Optik.)*
 - [x] Welche Node-Version läuft auf dem Pi (`node -v`)? Ab 22.13 reicht `node:sqlite`. *(Entfällt: Der Pi bekommt laut Anleitung Node 22 LTS von NodeSource, `package.json` verlangt `>=22.13`.)*
 

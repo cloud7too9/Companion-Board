@@ -1,7 +1,7 @@
-// Netlify-Stand (Umbau Phase 5): netlify/bauen.sh baut Anzeige (/), Companion (/app/) und Dashboard (/dashboard/)
+// Netlify-Stand (Umbau Phase 5): netlify/bauen.sh baut Companion (/app/) und die Anzeige, das Dashboard (/dashboard/),
 // mit der Adresse einer API auf einem anderen Ursprung. Hier liefert ein kleiner Server den Build mit den
-// _redirects aus, das Board läuft daneben: Beitreten als PWA, QR-Code zeigt auf /app/, Anzeige und Dashboard
-// mit Anzeige-Link, Kennblöcke unter /icons/, Service Worker hält die App-Shell auch offline bereit.
+// _redirects aus, das Board läuft daneben: Beitreten als PWA, QR-Code zeigt auf /app/, / und alte Anzeige-Links
+// führen aufs Dashboard (Bauplan „Sitzung“, S4), Kennblöcke unter /icons/, Service Worker hält die App-Shell offline bereit.
 import { chromium } from "playwright";
 import { fileURLToPath } from "node:url";
 import { mkdtempSync, rmSync, mkdirSync, existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -24,7 +24,7 @@ const warteAuf = (p, fn, arg, ms = 8000) => p.waitForFunction(fn, arg, { timeout
 // ---- Bauen wie bei Netlify (ohne npm ci: node_modules sind da) ----
 const DIST = path.join(TMP, "dist");
 execFileSync("bash", ["netlify/bauen.sh"], { cwd: WURZEL, stdio: "ignore", env: { ...process.env, API_URL: BOARD, ZIEL: DIST, OHNE_INSTALL: "1" } });
-pruefe(existsSync(path.join(DIST, "index.html")) && existsSync(path.join(DIST, "app/index.html")) && existsSync(path.join(DIST, "dashboard/index.html")), "Build: Anzeige, Companion unter app/, Dashboard unter dashboard/");
+pruefe(!existsSync(path.join(DIST, "index.html")) && existsSync(path.join(DIST, "app/index.html")) && existsSync(path.join(DIST, "dashboard/index.html")), "Build: Companion unter app/, Dashboard unter dashboard/, keine alte Anzeige unter /");
 pruefe(readFileSync(path.join(DIST, "app/konfig.js"), "utf8").includes(`apiAdresse: "${BOARD}"`) && existsSync(path.join(DIST, "icons/struktur_kennbloecke/stronghold.png")), "Build: konfig.js nennt die API, Kennblöcke unter /icons/");
 pruefe(!readFileSync(path.join(DIST, "app/sw.js"), "utf8").includes("__STAND__"), "Build: Stand im Service Worker eingesetzt");
 
@@ -61,6 +61,10 @@ try {
   const um = await fetch(`${SEITE}/app?pin=1`, { redirect: "manual" });
   pruefe(um.status === 301 && um.headers.get("location") === "/app/?pin=1", "/app → /app/ (Query bleibt)");
   pruefe((await fetch(`${SEITE}/dashboard/vollbild/w-x`)).headers.get("content-type").startsWith("text/html"), "/dashboard/* → Dashboard-Seite");
+  for (const [von, nach] of [["/", "/dashboard/"], [`/${link}`, `/dashboard/${link}`], [`/anzeige${link}`, `/dashboard/${link}`], ["/anzeige/x", "/dashboard/"]]) {
+    const r = await fetch(SEITE + von, { redirect: "manual" });
+    pruefe(r.status === 301 && r.headers.get("location") === nach, `${von.split("?")[0]} → /dashboard/${von.includes("?") ? " (Anzeige-Link bleibt)" : ""}`);
+  }
   const anzeigeApi = await (await fetch(`${BOARD}/api/anzeige${link}`)).json();
   pruefe(anzeigeApi.beitrittsUrl === `${SEITE}/app/?pin=${PIN}`, `QR-Code zeigt auf die Companion unter /app/ (${anzeigeApi.beitrittsUrl})`);
 
@@ -90,20 +94,24 @@ try {
   pruefe(ort.instanz?.id, `Ort über die API angelegt (${ort.instanz?.id ?? ort.message})`);
   await p.screenshot({ path: `${DIR}/n1-companion-app.png` });
 
-  // ---- Anzeige unter / mit Anzeige-Link, Kennblock aus /icons/ ----
+  // ---- Die Anzeige: Startseite → Dashboard, nur mit Anzeige-Link; Kennblock aus /icons/ ----
   const tv = await browser.newPage({ viewport: { width: 1600, height: 900 } });
   tv.on("pageerror", (e) => fehler.push(`Anzeige: ${e.message}`));
   await tv.goto(`${SEITE}/`);
-  pruefe(await warteAuf(tv, () => document.querySelector(".a-fehler")?.textContent.includes("Anzeige-Link")), "Anzeige ohne Link: gesperrt");
-  await tv.goto(`${SEITE}/anzeige${link}`);
-  pruefe(await warteAuf(tv, () => document.querySelector("h1")?.textContent === "Netlify-Welt" && document.querySelector(".a-zeile")), "Anzeige mit Link: Titel und Ort vom Board");
-  pruefe(await warteAuf(tv, () => [...document.querySelectorAll("img.kennblock")].some((i) => i.complete && i.naturalWidth > 0 && i.src.includes("/icons/struktur_kennbloecke/"))), "Kennblock der Festung kommt von /icons/");
+  pruefe(await warteAuf(tv, () => location.pathname === "/dashboard/"
+    && document.querySelector('[data-panel-id="w-orte"] [data-testid="widget-leer"]')?.textContent === "Diese Anzeige braucht ihren Anzeige-Link"), "Startseite → Dashboard, ohne Link gesperrt");
+  await tv.goto(`${SEITE}/${link}`);
+  pruefe(await warteAuf(tv, () => location.pathname === "/dashboard/" && document.querySelector('[data-testid="anzeige-titel"]')?.textContent === "Netlify-Welt"
+    && document.querySelector('[data-panel-id="w-sammelstatus"] [data-testid="karte"]') && !document.querySelector('[data-testid="beispielkarten"]'), null, 15000),
+    "Startseite mit Anzeige-Link: Dashboard mit Titel und Karten vom Board");
+  pruefe(await warteAuf(tv, () => [...document.querySelectorAll('[data-panel-id="w-orte"] [data-testid="ort-zeile"]')].some((z) => z.textContent.includes("Stronghold (Stairway)"))
+    && [...document.querySelectorAll('[data-panel-id="w-orte"] img.kennblock')].some((i) => i.complete && i.naturalWidth > 0 && i.src.includes("/icons/struktur_kennbloecke/"))),
+    "Orte: Stronghold mit Kennblock von /icons/");
   await tv.screenshot({ path: `${DIR}/n2-anzeige-netlify.png` });
-
-  // ---- Dashboard unter /dashboard/ mit Anzeige-Link ----
-  await tv.goto(`${SEITE}/dashboard${link}`);
-  pruefe(await warteAuf(tv, () => location.pathname === "/dashboard/" && document.querySelector('[data-panel-id="w-sammelstatus"] [data-testid="karte"]') && !document.querySelector('[data-testid="beispielkarten"]'), null, 15000), "Dashboard zeigt Karten vom Board (keine Beispielkarten)");
-  await tv.screenshot({ path: `${DIR}/n3-dashboard-netlify.png` });
+  // Alter Anzeige-Link (/anzeige?…) führt aufs Dashboard
+  await tv.goto(`${SEITE}/anzeige${link}`);
+  pruefe(await warteAuf(tv, () => location.pathname === "/dashboard/" && location.search.includes("schluessel=") && document.querySelector('[data-testid="anzeige-titel"]')?.textContent === "Netlify-Welt"),
+    "Alter Anzeige-Link → Dashboard");
 
   // ---- Neue Version: Knopf „Aktualisieren“ (Max, 05.10.2026) ----
   await warteAuf(p, () => navigator.serviceWorker.controller !== null, null, 10000);

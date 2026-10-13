@@ -83,8 +83,10 @@ async function jsonLaden<T>(url: string, beiFehler: (status: number) => T, token
   }
 }
 
-const fehlerHinweis = (status: number) =>
-  status === 403 ? "Diese Anzeige braucht ihren Anzeige-Link" : status === 404 ? "Unbekanntes Widget" : "Board nicht erreichbar";
+/** 403 an der Anzeige: ohne Link „braucht ihren Anzeige-Link“, mit (gemerktem) Link hat jemand einen neuen Schlüssel erzeugt */
+const fehlerHinweis = (status: number, zugang: Zugang | null = null) =>
+  status === 403 ? (zugang ? "Dieser Anzeige-Link gilt nicht mehr" : "Diese Anzeige braucht ihren Anzeige-Link")
+    : status === 404 ? "Unbekanntes Widget" : "Board nicht erreichbar";
 
 export const useBoardStore = create<BoardState>((set, get) => ({
   modus: "pruefen",
@@ -139,7 +141,7 @@ export const useBoardStore = create<BoardState>((set, get) => ({
       set({
         beitritt: beitritt && { beitrittsUrl: beitritt.beitrittsUrl, adresse: beitritt.adresse, pin: beitritt.pin },
         qrSvg: qr?.svg ?? "",
-        zugangHinweis: ohneLink ? fehlerHinweis(403) : null,
+        zugangHinweis: ohneLink ? fehlerHinweis(403, zugang) : null,
       });
     };
 
@@ -168,7 +170,7 @@ export const useBoardStore = create<BoardState>((set, get) => ({
         if (aus) return;
         set({ verbunden: false });
         // 4003: kein oder ein alter Anzeige-Link, 4001: Anmeldung abgelaufen – neu verbinden hilft nicht
-        if (e.code === 4003) set({ zugangHinweis: fehlerHinweis(403) });
+        if (e.code === 4003) set({ zugangHinweis: fehlerHinweis(403, zugang) });
         if (e.code === 4003 || e.code === 4001) return geaendert();
         warten = setTimeout(() => verbinden(versuch + 1), Math.min(10_000, 1000 * 2 ** versuch));
       };
@@ -215,12 +217,12 @@ export const useBoardStore = create<BoardState>((set, get) => ({
     if (get().modus !== "board") return mockKarte(typ, quelle);
     const parameter = { ...(quelle ? { quelle } : {}), ...zugangParameter(get().zugang) };
     return jsonLaden<WidgetAntwort>(adresse(`/api/widgets/${encodeURIComponent(typ)}`, parameter),
-      (status) => ({ karte: null, hinweis: fehlerHinweis(status) }), get().token);
+      (status) => ({ karte: null, hinweis: fehlerHinweis(status, get().zugang) }), get().token);
   },
 
   quellenLaden: async (typ) => {
     if (get().modus !== "board") return mockQuellen(typ);
     return jsonLaden<QuellenAntwort>(adresse(`/api/widgets/${encodeURIComponent(typ)}/quellen`, zugangParameter(get().zugang)),
-      (status) => ({ quelle: null, quellen: [], fehler: fehlerHinweis(status) }), get().token);
+      (status) => ({ quelle: null, quellen: [], fehler: fehlerHinweis(status, get().zugang) }), get().token);
   },
 }));

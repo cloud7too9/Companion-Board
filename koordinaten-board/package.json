@@ -2,15 +2,15 @@
   "name": "koordinaten-board",
   "version": "0.1.0",
   "private": true,
-  "description": "Koordinaten-Board: Server der Companion (API, SQLite, Live-Sync) und Anzeige im Raum",
+  "description": "Koordinaten-Board: Server der Companion (API, SQLite, Live-Sync); die Anzeige im Raum ist das Widget-Dashboard (companion/widgets)",
   "scripts": {
-    "installieren": "npm --prefix server install && npm --prefix client install",
-    "build": "npm --prefix client run build",
+    "installieren": "npm --prefix server install && npm --prefix ../companion/widgets install",
+    "build": "npm --prefix ../companion/widgets run build",
     "dashboard:installieren": "npm --prefix ../companion/widgets install",
     "dashboard:build": "npm --prefix ../companion/widgets run build",
     "start": "npm --prefix server start",
     "test": "npm --prefix server test",
     "dev:server": "npm --prefix server run dev",
-    "dev:client": "npm --prefix client run dev"
+    "dev:dashboard": "npm --prefix ../companion/widgets run dev"
   }
 }

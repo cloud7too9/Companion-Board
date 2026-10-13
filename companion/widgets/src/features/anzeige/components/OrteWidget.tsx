@@ -42,7 +42,7 @@ function Zeile({ o, jetzt }: { o: Ort; jetzt: number }) {
         <OrtIcon typ={o.typ} kategorie={o.kategorie} />
       </span>
       <span className="flex min-w-0 items-center gap-[0.5em]">
-        <b className="truncate">{o.name}</b>
+        <b className="truncate" data-testid="ort-name">{o.name}</b>
         {istNeu(o, jetzt) && <Neu />}
         <span className="ml-auto shrink-0 text-[0.75em] text-text-muted">{o.typ || kategorieLabel(o.kategorie)}</span>
       </span>
@@ -85,7 +85,7 @@ export function OrteWidget({ gross = false }: { gross?: boolean }) {
               <div className="flex items-center gap-[0.6em]">
                 <span className="grid h-[2.4em] w-[2.4em] shrink-0 place-items-center rounded-md bg-accent/15 text-accent"><OrtIcon typ={o.typ} kategorie={o.kategorie} groesse={22} /></span>
                 <div className="min-w-0">
-                  <div className="flex items-center gap-[0.5em] font-bold"><span className="truncate">{o.name}</span>{istNeu(o, jetzt) && <Neu />}</div>
+                  <div className="flex items-center gap-[0.5em] font-bold"><span className="truncate" data-testid="ort-name">{o.name}</span>{istNeu(o, jetzt) && <Neu />}</div>
                   <div className="truncate text-[0.8em] text-text-muted">{dimensionLabel(o.dimension)} · {o.typ || kategorieLabel(o.kategorie)}</div>
                 </div>
               </div>

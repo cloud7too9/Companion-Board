@@ -159,7 +159,7 @@ test('Anzeige-Link: von außen nur mit gültigem Schlüssel, neuer Schlüssel ma
   assert.equal(board.name, 'Board');
   assert.equal('schluessel' in board, false, 'Schlüssel nur im Link');
   const link = new URL(board.link);
-  assert.equal(link.pathname, '/anzeige');
+  assert.equal(link.pathname, '/dashboard', 'der Anzeige-Link führt aufs Dashboard (S4)');
   const aussen = (pfad, query = '') => fetch(`http://${AUSSEN}:${PORT}${pfad}${query}`);
 
   // Ohne Link gesperrt, auch auf dem Board-Gerät selbst (localhost); mit Link erlaubt
@@ -255,6 +255,11 @@ test('Widget-Dashboard unter /dashboard: Anzeige-Link bleibt beim Umleiten, eige
   const um = await fetch(`${BASIS}/dashboard?anzeige=a_1&schluessel=abc`, { redirect: 'manual' });
   assert.equal(um.status, 302);
   assert.equal(um.headers.get('location'), '/dashboard/?anzeige=a_1&schluessel=abc');
+  // Die alte Anzeige gibt es nicht mehr (S4): alte Links führen mit Schlüssel aufs Dashboard
+  for (const [pfad, ziel] of [['/anzeige?anzeige=a_1&schluessel=abc', '/dashboard/?anzeige=a_1&schluessel=abc'], ['/anzeige', '/dashboard/'], ['/anzeige/x', '/dashboard/']]) {
+    const alt = await fetch(BASIS + pfad, { redirect: 'manual' });
+    assert.deepEqual([alt.status, alt.headers.get('location')], [301, ziel], pfad);
+  }
   const gebaut = existsSync(fileURLToPath(new URL('../../../companion/widgets/dist/index.html', import.meta.url)));
   for (const pfad of ['/dashboard/', '/dashboard/vollbild/w-portale']) {
     const res = await fetch(BASIS + pfad);
@@ -415,8 +420,6 @@ test('Aufs Board als Sitzungs-Widget (Bauplan Sitzung, S1): zeigen mit Quelle, L
   let l = (await anfrage('GET', `/api/anzeige/layout${q}`)).daten.layout;
   assert.deepEqual([l.aktiverLayer, l.layer[0].id, l.layer[0].instanzen.map((i) => [i.typ, i.quelle, i.x, i.y, i.von, i.herkunft, i.titel])],
     ['sitzung', 'sitzung', [['portale.verbindung', portal.id, 0, 0, 'Max', `portal:${portal.id}`, 'Hof']]]);
-  // Bis S4 liegt die Karte auch groß auf der alten Anzeige
-  assert.ok(nachrichten.some((n) => n.art === 'gezeigt' && n.karte?.titel === 'Hof' && n.karte.id === a.instanzId), 'gezeigt mit derselben Instanz-ID');
   assert.ok(nachrichten.some((n) => n.art === 'geaendert' && n.bereich === 'layout' && n.anzeigeId === board.id), 'geaendert layout mit Anzeige-ID');
   assert.equal((await anfrage('GET', `/api/widgets/portale.verbindung${q}&quelle=${portal.id}`)).daten.karte.titel, 'Hof', 'das Widget hat seine Karte');
   // Dieselbe Quelle noch einmal: dieselbe Instanz. Zweite Quelle: daneben.
@@ -438,11 +441,10 @@ test('Aufs Board als Sitzungs-Widget (Bauplan Sitzung, S1): zeigen mit Quelle, L
   assert.equal((await antwort(7)).art, 'ok');
   l = (await anfrage('GET', `/api/anzeige/layout${q}`)).daten.layout;
   assert.deepEqual(l.layer[0].instanzen.map((i) => i.typ), ['portale.verbindung']);
-  assert.ok(nachrichten.some((n) => n.art === 'gezeigt' && n.karte === null), 'Wegnehmen der zuletzt gezeigten Karte räumt die alte Anzeige');
-  // Der alte Weg (fertige Karte → gezeigt) läuft bis S4 weiter
+  // Der alte Weg mit fertiger Karte ist mit S4 weg; die alte Anzeige und die Nachricht „gezeigt“ auch
   ws.send(JSON.stringify({ art: 'zeigen', karte: { titel: 'Alt', dimension: null, bloecke: [{ art: 'text', text: 'noch da' }] }, anfrage: 8 }));
-  assert.equal((await antwort(8)).art, 'ok');
-  assert.ok(nachrichten.some((n) => n.art === 'gezeigt' && n.karte?.titel === 'Alt'));
+  assert.equal((await antwort(8)).text, 'Die Companion ist veraltet – bitte neu laden');
+  assert.ok(!nachrichten.some((n) => n.art === 'gezeigt'), 'keine Nachricht „gezeigt“ mehr');
   ws.close();
   await anfrage('PUT', '/api/board/einstellungen', max, { aktiveWelt: null });
 });

@@ -143,9 +143,12 @@ Bauplan: `planung/bauplaene/Bauplan-Widget-Inhalte.md`, Entscheidung E3.
   „Noch keine Welt auf dem Board“.
 - **Live:** Das Dashboard hört auf `/ws` (Rolle Anzeige); nach jedem
   `geaendert` laden alle Widgets ihre Karte neu.
-- **Anzeige-Link:** `?anzeige=…&schluessel=…` wie bei `/anzeige`; der Browser
-  merkt sich den Schlüssel (`anzeige.zugang`). Ohne gültigen Link von einem
-  anderen Gerät zeigen die Widgets „Diese Anzeige braucht ihren Anzeige-Link“.
+- **Anzeige-Link:** `?anzeige=…&schluessel=…`; der Browser merkt sich den
+  Schlüssel (`anzeige.zugang`, derselbe Name wie früher bei `/anzeige`). Ohne
+  Link zeigen die Widgets „Diese Anzeige braucht ihren Anzeige-Link“, mit einem
+  Link, der nach „Neuer Schlüssel“ nicht mehr gilt, „Dieser Anzeige-Link gilt
+  nicht mehr“. Seit Bauplan „Sitzung“ (S4) ist das Dashboard die einzige
+  Anzeige; `/anzeige` leitet mit Schlüssel hierher um.
 - **Ohne Board** (`GET /api/server` antwortet nicht): feste Beispielkarten aus
   `lib/mock-karten.ts`, im Kopf steht „Beispielkarten“.
 - Die Schrift der Karten wächst mit der Zelle (`--zelle`); was nicht passt, wird

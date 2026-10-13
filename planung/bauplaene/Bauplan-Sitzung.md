@@ -2,7 +2,7 @@
 
 Stand: 13.10.2026 · Grundlage: Entscheidung E16 (Max, 04.10.2026) und Warteliste E20 · Setzt voraus: Bauplan-Widget-Struktur, Bauplan-Widget-Groessensystem, Widget-Dashboard A0–A6 (gebaut)
 
-> **Status: abgenommen (Max, 13.10.2026).** Alle fünf Fragen sind entschieden, siehe „Entschieden“ am Ende. Gebaut wird in den Phasen S1–S4, je auf eigenem Branch.
+> **Status: gebaut (13.10.2026, S1–S4).** Abgenommen von Max am 13.10.2026, alle fünf Fragen entschieden (siehe „Entschieden“ am Ende). Offen ist nur noch der Haltepunkt H10 (Probe nach dem Umschalten).
 
 Dieser Bauplan beschreibt die technischen Entscheidungen. Er baut auf dem auf, was im Repo liegt (Pfade und Zeilen Stand `main` vom 13.10.2026).
 
@@ -123,6 +123,13 @@ Technisch:
 - `koordinaten-board/client/` wird nach H10 gelöscht (entschieden, Frage 5). CI-Job „Board installieren und bauen“ entsprechend angepasst.
 - Tests, die umgeschrieben werden: `server/test/api.test.js` (Pfad `/anzeige` → `/dashboard`, Nachricht `gezeigt` → Layout), Playwright `anzeige-link`, `anzeigeschema`, `board`, `live`, `netlify` (Selektoren `.a-*`/`.g-*` → Dashboard, „Aufs Board“ prüft das Sitzungs-Widget), `widgets-anordnen` (ohne `client/dist`).
 - Doku: `koordinaten-board/README.md`, `UEBERGABE.md`, `pi/ANLEITUNG.md` (Probe-Abschnitt), `netlify.toml`-Kommentar, `UMBAUPLAN.md` (Zielbild).
+- **Gebaut (S4, 13.10.2026), Abweichungen:**
+  - `/anzeige` fällt nicht ersatzlos weg, sondern leitet mit Query per 301 auf `/dashboard/` um (Server und Netlify). So funktionieren gespeicherte Links und Lesezeichen am Fernseher weiter; das Dashboard merkt sich den Schlüssel unter demselben Namen wie die alte Anzeige.
+  - `koordinaten-board/client/` ist schon im S4-PR gelöscht, in einem eigenen Commit („Alte Anzeige entfernt“), der sich bei Problemen in H10 einzeln zurücknehmen lässt. Ausgeliefert und gebaut wird die alte Anzeige ohnehin nirgends mehr.
+  - Eine Companion aus dem Cache, die noch eine fertige Karte schickt, bekommt „Die Companion ist veraltet – bitte neu laden“ statt einer stillen Ablehnung.
+  - Das Dashboard unterscheidet wie die alte Anzeige „braucht ihren Anzeige-Link“ und „Dieser Anzeige-Link gilt nicht mehr“ (nach „Neuer Schlüssel“).
+  - Nicht übernommen: das langsame Durchscrollen langer Listen und das kurze Aufleuchten neuer Orte der alten Anzeige; „Neu“ (90 s) gibt es. Frage an Max in H10.
+  - Am Pi ändert sich nur der Server (Update wie immer); das Dashboard kommt von Netlify.
 
 ## Phasen, Haltepunkte, Branches
 
@@ -130,8 +137,8 @@ Technisch:
 |---|---|---|---|
 | **S1** Sitzung am Server · **gebaut 13.10.2026** | `sitzung.js` (Map, erste freie Stelle), `widget-groessen.mjs` gemeinsam, `QUELLE_ZU_TYP`, `portale.verbindung` in `WIDGETS`, `zeigen`/`verbergen` neu, Sitzungs-Layer in `anzeigeLayout`/`anzeigeLayoutSetzen`, `geaendert` mit `anzeigeId`. Alte Nachricht `gezeigt` bleibt in S1 parallel bestehen, damit die alte Anzeige bis S4 weiterläuft | `bereich/sitzung-server` | `node --test`: Sitzung (anlegen, idempotent, kein Platz, Neustart leer, Layout mischt, Speichern filtert), Größen gemeinsam |
 | **S2** Handy und Dashboard · **gebaut 13.10.2026** | Companion schickt Quelle, Zustand aus dem Layout, Board-Sheet-Liste, Anzeige-Auswahl; Dashboard und „Anordnen“ zeigen den Sitzungs-Layer (gesperrt für Löschen/Umbenennen/Galerie), `portale.verbindung` im Register und in der Galerie, Kennblock in `KarteAnsicht`, „von“-Chip | `bereich/sitzung-dashboard` | Playwright: Aufs Board → Widget erscheint im Dashboard, Wegnehmen, Anordnen verschiebt Sitzungs-Widget |
-| **S3** Widgets der Anzeige · **gebaut 13.10.2026** | `board.beitreten`, `karte.orte`, `board.spieler`, `board.zuletzt`, Kopf; Store verarbeitet `zustand`/`teilnehmer`; neues Standard-Layout | `bereich/anzeige-widgets` | Playwright-Screenshots ⏸ **H9:** Dashboard mit allen Blöcken der alten Anzeige nebeneinander (16:9), Max vergleicht mit `/anzeige` |
-| **S4** Umschalten und Aufräumen | `/` → Dashboard, `anzeigeLink`, `_redirects`, `bauen.sh`, `gezeigt` entfernt, `client/` gelöscht, Tests und Doku umgeschrieben | `aufraeumen/alte-anzeige` | alle Tests grün ⏸ **H10:** Probe am Fernseher/Tablet mit dem Anzeige-Link und über Mobilfunk: beitreten per QR aus dem Widget, Ort anlegen, „Aufs Board“, Wegnehmen, Neustart des Dienstes → Sitzung leer, Layout da |
+| **S3** Widgets der Anzeige · **gebaut 13.10.2026**, H9 OK | `board.beitreten`, `karte.orte`, `board.spieler`, `board.zuletzt`, Kopf; Store verarbeitet `zustand`/`teilnehmer`; neues Standard-Layout | `bereich/anzeige-widgets` | Playwright-Screenshots ⏸ **H9:** Dashboard mit allen Blöcken der alten Anzeige nebeneinander (16:9), Max vergleicht mit `/anzeige` |
+| **S4** Umschalten und Aufräumen · **gebaut 13.10.2026** | `/` → Dashboard, `anzeigeLink`, `_redirects`, `bauen.sh`, `gezeigt` entfernt, `client/` gelöscht, Tests und Doku umgeschrieben | `aufraeumen/alte-anzeige` | alle Tests grün ⏸ **H10:** Probe am Fernseher/Tablet mit dem Anzeige-Link und über Mobilfunk: beitreten per QR aus dem Widget, Ort anlegen, „Aufs Board“, Wegnehmen, Neustart des Dienstes → Sitzung leer, Layout da |
 
 Jede Phase ein PR gegen `main`, gemergt nach Rückfrage. S1 und S2 können ohne Haltepunkt durchlaufen; S3 wartet auf H9, S4 auf H10.
 
@@ -157,4 +164,4 @@ Jede Phase ein PR gegen `main`, gemergt nach Rückfrage. S1 und S2 können ohne 
 2. S1 auf `bereich/sitzung-server` → Commits „Sitzung: Modell und erste freie Stelle“, „Widget-Größen gemeinsam“, „Aufs Board legt Sitzungs-Widget an“, PR
 3. S2 auf `bereich/sitzung-dashboard` → Commits „Companion: Aufs Board mit Quelle“, „Dashboard: Sitzungs-Layer und Kennblöcke“, „Portal-Verbindung als Widget“, PR
 4. S3 auf `bereich/anzeige-widgets` → Commits je Widget, „Kopf der Anzeige“, Screenshots, PR, ⏸ H9
-5. S4 auf `aufraeumen/alte-anzeige` → Commits „Startseite: Dashboard“, „Alte Anzeige entfernt“, „Tests und Doku“, PR, ⏸ H10
+5. ~~S4 auf `aufraeumen/alte-anzeige` → Commits „Startseite: Dashboard“, „Alte Anzeige entfernt“, „Tests und Doku“, PR~~ gebaut 13.10.2026 (Branch `claude/festive-euler-a82up2`), ⏸ H10

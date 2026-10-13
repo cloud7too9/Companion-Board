@@ -123,10 +123,20 @@ Der Tunnel baut die Verbindung vom Pi nach außen auf: Am Router (bei deiner Mut
 
 ## 4. Probe (Umbauplan, Phase 6)
 
-1. Am Fernseher oder Tablet `https://mainhubv1.com/anzeige?anzeige=…&schluessel=…` öffnen (Anzeige-Link aus `journalctl -u companion-board` oder aus der Companion unter Board → Anzeigen). Das Dashboard: `https://mainhubv1.com/dashboard?anzeige=…&schluessel=…`.
+1. Am Fernseher oder Tablet den Anzeige-Link `https://mainhubv1.com/dashboard?anzeige=…&schluessel=…` öffnen (aus `journalctl -u companion-board` oder aus der Companion unter Board → Anzeigen). Die Anzeige ist seit Bauplan „Sitzung“ (S4) das Widget-Dashboard; `https://mainhubv1.com/` und alte Links auf `/anzeige` leiten dorthin um.
 2. Am Handy **im Mobilfunk** (WLAN aus) den QR-Code scannen → `https://mainhubv1.com/app/?pin=…` → beitreten → „Zum Home-Bildschirm“ (Safari: Teilen → Zum Home-Bildschirm; Chrome: Installieren).
 3. Ort anlegen oder Screenshot auslesen (die Texterkennung lädt beim ersten Mal etwa 7 MB) → die Anzeige aktualisiert sich live.
 4. Flugmodus an, App vom Home-Bildschirm öffnen: Die Seite geht auf (App-Shell aus dem Cache); Daten gibt es erst wieder mit Netz (Offline-Warteschlange kommt mit B3–B5).
+
+## Probe nach dem Umschalten auf das Dashboard (Bauplan „Sitzung“, S4, Haltepunkt H10)
+
+Nach dem Merge baut Netlify die Seite neu; am Pi einmal das **Update** (oben) ausführen, damit der Server den neuen Anzeige-Link schreibt und die alte Anzeige nicht mehr kennt.
+
+1. `https://mainhubv1.com/` am Fernseher oder Tablet: landet auf `/dashboard/`. Ein Gerät, das schon die alte Anzeige mit Link geöffnet hatte, kennt seinen Schlüssel noch; sonst den Anzeige-Link öffnen.
+2. Im Kopf stehen Titel, Seed, Uhr und ein grüner Punkt „Verbunden“; die Widgets zeigen Orte, QR-Code mit PIN und Spieler.
+3. Am Handy **im Mobilfunk** den QR-Code aus dem Widget „Beitreten“ scannen, beitreten, einen Ort anlegen: erscheint live im Widget „Orte der Welt“, das Handy unter „Spieler“.
+4. Einen Inhalt „Aufs Board“ legen: Die Anzeige wechselt auf den Layer „Sitzung“ und zeigt das Widget mit „von <Name>“. „Wegnehmen“ am Handy nimmt es wieder weg.
+5. `sudo systemctl restart companion-board`: Die Anzeige verbindet sich neu, die Sitzung ist leer, das Layout ist noch da.
 
 ## Aufräumen nach der Probe (Phase 6, Umbauplan): erledigt
 

@@ -65,18 +65,14 @@ jobs:
           cache: npm
           cache-dependency-path: |
             koordinaten-board/server/package-lock.json
-            koordinaten-board/client/package-lock.json
             companion/widgets/package-lock.json
             companion/tests/package-lock.json
 
-      # Die Tests starten eigene Board-Prozesse; die brauchen den Server, die alte Anzeige (client/dist)
-      # und das Widget-Dashboard (companion/widgets/dist).
-      - name: Board installieren und bauen
+      # Die Tests starten eigene Board-Prozesse; die brauchen den Server und das Widget-Dashboard
+      # (companion/widgets/dist), das seit Bauplan „Sitzung“ (S4) die Anzeige ist.
+      - name: Board installieren
         working-directory: koordinaten-board
-        run: |
-          npm ci --prefix server
-          npm ci --prefix client
-          npm run build
+        run: npm ci --prefix server
       - name: Dashboard installieren und bauen
         working-directory: companion/widgets
         run: |

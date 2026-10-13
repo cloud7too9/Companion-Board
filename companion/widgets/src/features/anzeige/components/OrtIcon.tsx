@@ -2,7 +2,7 @@ import { useState } from "react";
 import { kennblockDatei } from "../../karten/lib/kennbloecke";
 import type { Kategorie } from "../anzeige.types";
 
-// Linien-Icons je Kategorie (24er Raster), wie in der alten Anzeige (client/src/komponenten/Icon.tsx)
+// Linien-Icons je Kategorie (24er Raster), übernommen aus der alten Anzeige (bis S4 koordinaten-board/client)
 const PFADE: Record<Kategorie | "kompass", string> = {
   basis: "M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z",
   farm: "M12 21V11M12 11c0-4.4 3.1-7.5 7.5-7.5 0 4.4-3.1 7.5-7.5 7.5zM12 15c0-3.6-2.6-6.5-6.5-6.5 0 3.6 2.6 6.5 6.5 6.5z",
