@@ -18,7 +18,7 @@
 - **Umbau Netlify + Pi (`UMBAUPLAN.md`), Phasen 1–5 gebaut** (05.10.2026): Server abgesichert (Anzeige nur mit Link, `HOST`, `CF-Connecting-IP`, CORS, 6-stellige PIN), API-Adresse konfigurierbar (`konfig.js`, `VITE_API_URL`), Texterkennung am Handy (`texterkennung.js`, tesseract.js im Browser), SQLite (`daten.db`, `speicher.js`), Netlify-Build mit PWA (`netlify.toml`, `sw.js`). **Für Max:** neue 6-stellige PIN (QR-Code neu scannen); der Kiosk öffnet die Anzeige über `server/daten/anzeige-link.txt`; der Server braucht Node 22.13+; `daten.json` wird beim ersten Start nach `daten.db` übernommen.
 - **Als Nächstes** (Kapitel 9):
   0. ~~**Umbau**~~ **abgeschlossen (13.10.2026):** Phasen 1–6 sind gebaut und in Betrieb: Pi, Tunnel, Domain `mainhubv1.com`, Probe über Mobilfunk bestanden, Netlify-Probe (H8) bestanden. Aufgeräumt (E18): `netzwerk.js`, Adress-Lernen, Start- und Firewall-Skripte sind entfernt; ohne `OEFFENTLICHE_URL` gilt `localhost`. Die Einrichtung steht in `koordinaten-board/pi/ANLEITUNG.md`. Offen bleibt nur die Startseite der Domain (E20).
-  1. **Bauplan „Sitzung“** (E16) liegt vor: [`bauplaene/Bauplan-Sitzung.md`](bauplaene/Bauplan-Sitzung.md) (13.10.2026), wartet auf das OK von Max (fünf Fragen am Ende). Vorschlag: das Dashboard wird die einzige Anzeige.
+  1. **Bauplan „Sitzung“** (E16) ist abgenommen: [`bauplaene/Bauplan-Sitzung.md`](bauplaene/Bauplan-Sitzung.md) (13.10.2026). Das Dashboard wird die einzige Anzeige. Nächster Schritt: **S1** auf `bereich/sitzung-server`.
   2. **Offline B3–B5**, neu zugeschnitten (13.10.2026): N5 ist hinfällig, HTTPS kommt von Netlify/Cloudflare. B3 = Live-Modus ohne Netz, IndexedDB, Nachladen über `/api/aenderungen` (Nachtrag im Offline-Bauplan).
   3. A7 (Größenstufen je Widget): Planungsrunde mit Max
   4. Inhalte, die noch nicht beschrieben sind (Warteliste, Kapitel 4)
@@ -86,7 +86,7 @@ Frühere Entscheidungen (01.10.2026): Strang C als ganzer Biom-Import, N1 (abgeh
 | **E15** Nur Bedrock | Portal-Prüfung mit festem Suchradius ±128 (`PORTAL_SUCHRADIUS`), kein Umschalter, kein `edition` mehr im Kontext der Karten. Der Welt-Import weist Java-Welten mit klarer Meldung ab. | `companion/board-karten.js`, Portal-Verwaltung in `companion-prototyp.html` |
 | **CI** | Drei Jobs bei jedem PR und Push auf `main`, Screenshots als Download „bilder“ | `.github/workflows/tests.yml` |
 | **B3–B5** Offline | nicht gebaut. N5 ist hinfällig (HTTPS über Netlify/Cloudflare); B3 neu zugeschnitten, siehe Nachtrag im Offline-Bauplan. Gebaut ist davon schon der Service Worker mit versioniertem Cache (Umbau Phase 5). | `companion/sw.js` |
-| **E16** Sitzung | nicht gebaut. Bauplan liegt vor (`bauplaene/Bauplan-Sitzung.md`, 13.10.2026), wartet auf OK. | – |
+| **E16** Sitzung | nicht gebaut. Bauplan abgenommen (`bauplaene/Bauplan-Sitzung.md`, 13.10.2026), S1 kann losgehen. | – |
 | **A7** Größenstufen | nicht gebaut: Planungsrunde mit Max (E6) | – |
 
 Pfade unter `model/`, `lib/`, `components/` und `features/` liegen in `companion/widgets/src/` (`model/`, `lib/` und `components/` unter `features/workspace/`). „Board“ meint `koordinaten-board/server/src/`.
@@ -217,7 +217,7 @@ Voraussetzungen für die Playwright-Tests:
 ## 9. Nächste Schritte
 
 0. ~~**Umbau auf Netlify + Raspberry Pi**~~ **abgeschlossen (13.10.2026)**, siehe `UMBAUPLAN.md`: Phasen 1–6 in Betrieb unter `mainhubv1.com`, Aufräumen erledigt (E18). Entschieden: `/app/` bekommt den Prototyp, der Prototyp ist der Hauptstand; das Anzeigegerät bleibt offen (technisch egal). Noch zu entscheiden: die Startseite der Domain (E20, Anzeige oder Dashboard).
-1. **Bauplan „Sitzung“ (E16)** liegt vor: `bauplaene/Bauplan-Sitzung.md` (13.10.2026), **wartet auf das OK von Max** (fünf Fragen am Ende). Danach S1–S4 je auf eigenem Branch, Haltepunkte H9 und H10. Fest stand vorher:
+1. **Bauplan „Sitzung“ (E16)** ist abgenommen: `bauplaene/Bauplan-Sitzung.md` (13.10.2026, alle fünf Fragen entschieden). Jetzt S1–S4 je auf eigenem Branch, Haltepunkte H9 und H10. Fest stand vorher:
    - Die Sitzung lebt, solange das Board läuft. Ein Neustart beginnt leer; das gespeicherte Layout der Anzeige (A6) bleibt.
    - Inhalte lassen sich während der Laufzeit live ändern.
    - „Aufs Board“ fügt den Inhalt als **Widget an der ersten freien Stelle** ein (Größe aus dem Größen-Vertrag, Passt-Prüfung aus A2). Am Handy lässt er sich in „Anzeige anordnen“ verschieben oder entfernen.

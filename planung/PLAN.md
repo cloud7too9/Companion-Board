@@ -265,7 +265,7 @@ Git: Nach jeder Phase pushen. Nach jedem Strang (bzw. nach jedem Haltepunkt mit 
 | E14 | Anleitung und Abdeckung | **nur iPhone, besuchte Gebiete reichen** |
 | ~~N5~~ | HTTPS für Offline (04.10.2026) | ~~eigenes Zertifikat am Board~~ **hinfällig seit 13.10.2026:** HTTPS kommt von Netlify und Cloudflare (Umbau Phase 5/6) |
 | E15 | Edition (04.10.2026) | **nur Bedrock**, Java gibt es nirgendwo |
-| E16 | Board und „Aufs Board“ (04.10.2026) | Das Board bekommt eine **Sitzung**, die lebt, solange das Board läuft. „Aufs Board“ fügt den Inhalt als **Widget an der ersten freien Stelle** ein. Bauplan: [`bauplaene/Bauplan-Sitzung.md`](bauplaene/Bauplan-Sitzung.md) (13.10.2026, zum Abnicken). |
+| E16 | Board und „Aufs Board“ (04.10.2026) | Das Board bekommt eine **Sitzung**, die lebt, solange das Board läuft. „Aufs Board“ fügt den Inhalt als **Widget an der ersten freien Stelle** ein. Bauplan: [`bauplaene/Bauplan-Sitzung.md`](bauplaene/Bauplan-Sitzung.md) (abgenommen 13.10.2026). |
 | E8 | Themes Sammelobjekte, Banner, Rüstung (04.10.2026) | **vertagt**, wird an anderer Stelle geklärt; Platzhalter bleibt |
 
 ---
