@@ -4,18 +4,18 @@ Archiv aus `planung/UEBERGABE.md` und `planung/WARTELISTE.md` (ausgelagert am 13
 
 PR-Nummern bis #26 meinen das alte Repo `flexibel-visionboard`, ab dem Repo-Umzug am 05.10.2026 das Repo `Companion-Board` (dort ab #1).
 
-## Runde 13.10.2026 (Umbau abgeschlossen, Bauplan „Sitzung“)
+## Runde 13.10.2026 (Umbau abgeschlossen, Bauplan „Sitzung“) · Repo `Companion-Board`
 
 | PR | Inhalt |
 |---|---|
-| #13 | Bauplan „Sitzung und eine Anzeige“ (abgenommen), Offline neu zugeschnitten (N5 hinfällig), Checkliste Pi/Cloudflare, Fix „Fertig“ in Anordnen |
 | #17 | S4 Umschalten: Anzeige-Link aufs Dashboard, `/` und `/anzeige` leiten um (E20), `koordinaten-board/client/` und `gezeigt` entfernt, Hinweis „Dieser Anzeige-Link gilt nicht mehr“, Tests auf das Dashboard umgeschrieben; ⏸ H10 wartet auf Max |
 | #16 | S3 Widgets der Anzeige: Orte, Beitreten (QR-Code vom Server), Spieler, Zuletzt, Kopf der Anzeige, neues Standard-Layout; ⏸ H9 wartet auf Max |
 | #15 | S2 Handy und Dashboard: „Aufs Board“ mit Quelle, Sitzung im Board-Sheet, Kennblock und Absender-Chip im Dashboard, Sitzungs-Layer gesperrt, Brücke `gezeigt` bis S4; Playwright-Tests zu „Aufs Board“ laufen live vom Board |
 | #14 | S1 Sitzung am Server: `sitzung.js`, `companion/widget-groessen.mjs` gemeinsam für Server und Dashboard, „Aufs Board“ mit Quelle, `portale.verbindung` |
+| #13 | Bauplan „Sitzung und eine Anzeige“ (abgenommen), Offline neu zugeschnitten (N5 hinfällig), Checkliste Pi/Cloudflare, Fix „Fertig“ in Anordnen |
 | #12 | Umbau abgeschlossen: Netlify-Probe (H8) und Phase 6 abgehakt, Domain `mainhubv1.com` statt Platzhalter, Betrieb vom Laptop aus entfernt (E18: `netzwerk.js`, Adress-Lernen, Start- und Firewall-Skripte), Entscheidungen zu `/app/` (Prototyp = Hauptstand) und Anzeigegerät (offen) festgehalten, E20 (Startseite) neu auf der Warteliste |
 
-## Runde 05./06.10.2026
+## Runde 05./06.10.2026 · Repo `Companion-Board`
 
 | PR | Inhalt |
 |---|---|
@@ -25,7 +25,7 @@ PR-Nummern bis #26 meinen das alte Repo `flexibel-visionboard`, ab dem Repo-Umzu
 
 Neu auf der Warteliste: H7 (Farben der neuen Biome), H8 (Probe bei Netlify), N6 („Aktualisieren“ auch bei neuen Daten?), E17 (Inhalt des Spielerprofils), E18 (Heimnetz-Betrieb vom Laptop behalten?), E19 (Sammelobjekt-Karten mit Struktur-Ansicht, Besatz-Icon und Biom-Hintergrund; Max liefert die Ansichten), Kapitel 5 (Branches löschen).
 
-## Runde 04.10.2026
+## Runde 04.10.2026 · altes Repo `flexibel-visionboard`
 
 | PR | Inhalt |
 |---|---|
