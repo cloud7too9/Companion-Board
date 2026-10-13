@@ -10,14 +10,14 @@ Am Ende liefert Netlify alles Sichtbare aus, der Pi hält nur noch die API und S
 
 ```mermaid
 flowchart TB
-  subgraph netlify["Netlify · deinedomain.de"]
+  subgraph netlify["Netlify · mainhubv1.com"]
     board["Board<br/>/ · Anzeige mit QR-Code"]
     companion["Companion-PWA<br/>/app/ · Ziel des QR-Codes"]
     dashboard["Widget-Dashboard<br/>/dashboard/ · Widgets"]
   end
   boardgeraet["Board-Gerät<br/>TV, Tablet oder Laptop"]
   handys["Handys<br/>Companion installiert"]
-  tunnel["Cloudflare Tunnel<br/>api.deinedomain.de · HTTPS und WebSocket"]
+  tunnel["Cloudflare Tunnel<br/>api.mainhubv1.com · HTTPS und WebSocket"]
   subgraph pi["Raspberry Pi · 1 GB RAM"]
     cloudflared["cloudflared<br/>hält den Tunnel offen"]
     api["API<br/>Fastify + WebSocket"]
@@ -35,15 +35,15 @@ Gestrichelt: Seite laden, beim Handy nur einmal, danach kommt die Companion aus 
 
 ## Eine Domain, drei Adressen
 
-Eine Domain reicht völlig: Subdomains wie `api.` kosten nichts extra. Die Hauptdomain zeigt aufs Board, die API bekommt eine eigene Subdomain über den Tunnel. `deinedomain.de` steht hier als Platzhalter.
+Eine Domain reicht völlig: Subdomains wie `api.` kosten nichts extra. Die Hauptdomain zeigt aufs Board, die API bekommt eine eigene Subdomain über den Tunnel. Die Domain ist seit dem 13.10.2026 `mainhubv1.com`.
 
 | Adresse | Zeigt auf | Inhalt |
 | --- | --- | --- |
-| `deinedomain.de` | Netlify | Board (heute `/anzeige`, später das Widget-Dashboard) |
-| `deinedomain.de/app/` | Netlify | Companion-PWA, Ziel des QR-Codes |
-| `api.deinedomain.de` | Cloudflare Tunnel → Pi | REST-API und WebSocket |
+| `mainhubv1.com` | Netlify | Board (heute `/anzeige`, später das Widget-Dashboard) |
+| `mainhubv1.com/app/` | Netlify | Companion-PWA, Ziel des QR-Codes |
+| `api.mainhubv1.com` | Cloudflare Tunnel → Pi | REST-API und WebSocket |
 
-**Korrektur zum Chat:** Ein Tunnel ohne eigene Domain ist ein Quick Tunnel. Der bekommt bei jedem Start eine zufällige `trycloudflare.com`-Adresse, ist laut Cloudflare nur zum Testen gedacht und auf 200 gleichzeitige Anfragen begrenzt. Eine installierte PWA braucht aber eine feste API-Adresse. Deshalb läuft die API als benannter Tunnel auf `api.deinedomain.de` ([Quick Tunnels](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/trycloudflare/)).
+**Korrektur zum Chat:** Ein Tunnel ohne eigene Domain ist ein Quick Tunnel. Der bekommt bei jedem Start eine zufällige `trycloudflare.com`-Adresse, ist laut Cloudflare nur zum Testen gedacht und auf 200 gleichzeitige Anfragen begrenzt. Eine installierte PWA braucht aber eine feste API-Adresse. Deshalb läuft die API als benannter Tunnel auf `api.mainhubv1.com` ([Quick Tunnels](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/trycloudflare/)).
 
 Dafür muss die Domain im DNS von Cloudflare liegen:
 
@@ -72,7 +72,7 @@ Heute ist der Board-Server alles auf einmal: Webserver für alle Seiten, Datenha
 
 Drei Stellen gehen davon aus, dass Seite und API vom selben Server kommen:
 
-- `API_BASIS = "/api"` in `companion-prototyp.html` (Zeile 1514) wird eine feste Adresse auf `api.deinedomain.de`.
+- `API_BASIS = "/api"` in `companion-prototyp.html` (Zeile 1514) wird eine feste Adresse auf `api.mainhubv1.com`.
 - `client/src/lib/verbindung.ts` baut den WebSocket aus `location.host`. Das muss die API-Adresse werden, ebenso im Widget-Dashboard.
 - CORS ist nur für drei Pfade offen, mit `*` und nur `GET, POST` (`server.js` Zeile 108–125). Nötig sind alle `/api`-Pfade, `PUT` und `DELETE`, und nur die eigene Domain.
 
@@ -87,7 +87,7 @@ Sechs Phasen, jede als eigener Branch mit Pull Request wie bei `bereich/banner`.
 - [x] Sonderrecht für localhost streichen: Anzeige nur noch mit Anzeige-Link, `ANZEIGE_OFFEN` entfernen *(05.10.2026; der Server schreibt den Link der ersten Anzeige nach `daten/anzeige-link.txt`, die Startskripte öffnen ihn)*
 - [x] Server nur auf `127.0.0.1` lauschen lassen statt `0.0.0.0`, dann erreicht ihn nur noch `cloudflared` *(05.10.2026, als `HOST`; **Standard bleibt `0.0.0.0`**, weil bis Phase 5 alles lokal weiterläuft und die Handys im WLAN den Server sonst nicht mehr erreichen. Die Dienstdatei in Phase 6 setzt `HOST=127.0.0.1`.)*
 - [x] Echte Client-IP aus dem Header `CF-Connecting-IP` lesen, für PIN-Sperre und Anmeldung *(05.10.2026; der Header zählt nur bei Verbindungen von `127.0.0.1`, also von `cloudflared`)*
-- [x] CORS für alle `/api`-Pfade und `/ws`: nur Ursprünge aus einer Liste (`ERLAUBTE_URSPRUENGE`, z. B. `https://deinedomain.de` und `http://localhost:5173`), Methoden inklusive `PUT` und `DELETE` *(05.10.2026; dazu immer der eigene Ursprung, solange der Server die Seiten ausliefert)*
+- [x] CORS für alle `/api`-Pfade und `/ws`: nur Ursprünge aus einer Liste (`ERLAUBTE_URSPRUENGE`, z. B. `https://mainhubv1.com` und `http://localhost:5173`), Methoden inklusive `PUT` und `DELETE` *(05.10.2026; dazu immer der eigene Ursprung, solange der Server die Seiten ausliefert)*
 - [x] Board-PIN auf mindestens 6 Ziffern *(05.10.2026; Erzeugung mit 6 Ziffern, kurze `RAUM_PIN` lehnt der Start ab, eine alte 4-stellige `pin.txt` wird ersetzt)*
 
 Git: nach jedem Punkt `npm test` in `koordinaten-board`, dann committen (z. B. „Anzeige nur noch per Anzeige-Link“). Push und PR am Ende der Phase, die GitHub-Tests laufen mit.
@@ -122,7 +122,7 @@ Git: Schema, Umzugsskript und neue `daten.js` je ein Commit. Vor dem Merge das U
 - [x] `netlify.toml` im Repo-Wurzelordner: baut Anzeige und Dashboard, kopiert die Companion nach `/app/` *(05.10.2026: `netlify.toml` + `netlify/bauen.sh`; die Adresse der API kommt aus der Netlify-Umgebungsvariable `API_URL` in `VITE_API_URL` und `app/konfig.js`)*
 - [x] `_redirects` für die Routen von Anzeige und Dashboard (`/dashboard/*` → `index.html`) *(05.10.2026: `netlify/_redirects`, auch `/anzeige*` → `/index.html`)*
 - [x] Companion installierbar machen: Manifest und Service Worker mit Scope `/app/`, App-Shell im Cache *(05.10.2026: `companion/manifest.webmanifest`, `companion/sw.js`, Icons in `companion/icons/app/`; nur aktiv, wenn `konfig.js` `pwa: true` setzt, lokal vom Board also nicht)*
-- [x] QR-Code zeigt auf `https://deinedomain.de/app/?pin=…` (`OEFFENTLICHE_URL`) *(05.10.2026: neue Umgebungsvariable `COMPANION_PFAD=/app/` am Server, lokal bleibt `/`)*
+- [x] QR-Code zeigt auf `https://mainhubv1.com/app/?pin=…` (`OEFFENTLICHE_URL`) *(05.10.2026: neue Umgebungsvariable `COMPANION_PFAD=/app/` am Server, lokal bleibt `/`)*
 - [x] Erst mit der `.netlify.app`-Adresse testen, noch ohne Domain *(13.10.2026: Probe von Max bestanden, Site aus dem GitHub-Repo, Companion unter `/app/` als PWA installiert und beigetreten. **Phase 5 ist damit abgeschlossen.** Lokal prüft denselben Stand `companion/tests/netlify.test.mjs` baut wie Netlify und prüft Beitreten als PWA, QR-Code auf `/app/`, Anzeige und Dashboard mit Anzeige-Link, Kennblöcke, Offline aus dem Service Worker.)*
 
 Git: Push löst bei Netlify einen Vorschau-Build für den PR aus, dort testen, dann mergen.
@@ -130,7 +130,7 @@ Git: Push löst bei Netlify einen Vorschau-Build für den PR aus, dort testen, d
 ### Phase 6: Pi, Tunnel, Domain
 
 - [x] Repo auf dem Pi klonen, nur `koordinaten-board/server` installieren, als systemd-Dienst starten *(13.10.2026: läuft bei Max. Vorbereitet war: `koordinaten-board/pi/companion-board.service`, `companion-board.env`, `sicherung.sh`, Befehle in `pi/ANLEITUNG.md`; ausführen muss Max am Pi)*
-- [x] `cloudflared` installieren, benannten Tunnel anlegen, `api.deinedomain.de` zuordnen, ebenfalls als Dienst *(13.10.2026: läuft bei Max. Vorbereitet war: `pi/cloudflared-config.yml`, Befehle in `pi/ANLEITUNG.md`)*
+- [x] `cloudflared` installieren, benannten Tunnel anlegen, `api.mainhubv1.com` zuordnen, ebenfalls als Dienst *(13.10.2026: läuft bei Max. Vorbereitet war: `pi/cloudflared-config.yml`, Befehle in `pi/ANLEITUNG.md`)*
 - [ ] Domain auf Cloudflare-DNS umstellen und Netlify zuordnen (Abschnitt „Eine Domain, drei Adressen“) *(Schritte in `pi/ANLEITUNG.md`, Abschnitt 3)*
 - [ ] Probe über Mobilfunk statt WLAN: QR scannen, beitreten, Ort anlegen, Board aktualisiert sich
 - [ ] Aufräumen nach der Probe: `netzwerk.js`, Adress-Lernen und Firewall-Skripte braucht der Pi nicht mehr; sie bleiben für den Betrieb im Heimnetz vom Laptop aus (`pi/ANLEITUNG.md`, letzter Abschnitt). Entscheiden, ob dieser Betrieb noch gebraucht wird, sonst entfernen
@@ -162,7 +162,7 @@ Auf dem Pi bleiben genau zwei Dienste: die API (Fastify mit WebSocket, dazu SQLi
 
 Vier Fragen sind noch offen, bevor Phase 6 abgeschlossen ist (die fünfte, Node-Version am Pi, ist geklärt).
 
-- [ ] Welche Domain, und lässt der Registrar das Umstellen der Nameserver zu? *(Max)*
+- [x] Welche Domain, und lässt der Registrar das Umstellen der Nameserver zu? *(Entschieden: `mainhubv1.com`; die API antwortet seit dem 13.10.2026 unter `https://api.mainhubv1.com/api/server` über den Tunnel.)*
 - [ ] Welches Gerät zeigt das Board an (TV-Browser, Tablet, Laptop)? Der Pi fällt aus, Raspberry OS Lite hat keinen Desktop. *(Max; technisch egal, jedes Gerät mit Browser und Anzeige-Link)*
 - [ ] Startseite der Domain: heutige Anzeige oder gleich das Widget-Dashboard, das sie später ersetzen soll? *(Max; gebaut ist: `/` = Anzeige, `/dashboard/` = Dashboard. Soll das Dashboard auf `/`, reicht eine Zeile in `netlify/_redirects`.)*
 - [ ] Kommt nach `/app/` der Prototyp oder deine eigene `modul-a-live-karte.html`, die nicht im Repo liegt? *(Max; gebaut ist der Prototyp. Die eigene Datei müsste ins Repo und in `netlify/bauen.sh` statt `companion-prototyp.html` kopiert werden.)*

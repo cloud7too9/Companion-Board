@@ -46,7 +46,7 @@ npm run build
 npm start
 ```
 
-**Anzeige und Dashboard von einem anderen Server** (Umbau Phase 2): Beide lesen beim Bauen `VITE_API_URL` (z. B. `https://api.deinedomain.de`) für `fetch` und WebSocket; leer heißt eigener Ursprung. Die Companion liest ihre Board-Adresse aus `companion/konfig.js`. Der Server braucht dann den Ursprung der Seiten in `ERLAUBTE_URSPRUENGE`.
+**Anzeige und Dashboard von einem anderen Server** (Umbau Phase 2): Beide lesen beim Bauen `VITE_API_URL` (z. B. `https://api.mainhubv1.com`) für `fetch` und WebSocket; leer heißt eigener Ursprung. Die Companion liest ihre Board-Adresse aus `companion/konfig.js`. Der Server braucht dann den Ursprung der Seiten in `ERLAUBTE_URSPRUENGE`.
 
 **Widget-Dashboard** (in Arbeit, ersetzt später `/anzeige`): einmal `npm run dashboard:installieren && npm run dashboard:build`, dann mit demselben Anzeige-Link `http://…:3000/dashboard?anzeige=…&schluessel=…`.
 
@@ -124,10 +124,10 @@ Alles liegt in `server/daten/`:
 | Variable | Standard | Zweck |
 |---|---|---|
 | `PORT` | `3000` | Port des Servers |
-| `ERLAUBTE_URSPRUENGE` | `http://localhost:5173,http://127.0.0.1:5173` | Ursprünge (kommagetrennt), die `/api` und `/ws` aus dem Browser nutzen dürfen, z. B. später `https://deinedomain.de`. Der eigene Ursprung des Servers gilt immer |
+| `ERLAUBTE_URSPRUENGE` | `http://localhost:5173,http://127.0.0.1:5173` | Ursprünge (kommagetrennt), die `/api` und `/ws` aus dem Browser nutzen dürfen, z. B. später `https://mainhubv1.com`. Der eigene Ursprung des Servers gilt immer |
 | `HOST` | `0.0.0.0` | Lausch-Adresse. Im Heimnetz bleibt `0.0.0.0` (Handys im WLAN); auf dem Pi hinter `cloudflared` `127.0.0.1`, dann erreicht den Server nur der Tunnel |
 | `RAUM_PIN` | zufällig, in `pin.txt` | feste Board-PIN setzen, mindestens 6 Ziffern (sonst startet der Server nicht) |
-| `OEFFENTLICHE_URL` | automatisch | Adresse im QR-Code und im Anzeige-Link, falls die automatische LAN-IP falsch ist; auf dem Pi die Netlify-Adresse (`https://deinedomain.de`) |
+| `OEFFENTLICHE_URL` | automatisch | Adresse im QR-Code und im Anzeige-Link, falls die automatische LAN-IP falsch ist; auf dem Pi die Netlify-Adresse (`https://mainhubv1.com`) |
 | `COMPANION_PFAD` | `/` | Pfad der Companion unter dieser Adresse: lokal `/`, auf Netlify `/app/` (Umbau Phase 5) |
 | `DATEN_ORDNER` | `server/daten` | Speicherort |
 | `COMPANION_ORDNER` | `../companion` | Ordner mit Companion-Seite, `regeln.js`, `icons/`, `ruestungs-baukasten/` und den Dateien des Welt-Imports (`biom-*.js`, `vendor/`) |

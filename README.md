@@ -26,7 +26,7 @@ Zwei Projekte für eine gemeinsame Minecraft-Welt im Raum – seit dem 29.09.202
 
 ## Netlify (Umbau Phase 5)
 
-`netlify.toml` baut die Seite aus diesem Repo: Anzeige unter `/`, Companion-PWA unter `/app/`, Widget-Dashboard unter `/dashboard/` (`netlify/bauen.sh`, Routen in `netlify/_redirects`). In Netlify: Site aus dem GitHub-Repo anlegen (Branch `main`), unter *Site configuration → Environment variables* `API_URL` auf die Adresse der API setzen (`https://api.deinedomain.de`; ohne sie laufen die Seiten im DEMO-/Beispiel-Modus). Der Build wird lokal geprüft: `companion/tests/netlify.test.mjs`. Schritte für Domain, Tunnel und Pi: [`koordinaten-board/pi/ANLEITUNG.md`](koordinaten-board/pi/ANLEITUNG.md).
+`netlify.toml` baut die Seite aus diesem Repo: Anzeige unter `/`, Companion-PWA unter `/app/`, Widget-Dashboard unter `/dashboard/` (`netlify/bauen.sh`, Routen in `netlify/_redirects`). In Netlify: Site aus dem GitHub-Repo anlegen (Branch `main`), unter *Site configuration → Environment variables* `API_URL` auf die Adresse der API setzen (`https://api.mainhubv1.com`; ohne sie laufen die Seiten im DEMO-/Beispiel-Modus). Der Build wird lokal geprüft: `companion/tests/netlify.test.mjs`. Schritte für Domain, Tunnel und Pi: [`koordinaten-board/pi/ANLEITUNG.md`](koordinaten-board/pi/ANLEITUNG.md).
 
 ## Schnellstart
 
