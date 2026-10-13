@@ -11,9 +11,10 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { mkdirSync } from 'node:fs';
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import path from 'node:path';
-import { regeln } from './regeln.js';
+import { regeln, groessen } from './regeln.js';
 import { layoutPruefen, reihenGueltig } from './layout.js';
-import { WIDGETS } from './widgets.js';
+import { WIDGETS, quelleZuWidget, widgetQuellen } from './widgets.js';
+import { Sitzungen, SITZUNG_LAYER } from './sitzung.js';
 import { Speicher } from './speicher.js';
 
 const { DIM_ORDER, BIOMES, SAMMELOBJEKTE, WELTGRENZE } = regeln;
@@ -74,6 +75,8 @@ export class Daten {
     this.dbDatei = path.join(ordner, 'daten.db');
     this.biomeOrdner = path.join(ordner, 'biome');      // alte Biom-Dateien, nur noch zum Übernehmen
     this.inhalt = leer();
+    /** Sitzungen der Anzeigen (Bauplan „Sitzung“): Widgets von „Aufs Board“, nur im Speicher, nie in daten.db */
+    this.sitzungen = new Sitzungen(groessen);
     /** Änderungsnummer: steigt mit jeder Änderung, läuft über Neustarts weiter (aenderungen.nr in daten.db) */
     this.version = 0;
     this.timer = null;
@@ -490,18 +493,37 @@ export class Daten {
     return kopie(a);
   }
 
-  /** Layout einer Anzeige: { anzeige, reihen, layout, vollbild } – layout null, solange keins gespeichert ist;
+  /** Layout einer Anzeige: { anzeige, reihen, layout, vollbild } – layout null, solange keins gespeichert ist
+      und die Sitzung leer ist; sonst das gespeicherte Layout, und sobald die Sitzung ein Widget hat, mit dem
+      Sitzungs-Layer an erster Stelle (Bauplan „Sitzung“; aktiv ist er, wenn „Aufs Board“ ihn zuletzt aktiv
+      gemacht hat oder das Handy ihn gewählt hat);
       vollbild: ID des Widgets, das die Anzeige gerade allein zeigt (vom Handy gestartet), sonst null */
   anzeigeLayout(id) {
     const a = this.anzeige(id);
-    return { anzeige: { id: a.id, name: a.name }, reihen: a.reihen ?? null, layout: kopie(a.layout ?? null), vollbild: a.vollbild ?? null };
+    return { anzeige: { id: a.id, name: a.name }, reihen: a.reihen ?? null, layout: this.layoutMitSitzung(a), vollbild: a.vollbild ?? null };
   }
 
+  layoutMitSitzung(a) {
+    const sitzung = this.sitzungen.layer(a.id);
+    const mitSitzung = sitzung.instanzen.length > 0;
+    if (!a.layout && !mitSitzung) return null;
+    const layer = [...(mitSitzung ? [sitzung] : []), ...kopie(a.layout?.layer ?? [])];
+    const aktiverLayer = mitSitzung && (this.sitzungen.aktiv(a.id) || !a.layout) ? SITZUNG_LAYER : a.layout.aktiverLayer;
+    return { layer, aktiverLayer };
+  }
+
+  /** Vom Handy gespeichertes Layout: der Sitzungs-Layer geht in die Sitzung (Speicher), der Rest nach daten.db */
   anzeigeLayoutSetzen(id, body) {
     const a = this.anzeige(id);
     const { layout, fehler: problem } = layoutPruefen(body, Object.keys(WIDGETS));
     if (problem) fehler(422, problem);
-    a.layout = layout;
+    const sitzung = layout.layer.find((l) => l.id === SITZUNG_LAYER);
+    const gespeichert = layout.layer.filter((l) => l.id !== SITZUNG_LAYER);
+    if (sitzung) this.sitzungen.uebernehmen(a.id, sitzung.instanzen, layout.aktiverLayer === SITZUNG_LAYER);
+    else if (layout.aktiverLayer !== SITZUNG_LAYER) this.sitzungen.uebernehmen(a.id, this.sitzungen.layer(a.id).instanzen, false);
+    a.layout = gespeichert.length
+      ? { layer: gespeichert, aktiverLayer: gespeichert.some((l) => l.id === layout.aktiverLayer) ? layout.aktiverLayer : gespeichert[0].id }
+      : null;
     // Ein Vollbild endet, wenn sein Widget nicht mehr im aktiven Layer liegt
     if (a.vollbild && !this.imAktivenLayer(a, a.vollbild)) a.vollbild = null;
     this.speichernVerzoegert();
@@ -509,8 +531,32 @@ export class Daten {
   }
 
   imAktivenLayer(a, instanzId) {
-    const layer = a.layout?.layer.find((l) => l.id === a.layout.aktiverLayer);
+    const layout = this.layoutMitSitzung(a);
+    const layer = layout?.layer.find((l) => l.id === layout.aktiverLayer);
     return Boolean(layer?.instanzen.some((i) => i.id === instanzId));
+  }
+
+  /**
+   * „Aufs Board“ (Bauplan „Sitzung“): Quelle („portal:<id>“, „sammelstand“ …) als Widget an der ersten
+   * freien Stelle der Sitzung dieser Anzeige. → { instanz, neu }; Fehler 400 (Quelle unbekannt),
+   * 404 (Anzeige oder Quelle gibt es nicht), 409 (kein Platz).
+   */
+  sitzungHinzufuegen(anzeigeId, { quelle, nutzer }) {
+    const a = this.anzeige(anzeigeId);
+    const ziel = quelleZuWidget(quelle);
+    if (!ziel) fehler(400, `Unbekannte Quelle „${quelle}“`);
+    if (ziel.quelle && !widgetQuellen(this, ziel.typ).quellen.some((q) => q.id === ziel.quelle)) fehler(404, 'Die Quelle gibt es nicht mehr');
+    const ergebnis = this.sitzungen.hinzufuegen(a.id, { typ: ziel.typ, quelle: ziel.quelle, von: nutzer?.name ?? '', farbe: nutzer?.farbe ?? '' }, a.reihen ?? null);
+    if (ergebnis.fehler) fehler(409, ergebnis.fehler);
+    return ergebnis;
+  }
+
+  /** „Wegnehmen“ – true, wenn das Widget in der Sitzung lag */
+  sitzungEntfernen(anzeigeId, instanzId) {
+    const a = this.anzeige(anzeigeId);
+    const weg = this.sitzungen.entfernen(a.id, instanzId);
+    if (weg && a.vollbild === instanzId) a.vollbild = null;
+    return weg;
   }
 
   /** Vollbild an der Anzeige starten (ID eines Widgets im aktiven Layer) oder beenden (null) */
