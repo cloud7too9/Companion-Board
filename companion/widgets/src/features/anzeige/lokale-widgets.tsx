@@ -2,6 +2,7 @@ import { BeitretenWidget } from "./components/BeitretenWidget";
 import { OrteWidget } from "./components/OrteWidget";
 import { SpielerWidget } from "./components/SpielerWidget";
 import { ZuletztWidget } from "./components/ZuletztWidget";
+import { useBoardStore } from "../karten/model/board.store";
 
 /**
  * Widgets, die die Anzeige selbst aus ihrem Zustand rendert (Bauplan „Sitzung“, S3) – ohne
@@ -18,6 +19,11 @@ export const istLokalesWidget = (typ: string) => Object.hasOwn(LOKALE_WIDGETS, t
 
 export function LokalesWidget({ typ, gross = false }: { typ: string; gross?: boolean }) {
   const Komponente = LOKALE_WIDGETS[typ];
+  // Ohne Anzeige-Link kommen weder Zustand noch QR-Code: derselbe Hinweis wie bei den Karten vom Board
+  const zugangHinweis = useBoardStore((s) => s.zugangHinweis);
+  if (zugangHinweis) {
+    return <p className="flex h-full items-center justify-center text-center text-sm text-text-muted" data-testid="widget-leer">{zugangHinweis}</p>;
+  }
   return (
     // data-testid „karte“ wie bei Karten vom Board: ein Widget mit Inhalt
     <div className="h-full min-h-0" data-testid="karte" data-lokal={typ}>

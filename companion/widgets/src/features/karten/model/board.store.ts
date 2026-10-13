@@ -48,6 +48,8 @@ interface BoardState {
   beitritt: Beitritt | null;
   /** Anzeige: QR-Code zum Beitreten als SVG */
   qrSvg: string;
+  /** Anzeige ohne gültigen Anzeige-Link: Hinweis für die Widgets der Anzeige, sonst null */
+  zugangHinweis: string | null;
   /** Ohne Token als Anzeige, mit Token als Steuerung */
   starten: (optionen?: { token?: string }) => () => void;
   /** Reihen der eigenen Fläche ans Board melden (nur am Board) */
@@ -98,6 +100,7 @@ export const useBoardStore = create<BoardState>((set, get) => ({
   verbunden: false,
   beitritt: null,
   qrSvg: "",
+  zugangHinweis: null,
 
   starten: (optionen = {}) => {
     let aus = false;
@@ -127,12 +130,17 @@ export const useBoardStore = create<BoardState>((set, get) => ({
     const beitrittLaden = async () => {
       if (token) return;
       const parameter = zugangParameter(zugang);
+      let ohneLink = false;
       const [beitritt, qr] = await Promise.all([
-        jsonLaden<Beitritt | null>(adresse("/api/anzeige", parameter), () => null),
+        jsonLaden<Beitritt | null>(adresse("/api/anzeige", parameter), (status) => { ohneLink ||= status === 403; return null; }),
         jsonLaden<{ svg: string } | null>(adresse("/api/anzeige/qr", parameter), () => null),
       ]);
       if (aus) return;
-      set({ beitritt: beitritt && { beitrittsUrl: beitritt.beitrittsUrl, adresse: beitritt.adresse, pin: beitritt.pin }, qrSvg: qr?.svg ?? "" });
+      set({
+        beitritt: beitritt && { beitrittsUrl: beitritt.beitrittsUrl, adresse: beitritt.adresse, pin: beitritt.pin },
+        qrSvg: qr?.svg ?? "",
+        zugangHinweis: ohneLink ? fehlerHinweis(403) : null,
+      });
     };
 
     const verbinden = (versuch = 0) => {
@@ -160,6 +168,7 @@ export const useBoardStore = create<BoardState>((set, get) => ({
         if (aus) return;
         set({ verbunden: false });
         // 4003: kein oder ein alter Anzeige-Link, 4001: Anmeldung abgelaufen – neu verbinden hilft nicht
+        if (e.code === 4003) set({ zugangHinweis: fehlerHinweis(403) });
         if (e.code === 4003 || e.code === 4001) return geaendert();
         warten = setTimeout(() => verbinden(versuch + 1), Math.min(10_000, 1000 * 2 ** versuch));
       };

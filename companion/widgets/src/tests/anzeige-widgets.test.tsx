@@ -9,7 +9,13 @@ import { zahl } from "@/features/karten/lib/zahl";
 
 // Widgets der Anzeige (Bauplan „Sitzung“, S3): rendern aus dem Zustand im Store, ohne Karte vom Server
 describe("Widgets der Anzeige", () => {
-  beforeEach(() => useBoardStore.setState({ zustand: null, teilnehmer: [], beitritt: null, qrSvg: "" }));
+  beforeEach(() => useBoardStore.setState({ zustand: null, teilnehmer: [], beitritt: null, qrSvg: "", zugangHinweis: null }));
+
+  it("ohne Anzeige-Link: Hinweis statt Inhalt", () => {
+    useBoardStore.setState({ zustand: beispielZustand(), zugangHinweis: "Diese Anzeige braucht ihren Anzeige-Link" });
+    render(<LokalesWidget typ="board.spieler" />);
+    expect(screen.getByTestId("widget-leer").textContent).toBe("Diese Anzeige braucht ihren Anzeige-Link");
+  });
 
   it("die vier Typen sind lokal und stehen im Register", () => {
     for (const id of ["karte.orte", "board.beitreten", "board.spieler", "board.zuletzt"]) {
