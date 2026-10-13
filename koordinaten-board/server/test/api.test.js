@@ -499,7 +499,8 @@ test('Seiten wie auf Netlify: Anmeldeseite unter /, Companion unter /app/, alte 
   assert.deepEqual([anmeldung.status, anmeldung.headers.get('cache-control')], [200, 'no-cache']);
   assert.match(await anmeldung.text(), /<title>Companion · Anmeldung<\/title>/);
   const app = await fetch(`${BASIS}/app/`);
-  assert.equal(app.status, 200);
+  assert.deepEqual([app.status, app.headers.get('cache-control')], [200, 'no-cache']);
+  assert.equal((await fetch(`${BASIS}/app/regeln.js`)).headers.get('cache-control'), 'no-cache', 'Regeln ohne Cache (neuer Stand sofort)');
   assert.match(await app.text(), /<script src="regeln.js"><\/script>/);
   const um = await fetch(`${BASIS}/app?pin=471100`, { redirect: 'manual' });
   assert.deepEqual([um.status, um.headers.get('location')], [302, '/app/?pin=471100']);

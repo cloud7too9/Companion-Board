@@ -469,19 +469,21 @@ setInterval(() => {
 // ---------- Ausliefern: Anmeldeseite unter /, Companion unter /app/, Anzeige (Widget-Dashboard) unter /dashboard/ ----------
 
 const OHNE_CACHE = { 'cache-control': 'no-cache' };
+/** Datei ohne Cache ausliefern: cacheControl:false, sonst setzt sendFile das maxAge des Plugins (7 Tage) darüber */
+const ohneCache = (reply, datei, ordner) => reply.headers(OHNE_CACHE).sendFile(datei, ordner, { cacheControl: false });
 /** Weiterleiten und dabei die Query behalten (Anzeige-Link ?anzeige=…&schluessel=…, alte QR-Codes ?pin=…) */
 const mitQuery = (req, ziel) => {
   const query = req.url.indexOf('?');
   return `${ziel}${query === -1 ? '' : req.url.slice(query)}`;
 };
 // Anmeldeseite (Bauplan „Anmeldung“, L3); sie lädt app/konfig.js und app/regeln.js
-app.get('/', (req, reply) => reply.headers(OHNE_CACHE).sendFile('anmeldung.html', COMPANION_ORDNER));
+app.get('/', (req, reply) => ohneCache(reply, 'anmeldung.html', COMPANION_ORDNER));
 app.get('/app', (req, reply) => reply.redirect(mitQuery(req, '/app/')));
-app.get('/app/', (req, reply) => reply.headers(OHNE_CACHE).sendFile(COMPANION_DATEI, COMPANION_ORDNER));
+app.get('/app/', (req, reply) => ohneCache(reply, COMPANION_DATEI, COMPANION_ORDNER));
 // Regeln, Texterkennung, Welt-Import (Worker und Dekoder sind ES-Module, die das Handy selbst liest)
 for (const datei of ['konfig.js', 'regeln.js', 'board-karten.js', 'texterkennung.js',
   'biom-ids.js', 'biom-dekoder.js', 'biom-welt.js', 'welt-ordner.js', 'nbt.js', 'welt-funde.js', 'biom-import.worker.js']) {
-  app.get(`/app/${datei}`, (req, reply) => reply.headers(OHNE_CACHE).sendFile(datei, COMPANION_ORDNER));
+  app.get(`/app/${datei}`, (req, reply) => ohneCache(reply, datei, COMPANION_ORDNER));
 }
 await app.register(fastifyStatic, { root: path.join(COMPANION_ORDNER, 'icons'), prefix: '/app/icons/', maxAge: '7d' });
 // Kennblöcke auch für das Dashboard (es lädt /icons/…, wie auf Netlify)
@@ -498,7 +500,7 @@ function dashboardSeite(reply) {
     return reply.code(404).type('text/plain; charset=utf-8')
       .send('Dashboard nicht gebaut: npm --prefix companion/widgets install && npm --prefix companion/widgets run build');
   }
-  return reply.headers(OHNE_CACHE).sendFile('index.html', DASHBOARD_DIST, { cacheControl: false });   // neuer Build → neue Assets
+  return ohneCache(reply, 'index.html', DASHBOARD_DIST);   // neuer Build → neue Assets
 }
 // Widget-Dashboard: Dateien mit Hash im Namen unter /dashboard/assets/, eigene Routen (z. B. /dashboard/vollbild/:id) → index.html
 await app.register(fastifyStatic, { root: DASHBOARD_DIST, prefix: '/dashboard/', index: false, maxAge: '7d', decorateReply: false });
