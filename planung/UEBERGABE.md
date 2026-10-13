@@ -18,7 +18,7 @@
 - **Umbau Netlify + Pi (`UMBAUPLAN.md`), Phasen 1–5 gebaut** (05.10.2026): Server abgesichert (Anzeige nur mit Link, `HOST`, `CF-Connecting-IP`, CORS, 6-stellige PIN), API-Adresse konfigurierbar (`konfig.js`, `VITE_API_URL`), Texterkennung am Handy (`texterkennung.js`, tesseract.js im Browser), SQLite (`daten.db`, `speicher.js`), Netlify-Build mit PWA (`netlify.toml`, `sw.js`). **Für Max:** neue 6-stellige PIN (QR-Code neu scannen); der Kiosk öffnet die Anzeige über `server/daten/anzeige-link.txt`; der Server braucht Node 22.13+; `daten.json` wird beim ersten Start nach `daten.db` übernommen.
 - **Als Nächstes** (Kapitel 9):
   0. ~~**Umbau**~~ **abgeschlossen (13.10.2026):** Phasen 1–6 sind gebaut und in Betrieb: Pi, Tunnel, Domain `mainhubv1.com`, Probe über Mobilfunk bestanden, Netlify-Probe (H8) bestanden. Aufgeräumt (E18): `netzwerk.js`, Adress-Lernen, Start- und Firewall-Skripte sind entfernt; ohne `OEFFENTLICHE_URL` gilt `localhost`. Die Einrichtung steht in `koordinaten-board/pi/ANLEITUNG.md`. Offen bleibt nur die Startseite der Domain (E20).
-  1. **Bauplan „Sitzung“** (E16) ist abgenommen: [`bauplaene/Bauplan-Sitzung.md`](bauplaene/Bauplan-Sitzung.md) (13.10.2026). Das Dashboard wird die einzige Anzeige. **S1 und S2 sind gebaut** (13.10.2026): Sitzung am Server (`sitzung.js`, `companion/widget-groessen.mjs` gemeinsam), die Companion schickt für „Aufs Board“ nur noch die Quelle, der Zustand der Knöpfe und die Liste im Board-Sheet kommen aus der Sitzung, das Dashboard zeigt Kennblock und Absender, der Sitzungs-Layer ist gegen Hinzufügen/Löschen/Umbenennen gesperrt. Bis S4 schickt der Server die Karte als Brücke weiter an die alte Anzeige. **S3 ist gebaut** (13.10.2026): Widgets der Anzeige (Orte, Beitreten mit QR-Code vom Server, Spieler, Zuletzt) und der Kopf der Anzeige (Titel, Seed, Uhr, Verbunden-Punkt) aus `zustand`/`teilnehmer`, neues Standard-Layout. Jetzt ⏸ **H9** (Max vergleicht `w12-anzeige-widgets.png` mit `/anzeige`), danach S4.
+  1. **Bauplan „Sitzung“** (E16) ist **gebaut** (13.10.2026, S1–S4): [`bauplaene/Bauplan-Sitzung.md`](bauplaene/Bauplan-Sitzung.md). **Das Widget-Dashboard ist die einzige Anzeige.** „Aufs Board“ legt ein Widget in die Sitzung der Anzeige (Layer „Sitzung“, nur im Speicher), die Companion schickt dafür nur die Quelle. Die Widgets der Anzeige (Orte, Beitreten, Spieler, Zuletzt) und der Kopf (Titel, Seed, Uhr, Verbunden) ersetzen die alte Anzeige. Seit S4 zeigt der Anzeige-Link auf `/dashboard`, `/` (Netlify) und `/anzeige` leiten dorthin um (E20 erledigt), `koordinaten-board/client/` und die Nachricht `gezeigt` sind entfernt. Jetzt ⏸ **H10**: Probe am Fernseher/Tablet und über Mobilfunk (`koordinaten-board/pi/ANLEITUNG.md`, Abschnitt „Probe nach dem Umschalten“).
   2. **Offline B3–B5**, neu zugeschnitten (13.10.2026): N5 ist hinfällig, HTTPS kommt von Netlify/Cloudflare. B3 = Live-Modus ohne Netz, IndexedDB, Nachladen über `/api/aenderungen` (Nachtrag im Offline-Bauplan).
   3. A7 (Größenstufen je Widget): Planungsrunde mit Max
   4. Inhalte, die noch nicht beschrieben sind (Warteliste, Kapitel 4)
@@ -33,6 +33,7 @@
 | PR | Inhalt |
 |---|---|
 | #13 | Bauplan „Sitzung und eine Anzeige“ (abgenommen), Offline neu zugeschnitten (N5 hinfällig), Checkliste Pi/Cloudflare, Fix „Fertig“ in Anordnen |
+| #17 | S4 Umschalten: Anzeige-Link aufs Dashboard, `/` und `/anzeige` leiten um (E20), `koordinaten-board/client/` und `gezeigt` entfernt, Hinweis „Dieser Anzeige-Link gilt nicht mehr“, Tests auf das Dashboard umgeschrieben; ⏸ H10 wartet auf Max |
 | #16 | S3 Widgets der Anzeige: Orte, Beitreten (QR-Code vom Server), Spieler, Zuletzt, Kopf der Anzeige, neues Standard-Layout; ⏸ H9 wartet auf Max |
 | #15 | S2 Handy und Dashboard: „Aufs Board“ mit Quelle, Sitzung im Board-Sheet, Kennblock und Absender-Chip im Dashboard, Sitzungs-Layer gesperrt, Brücke `gezeigt` bis S4; Playwright-Tests zu „Aufs Board“ laufen live vom Board |
 | #14 | S1 Sitzung am Server: `sitzung.js`, `companion/widget-groessen.mjs` gemeinsam für Server und Dashboard, „Aufs Board“ mit Quelle, `portale.verbindung` |
@@ -122,7 +123,8 @@ Handy (Companion, /)                 Board-Server (Fastify, :3000)              
 Beitreten: Board-PIN + Account  ──▶  identitaet.js: anmelden → Token (Gerät)
   (Name + eigene PIN)                werBistDu(req) für API, /ws, Widgets
 Daten anlegen (ID vom Handy)    ──▶  daten.js (daten.db, SQLite): erstellerId = Account
-„Aufs Board“ (BOARD_KARTEN)     ──▶  /ws zeigen → gezeigt                    ──▶  /anzeige (alt, React)
+„Aufs Board“ (Quelle)           ──▶  /ws zeigen → Sitzung (sitzung.js),      ──▶  /dashboard: Layer „Sitzung“
+                                     Karte aus board-karten.js
 Board → Anzeigen → anordnen     ──▶  PUT /api/anzeigen/:id/layout, /vollbild
   = /dashboard/anordnen               layout.js prüft, geaendert „layout“      ──▶  /dashboard (Widgets)
                                      GET /api/widgets/:typ → Karte aus              lädt Layout seiner Anzeige,
@@ -138,7 +140,7 @@ Board → Anzeigen → anordnen     ──▶  PUT /api/anzeigen/:id/layout, /vo
   - **Anzeige**: jedes Gerät braucht den Anzeige-Link, seit Umbau Phase 1 auch das Board-Gerät selbst (Konsole, `daten/anzeige-link.txt`). Sie hat keine Bedienelemente.
   - **Steuerung**: ein Handy mit Token. Es ändert Layouts und startet das Vollbild.
 - **Identität:** Das Token enthält Account und Gerät. Ein gesperrtes Gerät oder ein Token von vor B2 gilt nicht. Hinter `werBistDu()` kann später ein richtiges Login stehen, ohne die Daten anzufassen.
-- **Heute vs. E16:** „Aufs Board“ geht heute über `/ws` (`zeigen` → `gezeigt`) an die alte `/anzeige` und bleibt dort liegen. Mit der Sitzung (E16) wird daraus ein Widget im Dashboard (Kapitel 9).
+- **Sitzung (E16, gebaut 13.10.2026):** „Aufs Board“ schickt über `/ws` nur die Quelle (`zeigen`), der Server legt ein Widget in die Sitzung der Anzeige; die alte `/anzeige` und die Nachricht `gezeigt` gibt es seit S4 nicht mehr.
 
 ---
 
@@ -146,13 +148,12 @@ Board → Anzeigen → anordnen     ──▶  PUT /api/anzeigen/:id/layout, /vo
 
 ```bash
 cd koordinaten-board
-npm run installieren && npm run build                  # Server + alte Anzeige
-npm run dashboard:installieren && npm run dashboard:build   # Widget-Dashboard (companion/widgets → dist)
+npm run installieren && npm run build                  # Server + Dashboard (die Anzeige, companion/widgets → dist)
 npm start                                              # lokal; Betrieb auf dem Pi, siehe koordinaten-board/pi/ANLEITUNG.md
 ```
 
 - **Handy:** QR-Code der Anzeige scannen → „Beitreten“. Dort die Board-PIN eingeben, einen Account antippen oder einen neuen Namen tippen, dazu die eigene PIN.
-- **Anzeige:** nur mit dem Anzeige-Link aus der Konsole (oder Board → Anzeigen), auch auf dem Board-Gerät selbst: `…/dashboard?anzeige=…&schluessel=…` (Widgets) oder `…/anzeige?…` (alt).
+- **Anzeige:** nur mit dem Anzeige-Link aus der Konsole (oder Board → Anzeigen), auch auf dem Board-Gerät selbst: `…/dashboard?anzeige=…&schluessel=…`. Alte Links auf `/anzeige` leiten mit Schlüssel dorthin um.
 - **Anordnen:** am Handy Board → Anzeigen → „Anzeige anordnen“, am besten im Querformat.
 - **Ohne Board:** `cd companion/widgets && npm run dev`. Dann gibt es Beispielkarten, man bearbeitet lokal, die Galerie geht im Bearbeiten-Modus. `companion/companion-prototyp.html` direkt geöffnet läuft im DEMO-Mock.
 
@@ -221,7 +222,7 @@ Voraussetzungen für die Playwright-Tests:
 ## 9. Nächste Schritte
 
 0. ~~**Umbau auf Netlify + Raspberry Pi**~~ **abgeschlossen (13.10.2026)**, siehe `UMBAUPLAN.md`: Phasen 1–6 in Betrieb unter `mainhubv1.com`, Aufräumen erledigt (E18). Entschieden: `/app/` bekommt den Prototyp, der Prototyp ist der Hauptstand; das Anzeigegerät bleibt offen (technisch egal). Noch zu entscheiden: die Startseite der Domain (E20, Anzeige oder Dashboard).
-1. **Bauplan „Sitzung“ (E16)** ist abgenommen: `bauplaene/Bauplan-Sitzung.md` (13.10.2026, alle fünf Fragen entschieden). S1, S2 und S3 sind gebaut (13.10.2026). Jetzt ⏸ H9, danach S4 und ⏸ H10. Fest stand vorher:
+1. **Bauplan „Sitzung“ (E16)** ist gebaut: `bauplaene/Bauplan-Sitzung.md` (13.10.2026, S1–S4). Offen ist nur noch ⏸ **H10** (Probe nach dem Umschalten, Max). Fest stand vorher:
    - Die Sitzung lebt, solange das Board läuft. Ein Neustart beginnt leer; das gespeicherte Layout der Anzeige (A6) bleibt.
    - Inhalte lassen sich während der Laufzeit live ändern.
    - „Aufs Board“ fügt den Inhalt als **Widget an der ersten freien Stelle** ein (Größe aus dem Größen-Vertrag, Passt-Prüfung aus A2). Am Handy lässt er sich in „Anzeige anordnen“ verschieben oder entfernen.

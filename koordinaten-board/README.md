@@ -8,13 +8,12 @@ Alles läuft offline im eigenen Netz: keine Cloud, kein Konto; die Texterkennung
 
 **Optik:** angelehnt an die Live-Karte der Minecraft Companion PWA – jede Dimension färbt die Oberfläche ein (Oberwelt grün, Nether rot, End violett).
 
-**Anzeige** (`/anzeige`, nur mit **Anzeige-Link**, seit Umbau Phase 1 auch auf dem Board-Gerät selbst)
-- Angeheftete Orte groß oben (bis zu 6), alle anderen in drei Spalten: Oberwelt, Nether, Ende
-- Automatische Umrechnung Oberwelt ↔ Nether (÷ 8 / × 8) bei jedem Ort
-- Lange Listen scrollen von selbst langsam durch
-- Neue und geänderte Orte leuchten kurz auf und sind mit „NEU“ markiert
-- QR-Code + PIN zum Beitreten, wer online ist, zuletzt gespeicherte Orte
-- Strukturen mit Kennblock (z. B. Netherziegel für „Nether Fortress“) zeigen das Bild statt des Linien-Icons, auch in der Handy-Liste und im Ort-Detail. Bilder: `companion/icons/struktur_kennbloecke/` (der Server liefert sie unter `/icons/` aus), Zuordnung Typ → Bild: `client/src/lib/kennbloecke.ts`
+**Anzeige** = das **Widget-Dashboard** (`../companion/widgets`, unter `/dashboard`, nur mit **Anzeige-Link**, seit Umbau Phase 1 auch auf dem Board-Gerät selbst). Seit Bauplan „Sitzung“ (S4, 13.10.2026) ist es die einzige Anzeige; die alte React-Anzeige unter `/anzeige` ist entfernt, alte Links leiten mit Schlüssel aufs Dashboard um.
+- Widgets im Raster, je Anzeige ein eigenes Layout mit Layern; angeordnet wird am Handy
+- **Orte der Welt:** angeheftete Orte groß oben (bis zu 6), alle anderen in drei Spalten (Oberwelt, Nether, End), mit Umrechnung Oberwelt ↔ Nether (÷ 8 / × 8) und „Neu“ für 90 Sekunden. Anders als die alte Anzeige scrollen lange Listen nicht von selbst, und neue Orte leuchten nicht auf
+- **Beitreten** (QR-Code, Adresse, PIN), **Spieler** (wer mit dem Handy verbunden ist), **Zuletzt gespeichert**; im Kopf Titel, Seed, Uhr und Verbunden-Punkt
+- Was am Handy „Aufs Board“ gelegt wird, erscheint als Widget im Layer „Sitzung“
+- Strukturen mit Kennblock (z. B. Netherziegel für „Nether Fortress“) zeigen das Bild statt des Linien-Icons, auch in der Handy-Liste und im Ort-Detail. Bilder: `companion/icons/struktur_kennbloecke/` (der Server liefert sie unter `/icons/` aus), Zuordnung Typ → Bild: `companion/widgets/src/features/karten/lib/kennbloecke.ts`
 
 **Handy: die Companion** (Startseite `/`)
 - Der Server liefert die Companion aus (`../companion/companion-prototyp.html`, per `COMPANION_DATEI` austauschbar). Den QR-Code der Anzeige mit der normalen Kamera-App scannen → die Companion öffnet sich mit der PIN → Name eingeben → beigetreten.
@@ -25,9 +24,9 @@ Alles läuft offline im eigenen Netz: keine Cloud, kein Konto; die Texterkennung
 - Geprüft wird mit denselben Regeln wie in der Companion: Der Server lädt `../companion/regeln.js` (`server/src/regeln.js`).
 - **Anzeige steuern** (Board-Sheet der Companion): Welt auf der Anzeige, Titel, QR-Code zeigen; Orte im Detail „Auf der Anzeige anheften“.
 - **Beitreten mit Account** (`server/src/identitaet.js`): Board-PIN aus dem QR-Code (bleibt als Zugang zum Server; seit Umbau Phase 1 mindestens 6 Ziffern), dann Account wählen oder anlegen – Name plus **eigene PIN** (4–8 Ziffern, nur als scrypt-Hash gespeichert). Das Token ist der Geräteschlüssel: Es nennt Account und Gerät (`benutzer`, `profile`, `geraete` in `daten.db`); ein gesperrtes Gerät oder ein Token von vor den Accounts gilt nicht mehr. Einträge tragen die Benutzer-ID als `erstellerId`. Nach **5 falschen PINs** ist das Gerät **60 s gesperrt** (`server/src/sperre.js`) – für die Board-PIN je Gerät, für die eigene PIN je Gerät und Account. Als Adresse des Geräts gilt hinter dem Cloudflare-Tunnel der Header `CF-Connecting-IP` (nur, wenn die Verbindung von `127.0.0.1` kommt, also von `cloudflared`); im Heimnetz die IP des Handys. **CORS** (Umbau Phase 1): Für alle `/api`-Pfade und `/ws` gelten nur die Ursprünge aus `ERLAUBTE_URSPRUENGE` und der eigene Ursprung des Servers, mit allen Methoden (`GET, POST, PUT, DELETE`). Fremde Ursprünge bekommen 403, auch beim WebSocket. Anfragen ohne `Origin` (Kamera-App, `curl`) sind davon nicht betroffen.
-- **Aufs Board**: Jeder Inhalt der Companion (Ort, Sammelobjekt, Sammel-Fortschritt, Portal-Verbindung, Banner, Rüstungs-Set) lässt sich groß auf die Anzeige werfen. Die Karte liegt über den Spalten, im Theme ihrer Dimension, mit Absender; eine neue ersetzt die alte, gespeichert wird sie nicht. Mit `typ` (Seed-Map-Typ) steht der Kennblock neben dem Titel, ein `bild`-Block (z. B. die Banner-Vorschau oder die Rüstungs-Figur) links neben den übrigen. Aufbau und Prüfung: `server/src/zeigen.js`. **Seit Bauplan „Sitzung“ (S1+S2):** Das Handy schickt statt der Karte nur die Quelle (`{ art:"zeigen", quelle:"portal:<id>", anzeigeId? }`), legt der Server den Inhalt als **Widget in die Sitzung der Anzeige** (`server/src/sitzung.js`): erste freie Stelle mit den Größen aus `companion/widget-groessen.mjs`, Antwort `ok { instanzId }`, live `geaendert` „layout“ mit `anzeigeId`; `{ art:"verbergen", instanzId }` nimmt es weg. Die Sitzung erscheint als Layer „Sitzung“ im Layout (nur im Speicher, nach einem Neustart leer); jede Instanz trägt `herkunft` (Quelle, wie die Companion sie nennt), `titel`, `von` und `farbe`. Bis S4 schickt der Server die gebaute Karte zusätzlich als `gezeigt` an die alte Anzeige; der alte Weg mit fertiger Karte vom Handy bleibt bis dahin ebenfalls erlaubt.
+- **Aufs Board** (Bauplan „Sitzung“): Jeder Inhalt der Companion (Ort, Sammelobjekt, Sammel-Fortschritt, Portal-Verbindung, Banner, Rüstungs-Set) lässt sich auf die Anzeige legen. Das Handy schickt nur die Quelle (`{ art:"zeigen", quelle:"portal:<id>", anzeigeId? }`), der Server legt den Inhalt als **Widget in die Sitzung der Anzeige** (`server/src/sitzung.js`): erste freie Stelle mit den Größen aus `companion/widget-groessen.mjs`, Antwort `ok { instanzId, titel }`, live `geaendert` „layout“ mit `anzeigeId`; `{ art:"verbergen", instanzId }` nimmt es weg. Die Sitzung erscheint als Layer „Sitzung“ im Layout (nur im Speicher, nach einem Neustart leer); jede Instanz trägt `herkunft` (Quelle, wie die Companion sie nennt), `titel`, `von` und `farbe`. Die Karte des Widgets baut der Server mit den Anzeigeschemas aus `companion/board-karten.js` und prüft sie mit `server/src/zeigen.js`; mit `typ` (Seed-Map-Typ) steht der Kennblock neben dem Titel. Der frühere Weg mit fertiger Karte vom Handy und die Nachricht `gezeigt` sind mit S4 entfallen; eine veraltete Companion bekommt „Die Companion ist veraltet – bitte neu laden“.
 - **Welt-Import (Biome)**: Die Companion liest einen hochgeladenen Weltordner (`.zip`/`.mcworld`) selbst im Browser (Web Worker) und schickt die Biome als Kacheln ans Board (`PUT /api/welten/:id/biome`, geprüft mit `biomImportPruefen` aus `regeln.js`, bis 64 MB). Das Board speichert sie in `daten.db` (eine Zeile je Kachel, seit Umbau Phase 4) und meldet `geaendert` „biome“. Worker, Dekoder und Bibliothek liefert es unter `/biom-import.worker.js`, `/biom-welt.js`, `/biom-dekoder.js`, `/biom-ids.js` und `/vendor/` aus. Biom-Punkte aus Screenshots gibt es nicht mehr; alte entfernt der Server beim Übernehmen einer `daten.json` (Sicherung `daten.vor-welt-import.json`).
-- **Widget-Dashboard** (`companion/widgets`, in Arbeit): Der Server liefert den Build unter `/dashboard` aus (eigene Routen wie `/dashboard/vollbild/…` → `index.html`; `/dashboard?anzeige=…&schluessel=…` behält den Anzeige-Link). `GET /api/widgets/:typ?quelle=…` liefert die fertige Karte eines Widget-Typs (z. B. `portale.verbindungen`, `banner.banner?quelle=b_3`) aus den Daten der aktiven Welt – gebaut mit denselben Anzeigeschemas wie „Aufs Board“ (`companion/board-karten.js`, per `node:vm` geladen), geprüft mit `zeigen.js`. Ohne Inhalt kommt `{ karte:null, hinweis }` (Bereich geplant, keine Welt, Quelle gelöscht). `GET /api/widgets/:typ/quellen` nennt, was man beim Hinzufügen als Quelle wählen kann. Lesen darf die Anzeige (mit Anzeige-Link) und jedes beigetretene Handy; nach Änderungen meldet `/ws` wie immer `geaendert`. Die Banner-Vorschau rendert der Server als PNG (`pngjs`), die Rüstungs-Figur gibt es nur in der Companion.
+- **Widget-Dashboard** (`companion/widgets`, die Anzeige): Der Server liefert den Build unter `/dashboard` aus (eigene Routen wie `/dashboard/vollbild/…` → `index.html`; `/dashboard?anzeige=…&schluessel=…` behält den Anzeige-Link). `GET /api/widgets/:typ?quelle=…` liefert die fertige Karte eines Widget-Typs (z. B. `portale.verbindungen`, `banner.banner?quelle=b_3`) aus den Daten der aktiven Welt – gebaut mit denselben Anzeigeschemas wie „Aufs Board“ (`companion/board-karten.js`, per `node:vm` geladen), geprüft mit `zeigen.js`. Ohne Inhalt kommt `{ karte:null, hinweis }` (Bereich geplant, keine Welt, Quelle gelöscht). `GET /api/widgets/:typ/quellen` nennt, was man beim Hinzufügen als Quelle wählen kann. Lesen darf die Anzeige (mit Anzeige-Link) und jedes beigetretene Handy; nach Änderungen meldet `/ws` wie immer `geaendert`. Die Banner-Vorschau rendert der Server als PNG (`pngjs`), die Rüstungs-Figur gibt es nur in der Companion.
 - **Layout pro Anzeige** (Widget-Dashboard, A6): Jede Anzeige hat ihr eigenes Widget-Layout (Layer mit Widgets im Raster, aktiver Layer) und meldet, wie viele Reihen auf ihren Bildschirm passen (`PUT /api/anzeige/reihen`). Das Dashboard liest sein Layout über `GET /api/anzeige/layout` (welche Anzeige, sagt der Anzeige-Link). Handys lesen und speichern es über `GET/PUT /api/anzeigen/:id/layout` (Form geprüft in `server/src/layout.js`) und starten mit `PUT /api/anzeigen/:id/vollbild` `{ instanzId|null }` das Vollbild an der Anzeige; Änderungen gehen live als `geaendert` „layout“. Angeordnet wird am Handy unter `/dashboard/anordnen` (aus der Companion: Board → Anzeigen → „Anzeige anordnen“).
 - **Widgets der Anzeige** (Bauplan „Sitzung“, S3): Orte der Welt, Beitreten, Spieler und „Zuletzt gespeichert“ rendert das Dashboard selbst aus `zustand` und `teilnehmer` vom `/ws`, dazu im Kopf Titel, Seed, Uhr und Verbunden-Punkt. Den QR-Code zum Beitreten liefert `GET /api/anzeige/qr` als SVG (nur mit Anzeige-Link).
 - Aus der früheren Handy-Oberfläche des Boards noch nicht übernommen: Notiz, Kartenausschnitt als Bild, Export als JSON.
@@ -46,16 +45,16 @@ npm start
 ```
 Ohne `OEFFENTLICHE_URL` zeigen QR-Code und Anzeige-Link auf `http://localhost:3000`. Sollen Handys im WLAN den lokalen Server erreichen, die eigene Adresse setzen (`OEFFENTLICHE_URL=http://192.168.178.23:3000`) und die Firewall des Rechners für den Port freigeben.
 
-**Anzeige und Dashboard von einem anderen Server** (Umbau Phase 2): Beide lesen beim Bauen `VITE_API_URL` (z. B. `https://api.mainhubv1.com`) für `fetch` und WebSocket; leer heißt eigener Ursprung. Die Companion liest ihre Board-Adresse aus `companion/konfig.js`. Der Server braucht dann den Ursprung der Seiten in `ERLAUBTE_URSPRUENGE`.
+**Dashboard von einem anderen Server** (Umbau Phase 2): Es liest beim Bauen `VITE_API_URL` (z. B. `https://api.mainhubv1.com`) für `fetch` und WebSocket; leer heißt eigener Ursprung. Die Companion liest ihre Board-Adresse aus `companion/konfig.js`. Der Server braucht dann den Ursprung der Seiten in `ERLAUBTE_URSPRUENGE`.
 
-**Widget-Dashboard** (in Arbeit, ersetzt später `/anzeige`): einmal `npm run dashboard:installieren && npm run dashboard:build`, dann mit demselben Anzeige-Link `http://…:3000/dashboard?anzeige=…&schluessel=…`.
+`npm run installieren` holt die Pakete von Server und Dashboard, `npm run build` baut das Dashboard (die Anzeige, `../companion/widgets/dist`). Geöffnet wird es mit dem Anzeige-Link `http://…:3000/dashboard?anzeige=…&schluessel=…`.
 
 Die Konsole zeigt dann die Adresse für die Handys und die PIN. Einfacher: den QR-Code auf der Anzeige scannen – die PIN ist darin schon enthalten.
 
 **Anzeige auf einem anderen Gerät** (TV-Browser, Tablet, zweiter Laptop): Der Server läuft auf einem Rechner, die Anzeige kann auf jedem Gerät im WLAN laufen. Dafür hat jede Anzeige einen **Anzeige-Link** mit eigenem Schlüssel:
-- Die Konsole nennt ihn beim Start: `Anzeige auf anderem Gerät: http://192.168.…:3000/anzeige?anzeige=a_1&schluessel=…`
+- Die Konsole nennt ihn beim Start: `Anzeige: http://192.168.…:3000/dashboard?anzeige=a_1&schluessel=…`
 - In der Companion unter **Board → Anzeigen**: Link kopieren oder als QR-Code zeigen (mit dem Tablet abscannen), Anzeigen anlegen und umbenennen. **Neuer Schlüssel** macht alte Links ungültig; verbundene Anzeigen mit altem Link werden getrennt.
-- Der Browser merkt sich den Schlüssel – nach einem Neustart des TVs reicht `http://…:3000/anzeige`.
+- Der Browser merkt sich den Schlüssel – nach einem Neustart des TVs reicht `http://…:3000/dashboard`. Alte Links auf `/anzeige` leiten dorthin um, mit Schlüssel.
 - **Auch das Gerät, auf dem der Server läuft, braucht den Link** (Umbau Phase 1: hinter einem Tunnel käme sonst jede Anfrage aus dem Internet als `localhost` herein). Der Server schreibt den Link der ersten Anzeige nach `<Datenordner>/anzeige-link.txt` (auf dem Pi `/var/lib/companion-board/`). Den Notschalter `ANZEIGE_OFFEN` gibt es nicht mehr.
 
 ## Handy verbindet nicht?
@@ -86,14 +85,13 @@ Dienstdatei, Umgebung, Tunnel-Konfiguration und Sicherung liegen in [`pi/`](pi/)
 
 ```bash
 npm run dev:server    # Server mit Auto-Neustart auf :3000
-npm run dev:client    # Vite auf :5173 (leitet /api und /ws an :3000 weiter)
+npm run dev:dashboard # Vite für das Dashboard (companion/widgets, siehe dessen README)
 npm test              # Server-Tests: Daten, Companion-API, Regeln, Auswertung der Texterkennung, Karten, Netzwerk, PIN-Sperre
 ```
 
 Aufbau:
 ```
-server/src/server.js        Fastify: Beitritt, WebSocket, liefert Companion (/) und Anzeige (/anzeige) aus
-client/src/lib/api.ts       Adresse der API: VITE_API_URL beim Bauen (Netlify ↔ Pi, Umbau Phase 2), sonst eigener Ursprung
+server/src/server.js        Fastify: Beitritt, WebSocket, liefert Companion (/) und Anzeige (Dashboard, /dashboard) aus
 server/src/daten.js         gemeinsame Daten im Speicher: Welten, Orte, Sammelobjekte, Banner, Rüstungs-Sets, Portale, Anzeigen, Accounts, Einstellungen
 server/src/speicher.js      SQLite (daten.db, node:sqlite, WAL): je Sammlung eine Tabelle mit version je Zeile, Änderungsnummer, Biome je Kachel
 server/werkzeuge/nach-sqlite.mjs  Umzug daten.json → daten.db von Hand (macht der Server beim ersten Start auch selbst)
@@ -103,11 +101,11 @@ server/src/widgets.js       Widget-Typ + Quelle → Karte fürs Dashboard (GET /
 server/src/layout.js        Widget-Layout einer Anzeige prüfen (Form, Widget-Typen, Grenzen)
 server/src/sicht.js         Orte der aktiven Welt in der Form, die die Anzeige kennt
 server/src/texterkennung.js lädt ../companion/texterkennung.js per node:vm: Feature-Liste und Auswertung der Texterkennung (OCR selbst läuft am Handy)
-server/src/zeigen.js        „Aufs Board“: Karten vom Handy prüfen
+server/src/zeigen.js        Karten prüfen (Widgets, „Aufs Board“)
 server/src/sitzung.js       Sitzung je Anzeige (Bauplan „Sitzung“): Widgets von „Aufs Board“, nur im Speicher, erste freie Stelle
 ../companion/widget-groessen.mjs  Größenstufen aller Widget-Typen und Passt-Prüfung, gemeinsam für Server und Dashboard
 server/src/sperre.js        Sperre nach falschen PINs
-client/src/anzeige/         Große Anzeige (Gezeigt.tsx: geworfene Karte) – der Client ist nur noch die Anzeige
+../companion/widgets/       Widget-Dashboard = die Anzeige (Vite, React; VITE_API_URL beim Bauen für Netlify ↔ Pi)
 ```
 
 Neue Feature-Typen für die Texterkennung: Liste `FEATURES` in `../companion/texterkennung.js`. Kategorien, Biome und Regeln stehen in `../companion/regeln.js`.
@@ -120,7 +118,7 @@ Alles liegt in `server/daten/`:
 - `daten.vor-welt-import.json` – Sicherung, falls beim Umstieg auf den Welt-Import alte Biom-Punkte entfernt wurden
 - `zustand.json`, `medien/` – Orte und Bilder der früheren Handy-Oberfläche; werden nicht mehr gelesen und bleiben als Sicherung liegen
 - `pin.txt` – Board-PIN, 6 Ziffern (löschen = neue PIN beim nächsten Start; eine alte 4-stellige ersetzt der Server beim Start)
-- `anzeige-link.txt` – Anzeige-Link der ersten Anzeige, für die Startskripte (schreibt der Server bei jedem Start und bei „Neuer Schlüssel“)
+- `anzeige-link.txt` – Anzeige-Link der ersten Anzeige (aufs Dashboard), z. B. für einen Kiosk-Browser (schreibt der Server bei jedem Start und bei „Neuer Schlüssel“)
 - `geheim.txt` – Schlüssel für die Anmeldungen (löschen = alle Handys müssen sich neu anmelden; die Accounts bleiben)
 
 ## Einstellungen per Umgebungsvariable
