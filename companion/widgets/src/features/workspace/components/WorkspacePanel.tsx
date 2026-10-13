@@ -61,16 +61,31 @@ export function WorkspacePanel({
           onPointerDown: (e) => onHeaderPointerDown(e, item.id),
           onContextMenu: (e) => e.preventDefault(),
         }}
-        kopfZusatz={editMode && !leer && (
+        kopfZusatz={!leer && (
           <>
-            <span
-              className="ml-auto shrink-0 rounded-full border border-border px-1.5 text-[10px] leading-4 text-text-muted"
-              data-testid="stufe"
-              title="Größenstufe · Breite × Höhe in Zellen"
-            >
-              {item.stufe} · {stufe?.breite}×{stufe?.hoehe}
-            </span>
-            <PanelToolbar panelId={item.id} typ={item.typ} />
+            {item.von && (
+              // Sitzungs-Widget (Bauplan „Sitzung“): wer es aufs Board gelegt hat, in der Farbe des Spielers
+              <span
+                className="ml-auto flex shrink-0 items-center gap-1 rounded-full border border-border px-1.5 text-[10px] leading-4 text-text-muted"
+                data-testid="von"
+                title={`Aufs Board gelegt von ${item.von}`}
+              >
+                <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full" style={{ background: item.farbe || "currentColor" }} />
+                {item.von}
+              </span>
+            )}
+            {editMode && (
+              <>
+                <span
+                  className={["shrink-0 rounded-full border border-border px-1.5 text-[10px] leading-4 text-text-muted", item.von ? "" : "ml-auto"].join(" ")}
+                  data-testid="stufe"
+                  title="Größenstufe · Breite × Höhe in Zellen"
+                >
+                  {item.stufe} · {stufe?.breite}×{stufe?.hoehe}
+                </span>
+                <PanelToolbar panelId={item.id} typ={item.typ} />
+              </>
+            )}
           </>
         )}
       >

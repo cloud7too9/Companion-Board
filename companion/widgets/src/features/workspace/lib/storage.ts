@@ -45,6 +45,8 @@ function normalizeLayout(layout: WorkspaceLayout): WorkspaceLayout {
         x: clamp(Math.round(i.x), 0, RASTER_SPALTEN - s.breite),
         y: Math.max(0, Math.round(i.y)),
         ...(t.quelle && typeof i.quelle === "string" && i.quelle ? { quelle: i.quelle.slice(0, 80) } : {}),
+        ...(typeof i.von === "string" && i.von ? { von: i.von.slice(0, 40) } : {}),
+        ...(typeof i.farbe === "string" && /^#[0-9a-f]{3,8}$/i.test(i.farbe) ? { farbe: i.farbe } : {}),
       }];
     }),
   };

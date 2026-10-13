@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { Id } from "../../../shared/types/common.types";
 import type { WorkspaceData, WorkspaceLayout } from "./workspace.types";
-import type { WidgetInstanz } from "./widget-struktur";
+import { SITZUNG_LAYER, type WidgetInstanz } from "./widget-struktur";
 import { DEFAULT_LAYOUT } from "./default-layout";
 import { instanzRect, instanzRects, schonDa, widgetTyp } from "./widget-register";
 import { clampItemToGrid } from "../lib/layout-utils";
@@ -205,7 +205,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
     addItem: (typId, quelle) => {
       const layout = selectActiveLayer(get());
       const t = widgetTyp(typId);
-      if (!t || schonDa(layout.instanzen, typId)) return false;
+      // In die Sitzung kommt man nur über „Aufs Board“ am Handy (Bauplan „Sitzung“)
+      if (!t || layout.id === SITZUNG_LAYER || schonDa(layout.instanzen, typId)) return false;
       const slot = findSlot(layout, get().reihen, t.vertrag.stufen);
       if (!slot) return false;
       const instanz: WidgetInstanz = { id: nextId("w"), typ: t.id, ...slot, ...(t.quelle && quelle ? { quelle } : {}) };
@@ -226,7 +227,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       const layout = selectActiveLayer(get());
       const target = layout.instanzen.find((i) => i.id === id);
       const t = target && widgetTyp(target.typ);
-      if (!target || !t || !t.mehrfach) return false;
+      if (!target || !t || !t.mehrfach || layout.id === SITZUNG_LAYER) return false;
       const slot = findSlot(layout, get().reihen, stufenAb(t.vertrag.stufen, stufeVon(t.vertrag, target.stufe).name));
       if (!slot) return false;
       commitActiveItems([...layout.instanzen, { ...target, id: nextId("w"), ...slot }]);
@@ -255,7 +256,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       const { layers, activeLayerId } = get();
       const normalized = normalizeLayerName(name);
       const target = layers.find((l) => l.id === id);
-      if (!target || !normalized || normalized === target.name) return false;
+      if (!target || id === SITZUNG_LAYER || !normalized || normalized === target.name) return false;
       commit({
         layers: layers.map((l) => (l.id === id ? { ...l, name: normalized } : l)),
         activeLayerId,
@@ -265,7 +266,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
 
     removeLayer: (id) => {
       const { layers, activeLayerId } = get();
-      if (layers.length <= 1) return false;
+      if (layers.length <= 1 || id === SITZUNG_LAYER) return false;
       const index = layers.findIndex((l) => l.id === id);
       if (index === -1) return false;
       const next = layers.filter((l) => l.id !== id);

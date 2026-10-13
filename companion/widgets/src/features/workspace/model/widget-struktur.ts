@@ -50,6 +50,12 @@ export interface WidgetTyp {
 }
 
 /**
+ * Layer der Sitzung (Bauplan „Sitzung“): Widgets von „Aufs Board“, nur im Speicher des Boards.
+ * Hinzugefügt wird dort nur über „Aufs Board“; der Layer lässt sich weder löschen noch umbenennen.
+ */
+export const SITZUNG_LAYER = "sitzung";
+
+/**
  * Was auf dem Dashboard liegt. Breite und Höhe stehen nicht drin – sie folgen
  * aus der Stufe. Vollbild ist keine Stufe, sondern eine eigene Route.
  */
@@ -63,6 +69,9 @@ export interface WidgetInstanz {
   y: number;
   /** ID der Quelle (Koordinate, Liste, Eintrag, Bauplan, Banner, Set) bei Typen mit `quelle` */
   quelle?: string;
+  /** Sitzungs-Widget: wer es aufs Board gelegt hat (Name und Farbe des Spielers) */
+  von?: string;
+  farbe?: string;
 }
 
 const flaeche = (s: Pick<Groessenstufe, "breite" | "hoehe">) => s.breite * s.hoehe;

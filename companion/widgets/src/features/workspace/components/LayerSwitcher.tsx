@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "re
 import { IconButton } from "../../../shared/ui/IconButton";
 import type { Id } from "../../../shared/types/common.types";
 import { LAYER_NAME_MAX_LENGTH, useWorkspaceStore } from "../model/workspace.store";
+import { SITZUNG_LAYER } from "../model/widget-struktur";
 
 const VIEWPORT_MARGIN = 12;
 
@@ -169,7 +170,12 @@ export function LayerSwitcher() {
                       {widgetCountLabel(layer.instanzen.length)}
                     </span>
                   </button>
-                  {editMode && (
+                  {editMode && layer.id === SITZUNG_LAYER && (
+                    <span className="shrink-0 px-1 text-[10px] text-text-muted" title="Die Sitzung füllt „Aufs Board“ am Handy; sie lebt, bis das Board neu startet">
+                      Aufs Board
+                    </span>
+                  )}
+                  {editMode && layer.id !== SITZUNG_LAYER && (
                     <>
                       <IconButton label={`„${layer.name}“ umbenennen`} onClick={() => setRenamingId(layer.id)}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
