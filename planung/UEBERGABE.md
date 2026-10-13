@@ -28,7 +28,13 @@
 - **Tests:** alle grün in `main`, lokal und in der CI (Kapitel 6).
 - **Für Max wichtig:** Seit B2 gelten alte Anmeldungen nicht mehr. Jedes Handy meldet sich einmal neu an, mit Name und eigener PIN.
 
-### Diese Runde (05./06.10.2026)
+### Diese Runde (13.10.2026)
+
+| PR | Inhalt |
+|---|---|
+| #12 | Umbau abgeschlossen: Netlify-Probe (H8) und Phase 6 abgehakt, Domain `mainhubv1.com` statt Platzhalter, Betrieb vom Laptop aus entfernt (E18: `netzwerk.js`, Adress-Lernen, Start- und Firewall-Skripte), Entscheidungen zu `/app/` (Prototyp = Hauptstand) und Anzeigegerät (offen) festgehalten, E20 (Startseite) neu auf der Warteliste |
+
+### Vorige Runde (05./06.10.2026)
 
 | PR | Inhalt |
 |---|---|
@@ -38,7 +44,7 @@
 
 Neu auf der Warteliste: H7 (Farben der neuen Biome), H8 (Probe bei Netlify), N6 („Aktualisieren“ auch bei neuen Daten?), E17 (Inhalt des Spielerprofils), E18 (Heimnetz-Betrieb vom Laptop behalten?), E19 (Sammelobjekt-Karten mit Struktur-Ansicht, Besatz-Icon und Biom-Hintergrund; Max liefert die Ansichten), Kapitel 5 (Branches löschen).
 
-### Vorige Runde (04.10.2026)
+### Runde davor (04.10.2026)
 
 | PR | Inhalt |
 |---|---|

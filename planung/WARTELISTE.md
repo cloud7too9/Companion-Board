@@ -26,7 +26,7 @@ Bei jedem Haltepunkt stehen Branch und Screenshots. Die Screenshots erzeugen die
 
 Später, wenn es so weit ist: B3 (am echten iPhone im Flugmodus).
 
-**Pull Requests:** Seit dem 04.10.2026 ist alles in `main`: #7, #9–#11 und #19 einzeln, die Kette A2–A6 mit B1/B2 und dem Anzeige-Link in einem Merge über #17. #12–#16 sind darin enthalten und geschlossen (Kapitel 3 in [`UEBERGABE.md`](UEBERGABE.md); diese Nummern meinen das alte Repo). Im neuen Repo: #1–#7 Umbau Phasen 1–5, am 06.10.2026 #8 (Aufräumen), #9 (Biom-IDs) und #10 (Spielerprofil, Aktualisieren). **Gemergt wird nur nach Rückfrage bei Max.**
+**Pull Requests:** Seit dem 04.10.2026 ist alles in `main`: #7, #9–#11 und #19 einzeln, die Kette A2–A6 mit B1/B2 und dem Anzeige-Link in einem Merge über #17. #12–#16 sind darin enthalten und geschlossen (Kapitel 3 in [`UEBERGABE.md`](UEBERGABE.md); diese Nummern meinen das alte Repo). Im neuen Repo: #1–#7 Umbau Phasen 1–5, am 06.10.2026 #8 (Aufräumen), #9 (Biom-IDs) und #10 (Spielerprofil, Aktualisieren), #11 (Warteliste), am 13.10.2026 #12 (Umbau abgeschlossen, E18). **Gemergt wird nur nach Rückfrage bei Max.**
 
 ---
 
