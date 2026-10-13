@@ -653,7 +653,7 @@ select.orte-eingabe { padding-right:34px;
 .sheet-fuss .btn-primary { flex:1; }
 .knopf-raster { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
 .anzeige-anordnen { width:100%; margin-bottom:8px; }
-.konto-zeile { display:flex; align-items:center; gap:10px; }
+.konto-zeile { display:flex; flex-direction:row; align-items:center; justify-content:space-between; gap:10px; text-align:left; }
 .konto-zeile .text { flex:1; min-width:0; }
 .konto-zeile .knopf-reihe { display:flex; gap:6px; flex:0 0 auto; }
 .konto-zeile .knopf-reihe button { min-height:36px; padding:6px 12px; }
@@ -3864,8 +3864,9 @@ setInterval(() => { if(bd.status === "verbunden") kontaktMerken(); }, 60000);
 
 /* Ohne Netz zählt die Companion die Zeit selbst: nach über OFFLINE_MINUTEN.konto ohne Kontakt sperrt sie sich und
    prüft die PIN gegen den lokalen Hash. Online entscheidet das Board (423 → Anmeldeseite). Die offline eingegebene PIN
-   bleibt im Speicher und wird nachgereicht, sobald das Board wieder antwortet – dann fragt es nicht ein zweites Mal. */
-const sperre = { pin:null, offen:false, nachreichen:null };
+   bleibt im Speicher und wird einmal nachgereicht, sobald das Board wieder antwortet – dann fragt es nicht ein
+   zweites Mal. Anfragen, die schon unterwegs waren, wiederholt api() kurz danach ohne neue PIN. */
+const sperre = { pin:null, offen:null, nachreichen:null, nachgereicht:0 };
 const offlineAbgelaufen = () => Date.now() - (Number(lsLesen("board.kontakt")) || 0) > OFFLINE_MINUTEN.konto * 60000;
 /** → Promise, die erst nach der richtigen PIN erfüllt ist (ohne lokalen Hash: erst mit dem Board) */
 function offlineSperre(){
@@ -3907,14 +3908,15 @@ function offlinePruefen(){
   if(!DEMO.enabled && bd.verbindung && bd.status !== "verbunden" && offlineAbgelaufen()) return offlineSperre();
 }
 setInterval(offlinePruefen, 60000);
-/** PIN aus der Offline-Sperre ans Board → true, wenn es sie angenommen hat (einmal gleichzeitig) */
+/** PIN aus der Offline-Sperre ans Board → true, wenn es sie angenommen hat (nur einmal, gleichzeitige Anfragen teilen sich das) */
 function pinNachreichen(){
+  if(Date.now() - sperre.nachgereicht < 10000) return Promise.resolve(true);   // eben bestätigt: diese Anfrage war vorher unterwegs
   if(!sperre.pin || !bd.verbindung) return Promise.resolve(false);
   return sperre.nachreichen ??= (async () => {
     try {
       const res = await fetch(`${API_BASIS}/pin`, { method:"POST", headers:{ "Content-Type":"application/json", ...authHeaders() },
         body:JSON.stringify({ pin:sperre.pin }) });
-      if(res.ok) kontaktMerken();
+      if(res.ok){ sperre.nachgereicht = Date.now(); bd.kontaktGemerkt = 0; kontaktMerken(); }
       return res.ok;
     } catch { return false; }
     finally { sperre.pin = null; sperre.nachreichen = null; }
@@ -3938,7 +3940,7 @@ function boardKontenHtml(){
     ${wartend.length ? `<div class="list-stack">${wartend.map((k) => zeile(k, `<span class="knopf-reihe">
         <button class="btn-primary" data-aktion="konto-freigeben" data-id="${esc(k.id)}">Freigeben</button>
         <button class="btn-secondary" data-aktion="konto-ablehnen" data-id="${esc(k.id)}">${bd.kontoFrage === k.id ? "Wirklich?" : "Ablehnen"}</button></span>`)).join("")}</div>
-      <div class="result-hint">${wartend.length === 1 ? "Ein neues Konto wartet" : `${wartend.length} neue Konten warten`} auf Freigabe. Erst danach kommen sie in die Companion.</div>` : ""}
+      <div class="result-hint">${wartend.length === 1 ? "Ein neues Konto wartet auf Freigabe. Erst danach kommt es" : `${wartend.length} neue Konten warten auf Freigabe. Erst danach kommen sie`} in die Companion.</div>` : ""}
     <div class="list-stack">${frei.map((k) => zeile(k, "")).join("")}</div>
   </div>`;
 }

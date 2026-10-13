@@ -11,7 +11,7 @@ import { mkdirSync, mkdtempSync, rmSync, existsSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { tmpdir, networkInterfaces } from "node:os";
 import path from "node:path";
-import { CHROMIUM_OPTIONEN, anzeigeLinkQuery } from "./hilfen.mjs";
+import { CHROMIUM_OPTIONEN, anzeigeLinkQuery, konto } from "./hilfen.mjs";
 
 const HIER = fileURLToPath(new URL(".", import.meta.url));
 const DIR = path.join(HIER, "bilder");
@@ -24,11 +24,11 @@ if (!existsSync(path.join(HIER, "../widgets/dist/index.html"))) {
 }
 
 const TMP = mkdtempSync(path.join(tmpdir(), "widgets-board-"));
-const PORT = 3186, PIN = "471100", BOARD = `http://127.0.0.1:${PORT}`;
+const PORT = 3186, BOARD = `http://127.0.0.1:${PORT}`;
 const AUSSEN = Object.values(networkInterfaces()).flat().find((n) => n && n.family === "IPv4" && !n.internal)?.address;
 const board = spawn(process.execPath, ["src/server.js"], {
   cwd: path.join(HIER, "../../koordinaten-board/server"),
-  env: { ...process.env, PORT: String(PORT), RAUM_PIN: PIN, DATEN_ORDNER: path.join(TMP, "daten"),
+  env: { ...process.env, PORT: String(PORT), DATEN_ORDNER: path.join(TMP, "daten"),
          ...(AUSSEN && { OEFFENTLICHE_URL: `http://${AUSSEN}:${PORT}` }) },
   stdio: "ignore",
 });
@@ -45,7 +45,7 @@ const browser = await chromium.launch(CHROMIUM_OPTIONEN);
 const fehler = [];
 try {
   for (let i = 0; i < 60 && !(await fetch(`${BOARD}/api/server`).then((r) => r.ok, () => false)); i++) await schlafen(200);
-  ({ token } = await api("POST", "/api/beitreten", { pin: PIN, name: "Max", kontoPin: "2468" }));
+  ({ token } = await konto(BOARD, "Max"));
   const welt = (await api("POST", "/api/orte/welten", { seed: "6889192652397090698" })).welt;
   const basis = (await api("POST", "/api/orte/instanzen",
     { dimensionId: `d_${welt.id}_overworld`, kategorie: "Eigene Orte", variante: "Hauptbasis", x: 260, y: 80, z: -420, quelle: "manuell" })).instanz;
@@ -71,7 +71,8 @@ try {
     .some((z) => z.textContent.includes("Hauptbasis") && z.textContent.includes("X 260 · Y 80 · Z −420") && z.textContent.includes("Nether 32 / −53"))),
     "Orte: Hauptbasis in der Oberwelt-Spalte mit Koordinaten und Umrechnung");
   pruefe(await warteAuf(() => document.querySelector('[data-panel-id="w-beitreten"] [data-testid="qr"] svg')
-    && document.querySelector('[data-panel-id="w-beitreten"] [data-testid="pin"]')?.textContent === "471100"), "Beitreten: QR-Code vom Board und PIN");
+    && document.querySelector('[data-panel-id="w-beitreten"] [data-testid="adresse"]')?.textContent && !document.querySelector('[data-panel-id="w-beitreten"] [data-testid="pin"]')),
+    "Beitreten: QR-Code zur Anmeldeseite mit Adresse, keine Board-PIN mehr");
   pruefe(await warteAuf(() => document.querySelector('[data-panel-id="w-spieler"] [data-testid="spieler-leer"]')), "Spieler: niemand mit dem Handy verbunden");
   pruefe(await p.textContent('[data-testid="anzeige-titel"]') === "Unsere Welt"
     && (await p.textContent('[data-testid="anzeige-welt"]')).includes("Seed 68891…0698 · 1 Ort")

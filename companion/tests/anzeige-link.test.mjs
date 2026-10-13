@@ -8,7 +8,7 @@ import { mkdirSync, mkdtempSync, rmSync, existsSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { tmpdir, networkInterfaces } from "node:os";
 import path from "node:path";
-import { CHROMIUM_OPTIONEN, anzeigeLinkQuery } from "./hilfen.mjs";
+import { CHROMIUM_OPTIONEN, anzeigeLinkQuery, konto, anmelden } from "./hilfen.mjs";
 
 const HIER = fileURLToPath(new URL(".", import.meta.url));
 const DIR = path.join(HIER, "bilder");
@@ -23,10 +23,10 @@ const AUSSEN = Object.values(networkInterfaces()).flat().find((n) => n && n.fami
 if (!AUSSEN) { console.log("OK   übersprungen: keine Netzwerkadresse für den Zugriff „von außen“"); process.exit(0); }
 
 const TMP = mkdtempSync(path.join(tmpdir(), "anzeige-link-"));
-const PORT = 3189, PIN = "471100", BOARD = `http://127.0.0.1:${PORT}`;
+const PORT = 3189, BOARD = `http://127.0.0.1:${PORT}`;
 const board = spawn(process.execPath, ["src/server.js"], {
   cwd: path.join(HIER, "../../koordinaten-board/server"),
-  env: { ...process.env, PORT: String(PORT), RAUM_PIN: PIN, DATEN_ORDNER: path.join(TMP, "daten"), OEFFENTLICHE_URL: `http://${AUSSEN}:${PORT}` },
+  env: { ...process.env, PORT: String(PORT), DATEN_ORDNER: path.join(TMP, "daten"), OEFFENTLICHE_URL: `http://${AUSSEN}:${PORT}` },
   stdio: ["ignore", "pipe", "ignore"],
 });
 let konsole = "";
@@ -57,14 +57,12 @@ try {
   pruefe(/anzeige-link\.txt/.test(konsole) && (await anzeigeLinkQuery(path.join(TMP, "daten"))).startsWith("?anzeige=a_"),
     "Server schreibt den Link nach daten/anzeige-link.txt (für die Startskripte)");
 
-  // ---- Max tritt bei, öffnet das Board-Sheet ----
+  // ---- Max meldet sich an, öffnet das Board-Sheet ----
   const max = await seite();
-  await max.goto(`${BOARD}/?pin=${PIN}`);
-  await max.waitForSelector("#boardName"); await max.fill("#boardName", "Max"); await max.fill("#boardKontoPin", "2468");
-  await max.click('[data-aktion="board-beitreten"]');
-  await warteAuf(max, () => !DEMO.enabled && bd.verbindung?.name);
+  await konto(BOARD, "Max");
+  await anmelden(max, BOARD, "Max");
   // „Noch keine Welt“ geht erst nach dem Laden der Welten auf – vorher schließen, und es überdeckt später das Board-Sheet
-  pruefe(await warteAuf(max, () => document.querySelector(".sheet-kopf h2")?.textContent === "Welt"), "Beigetreten → leeres Board: Welt anlegen");
+  pruefe(await warteAuf(max, () => document.querySelector(".sheet-kopf h2")?.textContent === "Welt"), "Angemeldet → leeres Board: Welt anlegen");
   await max.evaluate(() => alleSchliessen());
   await max.click("#burgerBtn"); await schlafen(300);   // Board-Knopf unten in der Sidebar
   await max.click("#boardBtn");

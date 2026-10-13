@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { companionAusliefern, CHROMIUM_OPTIONEN } from "./hilfen.mjs";
+import { companionAusliefern, CHROMIUM_OPTIONEN, konto, anmelden } from "./hilfen.mjs";
 import { testweltBauen, fundeweltBauen, zipBauen, levelDatBauen, SEED } from "./welt-bauen.mjs";
 
 const HIER = fileURLToPath(new URL(".", import.meta.url));
@@ -366,21 +366,18 @@ try {
   const PORT = 3190, BOARD = `http://127.0.0.1:${PORT}`;
   board = spawn(process.execPath, ["src/server.js"], {
     cwd: path.join(HIER, "../../koordinaten-board/server"),
-    env: { ...process.env, PORT: String(PORT), RAUM_PIN: "471100", DATEN_ORDNER: path.join(tmp, "daten") }, stdio: "ignore",
+    env: { ...process.env, PORT: String(PORT), DATEN_ORDNER: path.join(tmp, "daten") }, stdio: "ignore",
   });
   for (let i = 0; i < 60; i++) { try { if ((await fetch(`${BOARD}/api/server`)).ok) break; } catch {} await schlafen(200); }
-  const token = (await (await fetch(`${BOARD}/api/beitreten`, { method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify({ pin: "471100", name: "Tim", kontoPin: "9753" }) })).json()).token;
+  const { token } = await konto(BOARD, "Tim", "9753");
   const welt = (await (await fetch(`${BOARD}/api/orte/welten`, { method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ seed: SEED }) })).json()).welt;
   const beitreten = async (q, name) => {
-    await q.goto(`${BOARD}/?pin=471100`);
-    await q.waitForSelector("#boardName"); await q.fill("#boardName", name); await q.fill("#boardKontoPin", "2468");
-    await q.click('[data-aktion="board-beitreten"]');
-    return warteAuf(q, () => !DEMO.enabled && bd.verbindung?.name && st.welt && bm.weltId === st.weltId);
+    await konto(BOARD, name);
+    return await anmelden(q, BOARD, name) && warteAuf(q, () => !DEMO.enabled && bd.verbindung?.name && st.welt && bm.weltId === st.weltId);
   };
   const max = await handy(), lena = await handy();
-  pruefe(await beitreten(max, "Max") && await beitreten(lena, "Lena"), "Max und Lena treten bei");
+  pruefe(await beitreten(max, "Max") && await beitreten(lena, "Lena"), "Max und Lena melden sich an");
   pruefe(await lena.evaluate(() => bm.import === null), "Live: noch keine Biome");
   await importOeffnen(max);
   await hochladen(max, DATEIEN.korrekt);

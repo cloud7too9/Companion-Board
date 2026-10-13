@@ -1,7 +1,8 @@
-// Netlify-Stand (Umbau Phase 5): netlify/bauen.sh baut Companion (/app/) und die Anzeige, das Dashboard (/dashboard/),
-// mit der Adresse einer API auf einem anderen Ursprung. Hier liefert ein kleiner Server den Build mit den
-// _redirects aus, das Board läuft daneben: Beitreten als PWA, QR-Code zeigt auf /app/, / und alte Anzeige-Links
-// führen aufs Dashboard (Bauplan „Sitzung“, S4), Kennblöcke unter /icons/, Service Worker hält die App-Shell offline bereit.
+// Netlify-Stand (Umbau Phase 5): netlify/bauen.sh baut die Anmeldeseite (/), die Companion (/app/) und die Anzeige,
+// das Dashboard (/dashboard/), mit der Adresse einer API auf einem anderen Ursprung. Hier liefert ein kleiner Server den
+// Build mit den _redirects aus, das Board läuft daneben: Registrieren auf der Anmeldeseite (Bauplan „Anmeldung“), weiter
+// in die PWA, QR-Code zeigt auf die Anmeldeseite, alte Anzeige-Links führen aufs Dashboard (Bauplan „Sitzung“, S4),
+// Kennblöcke unter /icons/, Service Worker hält die App-Shell offline bereit, ohne Netz fragt die App nach der PIN.
 import { chromium } from "playwright";
 import { fileURLToPath } from "node:url";
 import { mkdtempSync, rmSync, mkdirSync, existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -16,7 +17,7 @@ const HIER = fileURLToPath(new URL(".", import.meta.url));
 const WURZEL = path.join(HIER, "../..");
 const DIR = path.join(HIER, "bilder"); mkdirSync(DIR, { recursive: true });
 const TMP = mkdtempSync(path.join(tmpdir(), "netlify-"));
-const PORT = 3199, SEITE_PORT = 3197, PIN = "471100", BOARD = `http://127.0.0.1:${PORT}`, SEITE = `http://127.0.0.1:${SEITE_PORT}`;
+const PORT = 3199, SEITE_PORT = 3197, BOARD = `http://127.0.0.1:${PORT}`, SEITE = `http://127.0.0.1:${SEITE_PORT}`;
 const pruefe = (ok, text) => { console.log((ok ? "OK   " : "FEHL ") + text); if (!ok) process.exitCode = 1; };
 const schlafen = (ms) => new Promise((r) => setTimeout(r, ms));
 const warteAuf = (p, fn, arg, ms = 8000) => p.waitForFunction(fn, arg, { timeout: ms }).then(() => true, () => false);
@@ -24,7 +25,8 @@ const warteAuf = (p, fn, arg, ms = 8000) => p.waitForFunction(fn, arg, { timeout
 // ---- Bauen wie bei Netlify (ohne npm ci: node_modules sind da) ----
 const DIST = path.join(TMP, "dist");
 execFileSync("bash", ["netlify/bauen.sh"], { cwd: WURZEL, stdio: "ignore", env: { ...process.env, API_URL: BOARD, ZIEL: DIST, OHNE_INSTALL: "1" } });
-pruefe(!existsSync(path.join(DIST, "index.html")) && existsSync(path.join(DIST, "app/index.html")) && existsSync(path.join(DIST, "dashboard/index.html")), "Build: Companion unter app/, Dashboard unter dashboard/, keine alte Anzeige unter /");
+pruefe(readFileSync(path.join(DIST, "index.html"), "utf8").includes("<title>Companion · Anmeldung</title>") && existsSync(path.join(DIST, "app/index.html")) && existsSync(path.join(DIST, "dashboard/index.html")),
+  "Build: Anmeldeseite unter /, Companion unter app/, Dashboard unter dashboard/");
 pruefe(readFileSync(path.join(DIST, "app/konfig.js"), "utf8").includes(`apiAdresse: "${BOARD}"`) && existsSync(path.join(DIST, "icons/struktur_kennbloecke/stronghold.png")), "Build: konfig.js nennt die API, Kennblöcke unter /icons/");
 pruefe(!readFileSync(path.join(DIST, "app/sw.js"), "utf8").includes("__STAND__"), "Build: Stand im Service Worker eingesetzt");
 
@@ -48,7 +50,7 @@ await new Promise((ok) => seite.listen(SEITE_PORT, "127.0.0.1", ok));
 
 const board = spawn(process.execPath, ["src/server.js"], {
   cwd: path.join(WURZEL, "koordinaten-board/server"),
-  env: { ...process.env, PORT: String(PORT), RAUM_PIN: PIN, DATEN_ORDNER: path.join(TMP, "daten"), ERLAUBTE_URSPRUENGE: SEITE, OEFFENTLICHE_URL: SEITE, COMPANION_PFAD: "/app/" },
+  env: { ...process.env, PORT: String(PORT), DATEN_ORDNER: path.join(TMP, "daten"), ERLAUBTE_URSPRUENGE: SEITE, OEFFENTLICHE_URL: SEITE, TEST_UHR: "1" },
   stdio: "ignore",
 });
 const browser = await chromium.launch(CHROMIUM_OPTIONEN);
@@ -61,12 +63,14 @@ try {
   const um = await fetch(`${SEITE}/app?pin=1`, { redirect: "manual" });
   pruefe(um.status === 301 && um.headers.get("location") === "/app/?pin=1", "/app → /app/ (Query bleibt)");
   pruefe((await fetch(`${SEITE}/dashboard/vollbild/w-x`)).headers.get("content-type").startsWith("text/html"), "/dashboard/* → Dashboard-Seite");
-  for (const [von, nach] of [["/", "/dashboard/"], [`/${link}`, `/dashboard/${link}`], [`/anzeige${link}`, `/dashboard/${link}`], ["/anzeige/x", "/dashboard/"]]) {
+  const start = await fetch(`${SEITE}/`, { redirect: "manual" });
+  pruefe(start.status === 200 && (await start.text()).includes("<title>Companion · Anmeldung</title>"), "/ ist die Anmeldeseite (kein Umleiten mehr aufs Dashboard)");
+  for (const [von, nach] of [[`/anzeige${link}`, `/dashboard/${link}`], ["/anzeige/x", "/dashboard/"]]) {
     const r = await fetch(SEITE + von, { redirect: "manual" });
     pruefe(r.status === 301 && r.headers.get("location") === nach, `${von.split("?")[0]} → /dashboard/${von.includes("?") ? " (Anzeige-Link bleibt)" : ""}`);
   }
   const anzeigeApi = await (await fetch(`${BOARD}/api/anzeige${link}`)).json();
-  pruefe(anzeigeApi.beitrittsUrl === `${SEITE}/app/?pin=${PIN}`, `QR-Code zeigt auf die Companion unter /app/ (${anzeigeApi.beitrittsUrl})`);
+  pruefe(anzeigeApi.beitrittsUrl === `${SEITE}/` && !("pin" in anzeigeApi), `QR-Code zeigt auf die Anmeldeseite, keine Board-PIN (${anzeigeApi.beitrittsUrl})`);
 
   // ---- Companion als PWA von Netlify, Board auf dem anderen Ursprung ----
   const kontext = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
@@ -74,17 +78,23 @@ try {
   p.on("pageerror", (e) => fehler.push(e.message));
   let offline = false;
   p.on("console", (m) => { if (m.type() === "error" && !m.text().startsWith("Failed to load resource") && !(offline && m.text().startsWith("WebSocket connection to"))) fehler.push(m.text()); });
+  // QR-Code → Anmeldeseite; registrieren über die API auf dem anderen Ursprung (CORS), das erste Konto gilt sofort
   await p.goto(anzeigeApi.beitrittsUrl);
-  await p.waitForSelector("#boardName");
+  await p.waitForSelector("#anmName");
+  pruefe(await p.evaluate(() => document.querySelector('link[rel="manifest"]')?.getAttribute("href") === "app/manifest.webmanifest"), "Anmeldeseite hängt das Manifest der Companion ein");
+  await p.click('[data-weiter="anlegen"]');
+  for (const [feld, wert] of [["#neuEcht", "Max Muster"], ["#neuName", "Max"], ["#neuPasswort", "creeper123"], ["#neuPin", "2468"], ["#neuPin2", "2468"]]) await p.fill(feld, wert);
+  await p.click('#formAnlegen [type="submit"]');
+  pruefe(await warteAuf(p, () => document.querySelector(".willkommen h2")?.textContent === "Willkommen, Max"), "Registriert über zwei Ursprünge → Willkommenskarte");
+  await Promise.all([p.waitForURL(`${SEITE}/app/`), p.click('[data-weiter="companion"]')]);
   pruefe(await p.evaluate((b) => !DEMO.enabled && BOARD_ADRESSE === b, BOARD), "Companion unter /app/ läuft live gegen die API");
   pruefe(await p.evaluate(() => document.querySelector('link[rel="manifest"]')?.getAttribute("href") === "manifest.webmanifest" && document.querySelector('link[rel="apple-touch-icon"]') !== null), "Manifest und Apple-Icon eingehängt");
   const manifest = await (await fetch(`${SEITE}/app/manifest.webmanifest`)).json();
-  pruefe(manifest.scope === "./" && manifest.display === "standalone" && (await fetch(`${SEITE}/app/icons/app/icon-512.png`)).ok, "Manifest: Scope /app/, standalone, Icons da");
+  pruefe(manifest.scope === "../" && manifest.start_url === "./" && manifest.display === "standalone" && (await fetch(`${SEITE}/app/icons/app/icon-512.png`)).ok,
+    "Manifest: Start /app/, Bereich ab / (Anmeldeseite bleibt in der App), standalone, Icons da");
   pruefe(await warteAuf(p, () => navigator.serviceWorker?.controller || navigator.serviceWorker?.ready.then(() => true), null, 15000), "Service Worker registriert");
-  await p.fill("#boardName", "Max");
-  await p.fill("#boardKontoPin", "2468");
-  await p.click('[data-aktion="board-beitreten"]');
-  pruefe(await warteAuf(p, () => bd.verbindung?.name === "Max" && bd.status === "verbunden"), "Beigetreten, Live-Verbindung steht");
+  pruefe(await warteAuf(p, () => bd.verbindung?.name === "Max" && bd.status === "verbunden"), "Angemeldet, Live-Verbindung steht");
+  pruefe(await p.evaluate(() => Boolean(JSON.parse(localStorage.getItem("board.pinLokal"))?.hash)), "PIN-Hash für die Sperre ohne Netz liegt auf dem Gerät");
   await warteAuf(p, () => document.querySelector(".sheet-kopf h2")?.textContent === "Welt");
   const token = await p.evaluate(() => bd.verbindung.token);
   const api = (methode, pfad, body) => fetch(BOARD + pfad, { method: methode, headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: body === undefined ? undefined : JSON.stringify(body) }).then((r) => r.json());
@@ -94,12 +104,12 @@ try {
   pruefe(ort.instanz?.id, `Ort über die API angelegt (${ort.instanz?.id ?? ort.message})`);
   await p.screenshot({ path: `${DIR}/n1-companion-app.png` });
 
-  // ---- Die Anzeige: Startseite → Dashboard, nur mit Anzeige-Link; Kennblock aus /icons/ ----
+  // ---- Die Anzeige: Dashboard nur mit Anzeige-Link; ein alter Link auf die Startseite geht weiter; Kennblock aus /icons/ ----
   const tv = await browser.newPage({ viewport: { width: 1600, height: 900 } });
   tv.on("pageerror", (e) => fehler.push(`Anzeige: ${e.message}`));
-  await tv.goto(`${SEITE}/`);
-  pruefe(await warteAuf(tv, () => location.pathname === "/dashboard/"
-    && document.querySelector('[data-panel-id="w-orte"] [data-testid="widget-leer"]')?.textContent === "Diese Anzeige braucht ihren Anzeige-Link"), "Startseite → Dashboard, ohne Link gesperrt");
+  await tv.goto(`${SEITE}/dashboard/`);
+  pruefe(await warteAuf(tv, () => document.querySelector('[data-panel-id="w-orte"] [data-testid="widget-leer"]')?.textContent === "Diese Anzeige braucht ihren Anzeige-Link"),
+    "Dashboard ohne Link gesperrt");
   await tv.goto(`${SEITE}/${link}`);
   pruefe(await warteAuf(tv, () => location.pathname === "/dashboard/" && document.querySelector('[data-testid="anzeige-titel"]')?.textContent === "Netlify-Welt"
     && document.querySelector('[data-panel-id="w-sammelstatus"] [data-testid="karte"]') && !document.querySelector('[data-testid="beispielkarten"]'), null, 15000),
@@ -130,8 +140,16 @@ try {
   await warteAuf(p, () => navigator.serviceWorker.controller !== null, null, 10000);
   offline = true;
   await kontext.setOffline(true);
+  // Zuletzt vor 31 Minuten mit dem Board gesprochen: die App fragt ohne Netz nach der PIN (lokaler Hash, Bauplan „Anmeldung“)
+  await p.evaluate(() => localStorage.setItem("board.kontakt", String(Date.now() - 31 * 60000)));
   await p.reload().catch(() => {});
   pruefe(await warteAuf(p, () => typeof BOARD_ADRESSE !== "undefined" && document.querySelector("header"), null, 10000), "Offline: Seite kommt aus dem Cache des Service Workers");
+  pruefe(await warteAuf(p, () => document.querySelector("#offlineSperre #sperrePin"), null, 10000), "Offline und über 30 Minuten ohne Board: PIN-Sperre");
+  await p.fill("#sperrePin", "1111"); await p.click('#offlineSperre [type="submit"]');
+  pruefe(await warteAuf(p, () => document.getElementById("sperreMeldung")?.textContent === "Falsche PIN für Max"), "Falsche PIN wird gemeldet");
+  await p.screenshot({ path: `${DIR}/n6-offline-pin.png` });
+  await p.fill("#sperrePin", "2468"); await p.click('#offlineSperre [type="submit"]');
+  pruefe(await warteAuf(p, () => !document.getElementById("offlineSperre")), "Richtige PIN entsperrt die App ohne Netz");
   // Offline B3: live mit dem letzten Stand aus dem Spiegel (IndexedDB) statt Beispieldaten
   pruefe(await warteAuf(p, (id) => !DEMO.enabled && SPIEGEL.aus && st.instanzen.some((i) => i.id === id), ort.instanz.id, 10000), "Offline: Orte aus dem Spiegel, kein Demo");
   const offen = await p.evaluate(() => ({ status: document.getElementById("orteStatusLab").textContent, welt: st.welt?.id,
@@ -143,12 +161,15 @@ try {
   pruefe((await p.evaluate(() => api("/banner", { method: "POST", body: JSON.stringify({ name: "x", basis: "red", ebenen: [] }) }))).status === 0, "Offline: Schreiben meldet „Keine Verbindung“");
   // Während das Handy offline ist, legt jemand anderes einen Ort an
   const verpasst = await api("POST", "/api/orte/instanzen", { dimensionId: `d_${welt.id}_overworld`, kategorie: "Village", variante: null, x: 640, y: null, z: -1120, quelle: "manuell" });
+  // … und das Board sieht dieses Handy 31 Minuten nicht: Wieder online reicht die App die PIN von eben nach
+  await fetch(`${BOARD}/api/test/uhr`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ minuten: 31 }) });
   const anfragen = [];
   p.on("request", (r) => { if (r.url().startsWith(BOARD)) anfragen.push(new URL(r.url()).pathname); });
   await kontext.setOffline(false);
   pruefe(await warteAuf(p, (id) => st.instanzen.some((i) => i.id === id) && !SPIEGEL.aus && bd.status === "verbunden"
     && document.getElementById("orteStatusLab").textContent === "Verbunden", verpasst.instanz.id, 25000),
     "Wieder online: verbindet neu und holt den verpassten Ort nach");
+  pruefe(anfragen.includes("/api/pin") && new URL(p.url()).pathname === "/app/", "Das Board wollte die PIN: die App reicht sie nach, keine zweite Abfrage");
   pruefe(anfragen.includes("/api/aenderungen") && anfragen.includes(`/api/orte/welten/${welt.id}`) && !anfragen.includes("/api/banner"),
     `Nachladen nur, was sich geändert hat (GET /api/aenderungen, dann die Orte; ${[...new Set(anfragen)].join(", ")})`);
 } catch (e) {
