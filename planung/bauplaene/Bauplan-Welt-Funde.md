@@ -2,7 +2,7 @@
 
 Stand: 13.10.2026 · Grundlage: Frage von Max („Was kann man aus dem .mcworld-Upload alles bekommen?“, 13.10.2026) und Auswertung der Testwelt `companion/tests/daten/fixture-seed.mcworld` · Setzt voraus: Welt-Import (Strang C, im Archiv: `docs/bauplaene/Bauplan-Welt-Import.md`, `docs/plaene/PLAN-welt-import-biome.md`)
 
-> **Status: Entwurf, wartet auf Max.** Die fünf Fragen stehen unter „Zu entscheiden“ am Ende. Gebaut wird nach dem OK in den Phasen W1–W3.
+> **Status: W0 gebaut (13.10.2026), Rest Entwurf.** Auf Wunsch von Max kam zuerst W0: den Weltordner direkt wählen oder hineinziehen, nur die gebrauchten Dateien behalten. W1–W3 warten auf die fünf Fragen unter „Zu entscheiden“ am Ende.
 
 Dieser Bauplan beschreibt die technischen Entscheidungen. Er baut auf dem auf, was im Repo liegt (Stand `main` vom 13.10.2026).
 
@@ -34,6 +34,16 @@ Dieser Bauplan beschreibt die technischen Entscheidungen. Er baut auf dem auf, w
 
 Daraus ergeben sich **6 Verliese** (Spawner mit Zombie oder Spinne, daneben `simple_dungeon`-Truhen) und **1 vergrabener Schatz** (`buriedtreasure`, X 72 · Y 47 · Z −56). Das ist die Grundwahrheit für die Tests.
 
+## W0: Weltordner statt ZIP (gebaut 13.10.2026)
+
+Max (13.10.2026): „Als erstes ein Upload-Feld, in das man den ganzen Ordner vom iPhone ziehen kann. Danach sollen lediglich die Dateien behalten werden, die gebraucht werden.“
+
+- **Ordner wählen:** Knopf „Weltordner wählen“ (`<input type="file" webkitdirectory>`). Safari am iPhone kann das **ab iOS 18.4**; davor öffnet der Knopf nur die normale Dateiauswahl. Deshalb bleibt „ZIP oder .mcworld wählen“ als Rückweg daneben.
+- **Hineinziehen:** Fläche „Weltordner hierher ziehen“; Ordner werden über `webkitGetAsEntry` rekursiv gelesen (Safari liefert höchstens 100 Einträge je `readEntries`, darum bis zur leeren Antwort). Die Einträge holt die Seite noch im `drop`-Ereignis, danach gibt der Browser sie nicht mehr heraus. Ob Ziehen aus der Dateien-App am iPhone klappt, ist nicht belegt; am iPad und am Rechner geht es. Eine abgelegte ZIP geht wie gewählt.
+- **Nur Gebrauchtes behalten** (`companion/welt-ordner.js`): `level.dat`, `levelname.txt`, `db/CURRENT`, `db/MANIFEST-*`, `db/*.ldb`, `db/*.log`. Liegen bleiben `resource_packs/`, `behavior_packs/`, `world_*_packs.json`, `world_icon.jpeg`, `level.dat_old`, `db/LOCK`, `db/LOG` (Aufbau wie im Screenshot von Max). Nur diese Dateien gehen an den Worker; die Bestätigung zeigt „Gebraucht: 8 von 17 Dateien · 38 KB“. `world_icon.jpeg` kommt erst mit Frage 5 dazu.
+- **Mehrere Welten:** Wer gleich `minecraftWorlds` wählt, bekommt die Welten darin mit ihrem Namen aus `levelname.txt` zur Auswahl. Ein Ordner ohne `level.dat` und `db/CURRENT` ergibt „Darin ist keine Welt …“.
+- **Gleicher Leser:** `biom-welt.js` nimmt die Ordner-Liste wie eine ZIP (`ordnerAlsEintraege`); Aufbauprüfung, Streaming und Ergebnis sind dieselben. Tests: Ordner und ZIP liefern dieselben Kacheln, auch für die Testwelt von Max; Ablage mit 150 Dateien in `db/`; Playwright wählt Ordner (`setInputFiles` mit Verzeichnis), `minecraftWorlds` und zieht eine ZIP auf die Fläche.
+
 ## Was gelesen wird
 
 | Quelle in der Welt | Was daraus wird | In der Testwelt | Phase |
@@ -55,7 +65,7 @@ Daraus ergeben sich **6 Verliese** (Spawner mit Zombie oder Spinne, daneben `sim
 
 Nicht gelesen werden: jeder einzelne Block (SubChunks, zu teuer am iPhone), Lebewesen außer Loren und Rüstungsständern, Karten-Items, Daten anderer Spieler (Frage 2).
 
-**Was in der Testwelt fehlt, ist aus der Beschreibung des Bedrock-Formats übernommen.** Feldnamen und Kodierungen (Portal-Liste, Besatz an Rüstungsteilen, Farbcodes der Banner, Strukturbereiche) werden in W1 bzw. W3 an einer echten Welt von Max geprüft, bevor Code darauf baut (Haltepunkt H11).
+**Was in der Testwelt fehlt, ist aus der Beschreibung des Bedrock-Formats übernommen.** Feldnamen und Kodierungen (Portal-Liste, Besatz an Rüstungsteilen, Farbcodes der Banner, Strukturbereiche) werden in W1 bzw. W3 an einer echten Welt von Max geprüft, bevor Code darauf baut (Haltepunkt H12).
 
 ### Beute-Tabelle → Kategorie
 
@@ -110,8 +120,9 @@ Die Beute-Tabelle steht nur in **ungeöffneten** Behältern (`loot_tables/chests
 
 | Phase | Inhalt | Tests |
 |---|---|---|
-| **W1** Funde lesen | `nbt.js`, `welt-funde.js`, Sammler im Durchlauf von `biom-welt.js`, Worker und `welt-pruefen.mjs` geben Funde aus. Truhen, Spawner, Loren, Kies, Tresore, Portale, Spieler, Behälter-Inhalte, Banner, Welt-Info | `node --test`: NBT-Leser; Testwelt ergibt genau 6 Verliese und 1 Schatz an den bekannten Koordinaten; `welt-bauen.mjs` baut synthetische Welten mit Portalen, Bannern, Rüstung und Vorlagen; unbekannte Beute-Tabelle wird gemeldet. ⏸ **H11:** Max lässt `welt-pruefen.mjs` (oder Claude mit seiner Datei) über seine echte Welt laufen und vergleicht die Liste mit dem Spiel |
-| **W2** Prüfliste und Übernehmen | Abschnitte in der Prüfliste, „schon bekannt“, Übernehmen über die API, `quelle:"welt"` und Welt-Info am Server, Welt-Info im Welt-Sheet | Playwright `karte-mcworld` (DEMO) und live gegen das Board: Funde erscheinen, schon bekannte sind ausgegraut, Übernehmen legt Orte, Verbindung, Sammelobjekt, Set und Banner an, zweiter Import legt nichts doppelt an. ⏸ **H12:** Max importiert am iPhone und schaut Prüfliste und Karte an |
+| **W0** Weltordner statt ZIP · **gebaut 13.10.2026** | Ordner wählen oder hineinziehen, nur gebrauchte Dateien, Auswahl bei mehreren Welten, ZIP bleibt als Rückweg | `node --test` (Ordner = ZIP, auch Testwelt von Max; Ablage rekursiv), Playwright `karte-mcworld`. ⏸ **H11:** Max wählt am iPhone den Weltordner (und probiert das Hineinziehen aus der Dateien-App) |
+| **W1** Funde lesen | `nbt.js`, `welt-funde.js`, Sammler im Durchlauf von `biom-welt.js`, Worker und `welt-pruefen.mjs` geben Funde aus. Truhen, Spawner, Loren, Kies, Tresore, Portale, Spieler, Behälter-Inhalte, Banner, Welt-Info | `node --test`: NBT-Leser; Testwelt ergibt genau 6 Verliese und 1 Schatz an den bekannten Koordinaten; `welt-bauen.mjs` baut synthetische Welten mit Portalen, Bannern, Rüstung und Vorlagen; unbekannte Beute-Tabelle wird gemeldet. ⏸ **H12:** Max lässt `welt-pruefen.mjs` (oder Claude mit seiner Datei) über seine echte Welt laufen und vergleicht die Liste mit dem Spiel |
+| **W2** Prüfliste und Übernehmen | Abschnitte in der Prüfliste, „schon bekannt“, Übernehmen über die API, `quelle:"welt"` und Welt-Info am Server, Welt-Info im Welt-Sheet | Playwright `karte-mcworld` (DEMO) und live gegen das Board: Funde erscheinen, schon bekannte sind ausgegraut, Übernehmen legt Orte, Verbindung, Sammelobjekt, Set und Banner an, zweiter Import legt nichts doppelt an. ⏸ **H13:** Max importiert am iPhone und schaut Prüfliste und Karte an |
 | **W3** Strukturen ohne Truhe | Strukturbereiche (Tag 57), Dörfer, End-Transittore, Bild der Welt (je nach Frage 5) | wie W1, an einer Welt von Max mit diesen Strukturen |
 
 Jede Phase ein PR gegen `main`, gemergt nach Rückfrage. Branch: der Branch der Sitzung (`claude/…`), wie bei Bauplan „Sitzung“.
@@ -134,8 +145,9 @@ Jede Phase ein PR gegen `main`, gemergt nach Rückfrage. Branch: der Branch der 
 
 ## Reihenfolge und Git
 
-1. Fragen 1–5 beantworten
-2. W1 → Commits „NBT-Leser“, „Welt-Funde lesen“, „welt-pruefen zeigt Funde“, PR, ⏸ H11
-3. W2 → Commits „Prüfliste mit Funden“, „Funde übernehmen“, „Welt-Info am Server“, PR, ⏸ H12
-4. W3 → PR
-5. Danach zieht der Bauplan ins Archiv (`docs/bauplaene/`).
+1. ~~W0 Weltordner statt ZIP~~ gebaut 13.10.2026, ⏸ H11
+2. Fragen 1–5 beantworten
+3. W1 → Commits „NBT-Leser“, „Welt-Funde lesen“, „welt-pruefen zeigt Funde“, PR, ⏸ H12
+4. W2 → Commits „Prüfliste mit Funden“, „Funde übernehmen“, „Welt-Info am Server“, PR, ⏸ H13
+5. W3 → PR
+6. Danach zieht der Bauplan ins Archiv (`docs/bauplaene/`).

@@ -58,14 +58,16 @@ Jeder Bereich bekommt eigene Ansichten fürs Dashboard. Vorbild ist das iOS-Kont
 
 Im Code vorbereitet: `ansichten` im Modul-Vertrag der Registry `BEREICHE`. Welche Ansichten ein Bereich bekommt, klären wir, wenn wir den Bereich durchgehen.
 
-## Welt-Import: Biome aus dem Weltordner (`.zip` oder `.mcworld`)
+## Welt-Import: Biome aus dem Weltordner (Ordner, `.zip` oder `.mcworld`)
 
 Bauplan: `../docs/plaene/PLAN-welt-import-biome.md` (von Max, erledigt) und Strang C in `../planung/PLAN.md`. Biome kommen nur noch aus einer hochgeladenen Bedrock-Welt; die Companion liest sie im Browser (Web Worker) und zeigt sie flächig auf der Karte.
 
-**Anleitung für Max (iPhone):** In der Karte unten **Welt-Import** → die drei Schritte stehen direkt über dem Knopf:
-1. Dateien-App: Auf meinem iPhone › Minecraft › games › com.mojang › minecraftWorlds
-2. Den richtigen Weltordner finden (Name in `levelname.txt`), den Ordner **öffnen**, alles darin auswählen, „Komprimieren“
-3. Die entstandene `Archiv.zip` in der Companion auswählen
+**Anleitung für Max (iPhone):** Sidebar → **Welt** → **Welt-Import**, die Schritte stehen im Sheet:
+1. **Weltordner wählen** und in der Dateien-App öffnen: Auf meinem iPhone › Minecraft › games › com.mojang › minecraftWorlds
+2. Den Ordner der Welt wählen (Name ein Code wie `z2l2cn0rmkA=`, der Weltname steht in `levelname.txt`) – oder gleich `minecraftWorlds`, dann fragt die Companion, welche Welt
+3. Die Companion nimmt nur `level.dat`, `levelname.txt` und den Ordner `db`; Pakete, `world_icon.jpeg`, `level.dat_old`, `LOCK` und `LOG` bleiben liegen
+
+Die Ordnerwahl braucht Safari ab **iOS 18.4** (Bauplan „Welt-Funde“, W0). Davor, oder wenn es nicht klappt: den Ordnerinhalt in der Dateien-App „Komprimieren“ und die `Archiv.zip` über **ZIP oder .mcworld wählen** nehmen. Ordner und ZIP lassen sich auch auf die gestrichelte Fläche ziehen (`welt-ordner.js`: Ordner rekursiv über `webkitGetAsEntry`).
 
 Danach: Weltname und Seed bestätigen → **Biome lesen** (Fortschritt, Abbrechen) → Prüfliste → **Übernehmen**. Umbenennen in `.mcworld` ist nicht nötig; eine echte `.mcworld` geht genauso. Für eine Realm-Welt: Realm herunterladen, dann wie oben.
 
@@ -82,6 +84,7 @@ Danach: Weltname und Seed bestätigen → **Biome lesen** (Fortschritt, Abbreche
 | `biom-import.worker.js` | Web Worker (`type: "module"`): `pruefen` → Name, Seed, Version; `start` → Fortschritt, dann `{ meta, kacheln }` mit Base64-Kacheln |
 | `biom-dekoder.js` | reine Funktionen: Chunk-Schlüssel, Data3D (Höhenkarte + Biom-Sektionen), Oberflächenbiom, `level.dat` (NBT), Kacheln 32 × 32 Chunks, Base64 |
 | `biom-welt.js` | `weltPruefen(datei)` (Aufbau, Name, Seed) und `weltLesen(datei)`: ZIP → `level.dat` → LevelDB-Dateien **einzeln** entpacken und mit Besucher parsen (Streaming) oder `readMcworld()` (Vergleich); gemeinsam für Worker und Node |
+| `welt-ordner.js` | Weltordner statt ZIP: Dateien aus der Ordnerwahl (`webkitRelativePath`) oder der Ablage (rekursiv über `webkitGetAsEntry`) sammeln, Welten darin finden (`level.dat` + `db/CURRENT`, Name aus `levelname.txt`), nur die gebrauchten Dateien behalten; `ordnerAlsEintraege` macht daraus Einträge wie aus der ZIP |
 | `biom-ids.js` | erzeugte ID-Tabelle (minecraft-data `bedrock/1.20.0`, IDs 0–191, dazu bestätigt 195 Dappled Forest), setzt `globalThis.BIOM_IDS`; die Seite bindet sie per `<script>` ein (`BIOM_INFO`) |
 | `vendor/mcbe-leveldb.js` | Bundle aus `mcbe-leveldb-reader` 5.0.1 + zip.js (211 KB, gzip 86 KB), Lizenzen in `vendor/LIZENZEN.txt` |
 | `tools/` | `npm ci`, dann `npm run vendor` / `npm run biom-ids` (neu erzeugen), `npm test` (Gegenprobe mit prismarine-chunk), `node welt-pruefen.mjs <welt.mcworld> [--weg beide] [--massstab 4] [--punkt x,z]` |
@@ -276,7 +279,7 @@ Live gelten alle Pfade mit Präfix `/api` und Bearer-Token. Die Texterkennung l�
 - Die Liste steht unter dem Karten-Canvas (seit 05.10.2026 kein Umschalter mehr)
 - Marker und Biom-Kacheln werden in den bestehenden Renderer der Live-Karte gezeichnet,
   statt im eigenen Canvas – Spieler-Positionen und Sammlung auf einer Karte. Biome: je sichtbarer Kachel `kachelBild(k)` (32 × 32-Canvas) mit `imageSmoothingEnabled = false` unter Raster und Markern
-- **Welt-Import**: `biom-ids.js` vor dem Haupt-Script einbinden; `biom-import.worker.js`, `biom-welt.js`, `biom-dekoder.js` und `vendor/` neben die Hauptdatei legen (der Worker lädt sie als ES-Module, nur über http). Der Service Worker der PWA muss sie im Precache haben. Abschnitt 9h und `<input id="weltDatei">` übernehmen, auf dem Board liefern sie die Routen in `server.js` aus
+- **Welt-Import**: `biom-ids.js` vor dem Haupt-Script einbinden; `biom-import.worker.js`, `biom-welt.js`, `welt-ordner.js`, `biom-dekoder.js` und `vendor/` neben die Hauptdatei legen (der Worker lädt sie als ES-Module, nur über http). Der Service Worker der PWA muss sie im Precache haben. Abschnitt 9h und `<input id="weltDatei">` übernehmen, auf dem Board liefern sie die Routen in `server.js` aus
 - JS-Abschnitte 2–9 übernehmen; `api()`, `esc()`, `THEMES` gibt es dort schon
 - Sidebar der Hauptdatei auf `BEREICHE` umstellen (Karte, Sammelobjekte, Portal-Verwaltung, Handbuch, Baupläne, Banner, Rüstung)
 - `regeln.js` und `board-karten.js` neben die Hauptdatei legen und in dieser Reihenfolge vor dem Haupt-Script einbinden (`<script src="regeln.js">`, `<script src="board-karten.js">`); das Board liefert dann statt der Prototyp-Datei die Hauptdatei aus (`COMPANION_DATEI`)
