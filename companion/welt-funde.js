@@ -6,8 +6,9 @@
      · Block-Entities (Chunk-Tag 49): Behälter mit Beute-Tabelle, Spawner,
        Tresore, Prüfungs-Spawner, Seltsamer Kies und Sand, Banner, Inhalte,
        Endtransitportale (W3)
-     · Strukturbereiche (Chunk-Tag 57): Netherfestung, Hexenhütte, Ozeanmonument,
-       Außenposten – auch ohne Truhe (W3)
+     · Strukturbereiche (Chunk-Tag 119 „AABBVolumes“, W4): Netherfestung,
+       Ozeanmonument, Außenposten, Prüfungskammern, Tempel, Pfadruinen, Iglu,
+       Lager – mit Namen und Kasten je Teil; ältere Welten: Tag 57 (W3)
      · Dörfer (VILLAGE_…_INFO): Mitte aus dem Kasten des Dorfs (W3)
      · TheEnd: ob der Enderdrache besiegt ist (W3)
      · Lebewesen (actorprefix…, alte Welten Chunk-Tag 50): Loren und Boote mit
@@ -59,9 +60,10 @@ export const BEUTE = Object.freeze([
   [/^nether_bridge/, "Nether Fortress", NE],
   [/^bastion_/, "Bastion", NE],
   [/^end_city_treasure/, "End City", EN],
+  [/^(barrels\/)?abandoned_camp/, "Camp", OW],
 ]);
 /** Bekannte Tabellen, die keine Struktur sind (Bonustruhe, Geschenke der Dorfbewohner) – nicht als unbekannt melden */
-const BEUTE_OHNE_ORT = /^(spawn_bonus_chest|hero_of_the_village\/|gameplay\/)/;
+const BEUTE_OHNE_ORT = /^(spawn_bonus_chest|hero_of_the_village\/|gameplay\/|(pots|dispensers)\/trial_chambers\/)/;
 
 /* Spawner → Kategorie (Mob aus EntityIdentifier) */
 export const SPAWNER = Object.freeze({
@@ -74,6 +76,28 @@ export const SPAWNER = Object.freeze({
    (x1, y1, z1, x2, y2, z2) und ein Byte Typ. Typ → Kategorie und Dimension; 4 (Katze der Hexenhütte, entfallen) bleibt weg. */
 export const BEREICHE = Object.freeze({ 1: ["Nether Fortress", NE], 2: ["Witch Hut", OW], 3: ["Monument", OW], 5: ["Outpost", OW] });
 const BEREICH_BYTES = 6 * 4 + 1;
+
+/* Strukturbereiche ab Bedrock 1.26 (Chunk-Tag 119 = 0x77, „AABBVolumes“; Tag 57 schreibt das Spiel nicht mehr).
+   Aufbau, bestätigt an Max' Welt (1.26.52, 2 295 Einträge, alle ohne Rest):
+     u32 Version · u32 Anzahl Namen, je u32 Nr. + u16 Länge + Name („minecraft:fortress“)
+     · u32 Anzahl Teile, je u32 Teil + 6 × i32 (min X, Y, Z, max X, Y, Z)
+     · u32 Anzahl, je u32 Teil + u32 Nr. + u32          (Teile verschachtelter Strukturen, z. B. Prüfungskammern)
+     · u32 Anzahl, je u32 Teil + u32 Nr. + u32 + u32    (feste Strukturen, z. B. Netherfestung, Monument)
+   Die beiden Listen ordnen jedem Teil über die Nr. seinen Namen zu. Ein Eintrag kann mehrere Strukturen enthalten.
+   Name ohne „minecraft:“ → Kategorie und Dimension; Lager gibt es in mehreren Varianten (abandoned_camp_…). */
+export const VOLUMEN = Object.freeze({
+  fortress: ["Nether Fortress", NE], monument: ["Monument", OW], pillager_outpost: ["Outpost", OW],
+  swamp_hut: ["Witch Hut", OW],   // angenommen, in Max' Welt gab es keine Hexenhütte
+  trial_chambers: ["Trial Chamber", OW], desert_pyramid: ["Desert Temple", OW], jungle_pyramid: ["Jungle Temple", OW],
+  trail_ruins: ["Trail Ruins", OW], igloo: ["Igloo", OW],
+});
+const LAGER = /^abandoned_camp_/;
+const HOHER_BEREICH = 64;   // höhere Kästen sind Spawnbereiche, keine Bauteile
+/** Name aus 0x77 → [Kategorie, Dimensionen] oder null (unbekannt) */
+export function volumenZuordnen(name) {
+  const n = tagName(String(name));
+  return VOLUMEN[n] ?? (LAGER.test(n) ? ["Camp", OW] : null);
+}
 /* Dörfer: VILLAGE_<uuid>_INFO, in neueren Welten auch mit Dimension davor (VILLAGE_Overworld_<uuid>_INFO) */
 const DORF = /^VILLAGE_(?:(Overworld|Nether|TheEnd)_)?[0-9a-f-]{36}_INFO$/i;
 const DORF_DIM = Object.freeze({ overworld: "overworld", nether: "nether", theend: "end" });
@@ -84,6 +108,7 @@ export const NAEHE = Object.freeze({
   Dungeon: 16, Treasure: 16, Igloo: 16, "Ruined Portal": 16, "Desert Well": 16,
   "Witch Hut": 32,
   "Desert Temple": 48, "Jungle Temple": 48, Shipwreck: 48, "Ocean Ruins": 48, "Trail Ruins": 48, Outpost: 48,
+  Camp: 48,
   Mineshaft: 96, Village: 96, Mansion: 96, Bastion: 96, "Nether Fortress": 96, "End City": 96, "Trial Chamber": 96, Monument: 96,
   "Ancient City": 160, Stronghold: 160,
 });
@@ -195,6 +220,46 @@ function bereicheLesen(bytes, dim) {
   return liste;
 }
 
+/** Strukturbereiche eines Chunks (Tag 119, AABBVolumes) → { liste:[{ art:"bereich", kategorie, dim, x, y, z }], unbekannt:[Name] }.
+    Je Struktur im Eintrag ein Kandidat: die Mitte des Kastens um ihre Teile in diesem Chunk. Ungültige Kästen fallen weg. */
+function volumenLesen(bytes, dim) {
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let p = 0;
+  const platz = (n) => { if (p + n > bytes.length) throw new Error("Strukturbereich ist abgeschnitten"); };
+  const u32 = () => { platz(4); const v = dv.getUint32(p, true); p += 4; return v; };
+  const i32 = () => { platz(4); const v = dv.getInt32(p, true); p += 4; return v; };
+  const anzahl = (je) => { const n = u32(); platz(n * je); return n; };
+  u32();   // Version
+  const namen = new Map();
+  for (let i = 0, n = anzahl(6); i < n; i += 1) {
+    const nr = u32();
+    platz(2); const laenge = dv.getUint16(p, true); p += 2;
+    platz(laenge); namen.set(nr, String.fromCharCode(...bytes.subarray(p, p + laenge))); p += laenge;
+  }
+  const teile = new Map();
+  for (let i = 0, n = anzahl(28); i < n; i += 1) { const t = u32(); teile.set(t, [i32(), i32(), i32(), i32(), i32(), i32()]); }
+  const zu = new Map();
+  for (let i = 0, n = anzahl(12); i < n; i += 1) { const t = u32(); zu.set(t, u32()); p += 4; }
+  for (let i = 0, n = anzahl(16); i < n; i += 1) { const t = u32(); zu.set(t, u32()); p += 8; }
+  const kaesten = new Map();   // Nr. → [minX, minY, minZ, maxX, maxY, maxZ] über alle Teile
+  for (const [t, k] of teile) {
+    const nr = zu.get(t);
+    if (nr == null || !namen.has(nr) || k[0] > k[3] || k[1] > k[4] || k[2] > k[5]) continue;
+    const g = kaesten.get(nr);
+    if (!g) kaesten.set(nr, [...k]);
+    else for (let i = 0; i < 3; i += 1) { g[i] = Math.min(g[i], k[i]); g[i + 3] = Math.max(g[i + 3], k[i + 3]); }
+  }
+  const liste = [], unbekannt = [];
+  for (const [nr, k] of kaesten) {
+    const name = namen.get(nr), z = volumenZuordnen(name);
+    if (!z) { unbekannt.push(tagName(name)); continue; }
+    // Y: Mitte des Kastens – außer bei Spawnbereichen bis zur Bauhöhe (Außenposten: 63 … 319), dort die Unterkante (Boden)
+    const y = k[4] - k[1] > HOHER_BEREICH ? k[1] : Math.floor((k[1] + k[4]) / 2);
+    if (z[1].includes(dim)) liste.push({ art: "bereich", kategorie: z[0], dim, x: Math.floor((k[0] + k[3]) / 2), y, z: Math.floor((k[2] + k[5]) / 2) });
+  }
+  return { liste, unbekannt };
+}
+
 /** Dorf (VILLAGE_…_INFO, Kasten X0…Z1) → { art:"bereich", kategorie:"Village", dim, x, y, z } oder null */
 function dorfLesen(w, dimName) {
   const dim = DORF_DIM[String(dimName ?? "overworld").toLowerCase()];
@@ -287,7 +352,7 @@ export function weltInfo(levelDat) {
  *     banner:[{ name, basis, ebenen:[{ muster, farbe }], dim, x, y, z }],
  *     spieler:{ dim, x, y, z, level } | null, andereSpieler,
  *     info:{ …weltInfo, drache:true|false|null },   drache aus TheEnd (W3)
- *     unbekannt:{ beute:[{ name, anzahl }], muster:[Kürzel], ruestung:[Item] },
+ *     unbekannt:{ beute:[{ name, anzahl }], strukturen:[Name aus 0x77], muster:[Kürzel], ruestung:[Item] },
  *     fehler }   Einträge, deren letzter Stand nicht lesbar ist (ihr Fund fehlt)
  */
 export function fundeSammler() {
@@ -295,7 +360,8 @@ export function fundeSammler() {
   const wesen = new Map();     // Lebewesen-Schlüssel → gefiltertes Lebewesen
   const altWesen = new Map();  // alte Welten: Chunk-Schlüssel (Tag 50) → gefilterte Lebewesen
   const andere = new Set();    // player_… (andere Spieler, nur gezählt – Frage 2)
-  const bereiche = new Map();  // Chunk-Schlüssel (Tag 57) → Strukturbereiche
+  const bereiche = new Map();  // Chunk-Schlüssel (Tag 57 bzw. 119) → Strukturbereiche
+  const fremdeVolumen = new Map();   // Chunk-Schlüssel (Tag 119) → unbekannte Strukturnamen
   const doerfer = new Map();   // VILLAGE_…_INFO → Dorf
   const kaputt = new Set();    // Schlüssel, deren letzter Stand nicht lesbar ist (ein späterer Eintrag heilt)
   let spieler = null, portale = null, info = null, drache = null, levelDatKaputt = false;
@@ -370,6 +436,14 @@ export function fundeSammler() {
     if ((c = chunkVon(keyBytes, 57))) {
       bereiche.delete(s);
       if (!geloescht) { const liste = bereicheLesen(value, c.dim); if (liste.length) bereiche.set(s, liste); }
+      return;
+    }
+    if ((c = chunkVon(keyBytes, 119))) {
+      bereiche.delete(s); fremdeVolumen.delete(s);
+      if (geloescht || !value?.length) return;
+      const { liste, unbekannt } = volumenLesen(value, c.dim);
+      if (liste.length) bereiche.set(s, liste);
+      if (unbekannt.length) fremdeVolumen.set(s, unbekannt);
       return;
     }
     let m;
@@ -496,6 +570,7 @@ export function fundeSammler() {
       info: info && { ...info, drache },
       unbekannt: {
         beute: [...unbekannteBeute].map(([name, anzahl]) => ({ name, anzahl })).sort((a, b) => b.anzahl - a.anzahl || reihenfolge(a.name, b.name)),
+        strukturen: [...new Set([...fremdeVolumen.values()].flat())].sort(reihenfolge),
         muster: [...unbekannteMuster].sort(reihenfolge),
         ruestung: [...unbekannteRuestung].sort(reihenfolge),
       },

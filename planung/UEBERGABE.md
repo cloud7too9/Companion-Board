@@ -23,7 +23,7 @@
   2. **Offline:** **B3 gebaut** (13.10.2026): live ohne Netz aus dem Spiegel in IndexedDB, Nachladen über `/api/aenderungen`; ⏸ H14 am iPhone im Flugmodus. Als Nächstes B4 und B5 (Nachtrag im Offline-Bauplan).
   3. A7 (Größenstufen je Widget): Planungsrunde mit Max
   4. Inhalte, die noch nicht beschrieben sind (Warteliste, Kapitel 4)
-  5. **Bauplan „Welt-Funde“** (erweiterter Welt-Import, E21): [`bauplaene/Bauplan-Welt-Funde.md`](bauplaene/Bauplan-Welt-Funde.md). **W0 gebaut** (13.10.2026): Weltordner direkt wählen oder hineinziehen, nur die gebrauchten Dateien gehen an den Worker; ⏸ H11 am iPhone. **W1 gebaut** (13.10.2026): Der Import liest Strukturen, Portale, Spieler, Vorlagen, Rüstung, Banner und Welt-Info mit (`nbt.js`, `welt-funde.js`), die Companion zeigt sie noch nicht; ⏸ H12 an einer echten Welt. Fragen 1, 4 und 5 hat Max am 13.10.2026 beantwortet (automatisch übernehmen mit Schalter je Art, Portale ohne Gegenstück als Ort, kein Bild der Welt). **W2 gebaut** (13.10.2026): Prüfliste mit Welt-Info und einer Zeile je Art samt Schalter, „Übernehmen“ legt alles Eingeschaltete über `POST /welten/:id/funde` an; ⏸ H13 am iPhone. **W3 gebaut** (13.10.2026): Strukturbereiche (Außenposten, Hexenhütte, Ozeanmonument, Netherfestung), Dörfer, Endtransitportale, Enderdrache.
+  5. **Bauplan „Welt-Funde“** (erweiterter Welt-Import, E21): [`bauplaene/Bauplan-Welt-Funde.md`](bauplaene/Bauplan-Welt-Funde.md). **W0 gebaut** (13.10.2026): Weltordner direkt wählen oder hineinziehen, nur die gebrauchten Dateien gehen an den Worker; ⏸ H11 am iPhone. **W1 gebaut** (13.10.2026): Der Import liest Strukturen, Portale, Spieler, Vorlagen, Rüstung, Banner und Welt-Info mit (`nbt.js`, `welt-funde.js`), die Companion zeigt sie noch nicht; ⏸ H12 an einer echten Welt. Fragen 1–5 hat Max am 13.10.2026 beantwortet (automatisch übernehmen mit Schalter je Art, nur der eigene Spieler, Vorlagen auch aus Truhen, Portale ohne Gegenstück als Ort, kein Bild der Welt). **W2 gebaut** (13.10.2026): Prüfliste mit Welt-Info und einer Zeile je Art samt Schalter, „Übernehmen“ legt alles Eingeschaltete über `POST /welten/:id/funde` an; ⏸ H13 am iPhone. **W3 gebaut** (13.10.2026): Strukturbereiche (Außenposten, Hexenhütte, Ozeanmonument, Netherfestung), Dörfer, Endtransitportale, Enderdrache. **H12 bestätigt** (Max' Welt 1.26.52): Tag 57 gibt es dort nicht mehr. **W4 gebaut** (13.10.2026): Strukturbereiche aus Chunk-Tag 119 (AABBVolumes) mit Bedrock-ID, dazu Lager, Prüfungskammern, Tempel, Pfadruinen, Iglus; Tag 57 bleibt für ältere Welten.
 - **Git:** Gearbeitet wird im Repo `cloud7too9/Companion-Board` (seit 05.10.2026). **Gemergt wird nur nach Rückfrage bei Max**, auch wenn Claude den Merge ausführt. Die Runden mit allen PRs: `docs/verlauf/Runden-und-PRs.md`.
 - **Tests:** alle grün in `main`, lokal und in der CI (Kapitel 6).
 
@@ -156,7 +156,6 @@ Voraussetzungen für die Playwright-Tests:
 
 - **H10:** Probe nach dem Umschalten auf das Dashboard.
 - **H11:** Weltordner am iPhone wählen (Welt-Import, W0).
-- **H12:** `welt-pruefen.mjs` über eine echte Welt laufen lassen und die Funde mit dem Spiel vergleichen (W1).
 - **H13:** Welt-Funde am iPhone übernehmen (W2).
 - **E21:** Bauplan „Welt-Funde“: Fragen 1, 4 und 5 beantwortet (13.10.2026), 2 und 3 gelten nach Vorschlag.
 - **A7/E6:** Planungsrunde zu den Größenstufen je Widget und `seitenleistenBreite`.
@@ -180,5 +179,5 @@ Voraussetzungen für die Playwright-Tests:
    - Danach B4 (Offline-Regel, Warteschlange je Account) und B5 (Zustandswechsel, zuerst beim Abhaken der Sammelobjekte; `von`/`am` bei Wiederholung nicht überschreiben).
 3. **Nach A7:** echte Stufen statt der Platzhalter im Register, `SEITENLEISTEN_BREITE` setzen, größte Rasterstufe bauen.
 4. **Inhalte**, sobald beschrieben: Typen mit Quelle bekommen ihre Quelle in `widgets.js` (`quellenVon`) und ein Anzeigeschema in `board-karten.js`.
-5. **Welt-Funde (E21):** W0 (Weltordner, ⏸ H11) und W1 (Funde lesen, ⏸ H12 an einer echten Welt) sind gebaut. W2 (Übersicht mit Schalter je Art, automatisch übernehmen, ⏸ H13 am iPhone) und W3 (Strukturen ohne Truhe) sind gebaut. Offen sind nur die Proben H11–H13; danach zieht der Bauplan ins Archiv. Einzelheiten im Bauplan.
+5. **Welt-Funde (E21):** W0 (Weltordner, ⏸ H11) und W1 (Funde lesen, ⏸ H12 an einer echten Welt) sind gebaut. W2 (Übersicht mit Schalter je Art, automatisch übernehmen, ⏸ H13 am iPhone), W3 (Strukturen ohne Truhe) und W4 (Strukturbereiche aus Tag 119) sind gebaut, H12 hat Max bestätigt. Offen sind nur die Proben H11 und H13; danach zieht der Bauplan ins Archiv. Einzelheiten im Bauplan.
 6. **E8**, wenn an anderer Stelle geklärt: die Platzhalter-Themes in `themes.css` ersetzen. Am Widget-Code ändert sich nichts.

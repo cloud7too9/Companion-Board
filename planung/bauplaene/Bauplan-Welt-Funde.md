@@ -2,7 +2,7 @@
 
 Stand: 13.10.2026 · Grundlage: Frage von Max („Was kann man aus dem .mcworld-Upload alles bekommen?“, 13.10.2026) und Auswertung der Testwelt `companion/tests/daten/fixture-seed.mcworld` · Setzt voraus: Welt-Import (Strang C, im Archiv: `docs/bauplaene/Bauplan-Welt-Import.md`, `docs/plaene/PLAN-welt-import-biome.md`)
 
-> **Status: W0 bis W3 gebaut (13.10.2026), es fehlen nur die Proben von Max (H11–H13).** Auf Wunsch von Max kam zuerst W0: den Weltordner direkt wählen oder hineinziehen, nur die gebrauchten Dateien behalten. Danach W1 („mergen und weiter“, Max 13.10.2026): Die Funde werden gelesen, die Companion zeigt sie noch nicht. **Max hat Frage 1, 4 und 5 beantwortet (13.10.2026, Abschnitt „Entscheidungen“):** automatisch übernehmen mit einem Schalter je Art, Portale ohne Gegenstück auf die Karte, kein Bild der Welt. Frage 2 und 3 gelten weiter nach Vorschlag.
+> **Status: W0 bis W4 gebaut (13.10.2026), es fehlen nur die Proben von Max am iPhone (H11, H13); H12 hat Max bestätigt.** Auf Wunsch von Max kam zuerst W0: den Weltordner direkt wählen oder hineinziehen, nur die gebrauchten Dateien behalten. Danach W1 („mergen und weiter“, Max 13.10.2026): Die Funde werden gelesen, die Companion zeigt sie noch nicht. **Max hat Frage 1, 4 und 5 beantwortet (13.10.2026, Abschnitt „Entscheidungen“):** automatisch übernehmen mit einem Schalter je Art, Portale ohne Gegenstück auf die Karte, kein Bild der Welt. **Frage 2 und 3 hat Max ebenfalls entschieden (13.10.2026):** nur der eigene Spieler; Vorlagen zählen auch aus Truhen als gefunden – beides wie vorgeschlagen und schon so gebaut.
 
 Dieser Bauplan beschreibt die technischen Entscheidungen. Er baut auf dem auf, was im Repo liegt (Stand `main` vom 13.10.2026).
 
@@ -73,7 +73,7 @@ Max (13.10.2026): „Als erstes ein Upload-Feld, in das man den ganzen Ordner vo
 | Gegenstände in allen Behältern (`Items`) | **Sammelobjekte gefunden** | ja | W1 |
 | Banner (Block-Entity `Banner`, `Base`, `Patterns`) | **Banner** mit Grundfarbe und Mustern | nein | W1 |
 | `level.dat` | **Welt-Info** im Welt-Sheet: Spielmodus, Schwierigkeit, Tag, Spawn, zuletzt gespielt, Hardcore, Cheats | ja | W1 |
-| Strukturbereiche (Tag 57, `HardcodedSpawners`) | **Orte** „Nether Fortress“, „Witch Hut“, „Monument“, „Outpost“ ohne Truhe | nein | W3 |
+| Strukturbereiche (Tag 119 `AABBVolumes` ab 1.26, W4; Tag 57 `HardcodedSpawners` für ältere Welten, W3) | **Orte** „Nether Fortress“, „Witch Hut“, „Monument“, „Outpost“, „Camp“, „Trial Chamber“, Tempel, „Trail Ruins“, „Igloo“ – auch ohne Truhe | nein | W3, W4 |
 | Dörfer (`VILLAGE_<id>_INFO`) | **Ort** „Village“ mit Mittelpunkt | nein | W3 |
 | Das End (`TheEnd`): Drache besiegt, Transittore | **Orte** „End Gateway“, Hinweis im Welt-Sheet | nein | W3 |
 | `world_icon.jpeg` | ~~Bild der Welt~~ entfällt (Frage 5, Max 13.10.2026) | nein | – |
@@ -125,7 +125,7 @@ Die Beute-Tabelle steht nur in **ungeöffneten** Behältern (`loot_tables/chests
 ## Aufbau
 
 - **`companion/nbt.js`** (neu, ES-Modul): NBT in Little Endian lesen, alle Tag-Arten, mehrere Compounds hintereinander (Block-Entities liegen so). `levelDatLesen` in `biom-dekoder.js` nutzt ihn statt des eigenen Lesers.
-- **`companion/welt-funde.js`** (neu, ES-Modul): `fundeSammler()` bekommt im selben Durchlauf wie die Biome jeden Eintrag (`aufnehmen` in `biom-welt.js`) und behält nur, was er braucht: Tag 49 nach `id` gefiltert, `portals`, `~local_player`, `actorprefix…` nur Loren mit Truhe und Rüstungsständer, später Tag 57, `VILLAGE_…_INFO`, `TheEnd`. Am Ende `fundeAuswerten()` → `{ orte, portale, sammelobjekte, ruestung, banner, info, unbekannt }`. Die Zuordnungstabellen (Beute-Tabelle, Nähe, Muster-Kürzel, Farbcodes) stehen hier.
+- **`companion/welt-funde.js`** (neu, ES-Modul): `fundeSammler()` bekommt im selben Durchlauf wie die Biome jeden Eintrag (`aufnehmen` in `biom-welt.js`) und behält nur, was er braucht: Tag 49 nach `id` gefiltert, `portals`, `~local_player`, `actorprefix…` nur Loren mit Truhe und Rüstungsständer, Tag 119 und 57, `VILLAGE_…_INFO`, `TheEnd`. Am Ende `fundeAuswerten()` → `{ orte, portale, sammelobjekte, ruestung, banner, info, unbekannt }`. Die Zuordnungstabellen (Beute-Tabelle, Nähe, Muster-Kürzel, Farbcodes) stehen hier.
 - **`biom-welt.js`** reicht jeden Eintrag zusätzlich an den Sammler; Ergebnis `{ meta, kacheln, funde }`. Speicher: nur gefilterte Funde, kein Rohwert bleibt liegen.
 - **Worker** schickt `funde` mit `fertig` zurück. **`tools/welt-pruefen.mjs`** druckt die Funde aus, damit eine echte Welt am PC geprüft werden kann, ohne die Companion.
 - **Companion** (überholt durch die Entscheidungen vom 13.10.2026: Schalter je Art statt Haken je Fund, eine Route `POST /welten/:id/funde`)**:** Die Prüfliste des Welt-Imports bekommt unter den Biomen Abschnitte „Orte“, „Portale“, „Sammelobjekte“, „Rüstung“, „Banner“ und „Welt“, jeweils mit Haken, Anzahl und „schon bekannt“. „Übernehmen“ schickt erst die Biome (wie heute), dann die angehakten Funde über die bestehende API (`POST /orte/instanzen`, `POST /portale/welten/:id`, `PUT /sammelobjekte/welten/:id/:objekt`, `POST /ruestung`, `POST /banner`), mit IDs vom Handy (B1). Fortschritt und Fehler je Fund in der Liste. Der DEMO-Mock kann dasselbe.
@@ -164,7 +164,7 @@ Max (13.10.2026): „mergen und weiter mit W3“.
 
 ## H12: Ergebnis an Max' Welt (13.10.2026)
 
-Welt „letztes mal – Kopie“ von Max (Bedrock **1.26.52**, `Archiv.zip` aus der Dateien-App, 13 833 / 5 683 / 830 Chunks), ausgewertet von Claude mit `welt-pruefen.mjs` (Streaming, 15 s, 168 MB) und zum Gegenprüfen mit `tools/welt-inhalte.mjs`. Den Vergleich mit dem Spiel macht Max.
+Welt „letztes mal – Kopie“ von Max (Bedrock **1.26.52**, `Archiv.zip` aus der Dateien-App, 13 833 / 5 683 / 830 Chunks), ausgewertet von Claude mit `welt-pruefen.mjs` (Streaming, 15 s, 168 MB) und zum Gegenprüfen mit `tools/welt-inhalte.mjs`. **Max hat die Liste bestätigt (13.10.2026: „H12 ja“).**
 
 **Passt:**
 
@@ -200,7 +200,19 @@ Welt „letztes mal – Kopie“ von Max (Bedrock **1.26.52**, `Archiv.zip` aus 
 4. **179 nicht lesbare Einträge:** alles Lebewesen (`actorprefix…`); auch ein zweiter, unabhängiger NBT-Leser scheitert an genau diesen 179. Neues Format oder kaputte Einträge – klären, bevor Loren/Rüstungsständer darauf bauen.
 5. **Handelsangebote** (nicht Teil des Bauplans): 33 von 84 Dorfbewohnern haben `Offers` (294 Angebote), offenbar nur die, mit denen gehandelt wurde.
 
-**Vorschlag W4** (nicht gebaut, wartet auf Max): 0x77 statt Tag 57 lesen (Arten nach Bedrock-ID, Zuordnung wie im Referenzschema `planung/schema/`, Tabelle `struktur_ids`), Lager-Beute-Tabellen zuordnen, Topf/Spender der Prüfungskammern still übergehen, Tag 57 als Rückweg für ältere Welten behalten.
+**W4** (Max 13.10.2026: „W4 ja“, gebaut, siehe unten): 0x77 statt Tag 57 lesen (Arten nach Bedrock-ID, Zuordnung wie im Referenzschema `planung/schema/`, Tabelle `struktur_ids`), Lager-Beute-Tabellen zuordnen, Topf/Spender der Prüfungskammern still übergehen, Tag 57 als Rückweg für ältere Welten behalten.
+
+## W4: Strukturbereiche aus Tag 119 (gebaut 13.10.2026)
+
+Max (13.10.2026): „W4 ja“.
+
+- **Format** (an allen 2 295 Einträgen aus Max' Welt geprüft): `u32 Version` · `u32 Anzahl Namen`, je Name `u32 Nr.` + `u16`-Länge + Text · `u32 Anzahl Teile`, je Teil `u32 Teil` + 6 × `i32` (min X, Y, Z, max X, Y, Z) · Liste A (`u32` Anzahl, je 3 × `u32`: Teil, Nr., unbekannt – Strukturen aus Puzzleteilen) · Liste B (`u32` Anzahl, je 4 × `u32`: Teil, Nr., unbekannt, Kennung – feste Strukturen; Kennung 1 = Spawnbereich). Über A und B gehört jedes Teil zu einem Namen; damit sind auch die Einträge mit 2 Strukturen sicher gelesen.
+- **Arten** nach Bedrock-ID (`VOLUMEN` in `welt-funde.js`): `fortress`, `monument`, `pillager_outpost`, `swamp_hut` (angenommen, siehe Referenzschema), `trial_chambers`, `desert_pyramid`, `jungle_pyramid`, `trail_ruins`, `igloo` und alle `abandoned_camp_*` → Lager. Unbekannte Namen meldet `auswerten()` unter `unbekannt.strukturen`, `welt-pruefen.mjs` gibt sie aus.
+- **Ein Bereich je Name und Eintrag**: die Hülle aller Teile. Ort ist die Mitte in X/Z; Y die Mitte, bei über 64 Blöcken Höhe (Spawnbereich der Außenposten reicht bis 319) die Unterkante. Kästen mit min > max fallen weg.
+- **Zusammenfassen** wie in W3 über `NAEHE` je Art; neu: Lager 48.
+- **Beute**: `abandoned_camp_*` und `barrels/abandoned_camp_barrel` → Lager; Töpfe und Spender der Prüfungskammern werden still übergangen (keine Meldung als unbekannt).
+- **Tag 57** bleibt als Rückweg für Welten vor 1.26.
+- **An Max' Welt**: 1 109 Orte, keine unbekannten Beute-Tabellen und Strukturen; neu dazu 7 Ozeanmonumente, 9 Lager, 2 Iglus, 4 Außenposten (alle auf Y 63), 4 Dschungeltempel, 4 Netherfestungen. Offen bleiben die 179 nicht lesbaren Lebewesen-Einträge (Punkt 4 in „H12: Ergebnis“).
 
 ## Phasen, Haltepunkte, Branches
 
@@ -210,7 +222,7 @@ Welt „letztes mal – Kopie“ von Max (Bedrock **1.26.52**, `Archiv.zip` aus 
 | **W1** Funde lesen · **gebaut 13.10.2026** | `nbt.js`, `welt-funde.js`, Sammler im Durchlauf von `biom-welt.js`, Worker und `welt-pruefen.mjs` geben Funde aus. Truhen, Spawner, Loren, Kies, Tresore, Portale, Spieler, Behälter-Inhalte, Banner, Rüstungsständer, Welt-Info | `node --test welt-funde.test.mjs`: NBT-Leser; Testwelt ergibt genau 6 Verliese und 1 Schatz an den bekannten Koordinaten; `fundeweltBauen` mit Portalen, Bannern, Rüstung und Vorlagen; unbekannte Beute-Tabelle wird gemeldet. ⏸ **H12:** Max lässt `welt-pruefen.mjs` (oder Claude mit seiner Datei) über seine echte Welt laufen und vergleicht die Liste mit dem Spiel |
 | **W2** Übersicht und automatisch Übernehmen · **gebaut 13.10.2026** | Je Art eine Zeile mit Anzahl und Schalter (Entscheidungen 13.10.2026), „schon bekannt“, Portal-Paare (`zielSuchen` aus `board-karten.js`), Portale ohne Gegenstück als „Eigene Orte · Netherportal“, Lederfarbe → `FARBEN`, Übernehmen über `POST /welten/:id/funde`, `quelle:"welt"` und Welt-Info am Server, Welt-Info im Welt-Sheet | Playwright `karte-mcworld` (DEMO) und live gegen das Board: Funde erscheinen, schon bekannte sind ausgegraut, Übernehmen legt Orte, Verbindung, Sammelobjekt, Set und Banner an, zweiter Import legt nichts doppelt an. ⏸ **H13:** Max importiert am iPhone und schaut Prüfliste und Karte an |
 | **W3** Strukturen ohne Truhe · **gebaut 13.10.2026** | Strukturbereiche (Tag 57), Dörfer, End-Transittore, Enderdrache (Bild der Welt entfällt, Frage 5) | wie W1, an einer Welt von Max mit diesen Strukturen. **H12 (13.10.2026): Tag 57 gibt es in 1.26.52 nicht, siehe „H12: Ergebnis“** |
-| **W4** Strukturbereiche aus 0x77 · **Vorschlag** | 0x77 lesen, Lager und Prüfungskammer-Tabellen zuordnen (Abschnitt „H12: Ergebnis“) | Fundewelt mit 0x77-Einträgen, Max' Welt: 7 Ozeanmonumente, 8 Lager, 4 Außenposten |
+| **W4** Strukturbereiche aus 0x77 · **gebaut 13.10.2026** | 0x77 lesen, Lager und Prüfungskammer-Tabellen zuordnen (Abschnitt „W4“) | `welt-funde.test.mjs` (Fundewelt mit Tag-119-Einträgen), `karte-mcworld` (Prüfliste, Übernehmen, live); Max' Welt: 7 Ozeanmonumente, 9 Lager, 4 Außenposten auf Y 63 |
 
 Jede Phase ein PR gegen `main`, gemergt nach Rückfrage. Branch: der Branch der Sitzung (`claude/…`), wie bei Bauplan „Sitzung“.
 
@@ -225,16 +237,17 @@ Jede Phase ein PR gegen `main`, gemergt nach Rückfrage. Branch: der Branch der 
 ## Zu entscheiden (Max)
 
 1. ~~**Übernehmen:** Prüfliste mit Haken, alles Neue vorausgewählt (Vorschlag) – oder alles ohne Rückfrage übernehmen?~~ **Max (13.10.2026): automatisch übernehmen**, mit einem Schalter je Art (siehe „Entscheidungen“).
-2. **Spielerdaten** (in W1 vorläufig nach Vorschlag)**:** Nur der eigene Spieler der Welt (`~local_player`, Vorschlag) – oder auch die anderen Spieler einer Mehrspieler-Welt? Deren Inventar und Position wären dann für alle am Board sichtbar, und welcher Account zu welchem Spieler gehört, steht nicht in der Welt. Nachtrag W1: In einer heruntergeladenen Realm-Welt steht vermutlich auch der eigene Spieler nicht als `~local_player`, sondern wie alle als `player_server_…`. Dann käme nach dem Vorschlag aus einer Realm-Welt gar keine Rüstung und kein Inventar. `welt-pruefen.mjs` zeigt „Andere Spieler: N“, H12 klärt es.
-3. **Sammelobjekte** (in W1 vorläufig nach Vorschlag)**:** Gefunden, sobald die Vorlage irgendwo in der Welt liegt, auch in einer Truhe (Vorschlag) – oder nur, wenn der Spieler sie bei sich oder in der Endertruhe hat?
+2. ~~**Spielerdaten**~~ **Max (13.10.2026): nur der eigene Spieler** (`~local_player`), wie gebaut. Ursprüngliche Frage: Nur der eigene Spieler der Welt (`~local_player`, Vorschlag) – oder auch die anderen Spieler einer Mehrspieler-Welt? Deren Inventar und Position wären dann für alle am Board sichtbar, und welcher Account zu welchem Spieler gehört, steht nicht in der Welt. Nachtrag W1: In einer heruntergeladenen Realm-Welt steht vermutlich auch der eigene Spieler nicht als `~local_player`, sondern wie alle als `player_server_…`. Dann käme nach dem Vorschlag aus einer Realm-Welt gar keine Rüstung und kein Inventar. `welt-pruefen.mjs` zeigt „Andere Spieler: N“, H12 klärt es.
+3. ~~**Sammelobjekte**~~ **Max (13.10.2026): ja, auch aus Truhen**, wie gebaut. Ursprüngliche Frage: Gefunden, sobald die Vorlage irgendwo in der Welt liegt, auch in einer Truhe (Vorschlag) – oder nur, wenn der Spieler sie bei sich oder in der Endertruhe hat?
 4. ~~**Portal ohne Gegenstück:** Nur als Hinweis in der Prüfliste (Vorschlag) – oder als eigener Ort, damit man es auf der Karte sieht?~~ **Max (13.10.2026): auch auf der Karte zeigen** → „Eigene Orte · Netherportal“.
 5. ~~**Bild der Welt:** `world_icon.jpeg` mit hochladen und als Bild der Welt in Companion und Dashboard zeigen (etwa 50–150 KB je Welt) – ja oder nein?~~ **Max (13.10.2026): nein.**
 
 ## Reihenfolge und Git
 
 1. ~~W0 Weltordner statt ZIP~~ gebaut 13.10.2026, ⏸ H11
-2. ~~Fragen 1, 4 und 5 beantworten~~ Max 13.10.2026; 2 und 3 gelten nach Vorschlag
-3. ~~W1 Funde lesen~~ gebaut 13.10.2026, ⏸ H12
+2. ~~Fragen 1–5 beantworten~~ Max 13.10.2026
+3. ~~W1 Funde lesen~~ gebaut 13.10.2026, H12 bestätigt
 4. ~~W2 Übersicht und automatisch übernehmen~~ gebaut 13.10.2026, ⏸ H13
 5. ~~W3 Strukturen ohne Truhe~~ gebaut 13.10.2026
-6. Nach H11–H13 zieht der Bauplan ins Archiv (`docs/bauplaene/`).
+6. ~~W4 Strukturbereiche aus 0x77~~ gebaut 13.10.2026
+7. Nach H11 und H13 zieht der Bauplan ins Archiv (`docs/bauplaene/`).
