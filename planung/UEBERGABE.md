@@ -18,8 +18,8 @@
 - **Umbau Netlify + Pi (`UMBAUPLAN.md`), Phasen 1–5 gebaut** (05.10.2026): Server abgesichert (Anzeige nur mit Link, `HOST`, `CF-Connecting-IP`, CORS, 6-stellige PIN), API-Adresse konfigurierbar (`konfig.js`, `VITE_API_URL`), Texterkennung am Handy (`texterkennung.js`, tesseract.js im Browser), SQLite (`daten.db`, `speicher.js`), Netlify-Build mit PWA (`netlify.toml`, `sw.js`). **Für Max:** neue 6-stellige PIN (QR-Code neu scannen); der Kiosk öffnet die Anzeige über `server/daten/anzeige-link.txt`; der Server braucht Node 22.13+; `daten.json` wird beim ersten Start nach `daten.db` übernommen.
 - **Als Nächstes** (Kapitel 9):
   0. ~~**Umbau**~~ **abgeschlossen (13.10.2026):** Phasen 1–6 sind gebaut und in Betrieb: Pi, Tunnel, Domain `mainhubv1.com`, Probe über Mobilfunk bestanden, Netlify-Probe (H8) bestanden. Aufgeräumt (E18): `netzwerk.js`, Adress-Lernen, Start- und Firewall-Skripte sind entfernt; ohne `OEFFENTLICHE_URL` gilt `localhost`. Die Einrichtung steht in `koordinaten-board/pi/ANLEITUNG.md`. Offen bleibt nur die Startseite der Domain (E20).
-  1. **Bauplan „Sitzung“** (E16) schreiben und mit Max abnicken
-  2. **Offline B3–B5** mit HTTPS am Board (N5 ist entschieden: eigenes Zertifikat)
+  1. **Bauplan „Sitzung“** (E16) liegt vor: [`bauplaene/Bauplan-Sitzung.md`](bauplaene/Bauplan-Sitzung.md) (13.10.2026), wartet auf das OK von Max (fünf Fragen am Ende). Vorschlag: das Dashboard wird die einzige Anzeige.
+  2. **Offline B3–B5**, neu zugeschnitten (13.10.2026): N5 ist hinfällig, HTTPS kommt von Netlify/Cloudflare. B3 = Live-Modus ohne Netz, IndexedDB, Nachladen über `/api/aenderungen` (Nachtrag im Offline-Bauplan).
   3. A7 (Größenstufen je Widget): Planungsrunde mit Max
   4. Inhalte, die noch nicht beschrieben sind (Warteliste, Kapitel 4)
 - **Git:**
@@ -57,7 +57,7 @@ Entscheidungen von Max (Details in `WARTELISTE.md` und `PLAN.md`, Kapitel 7):
 
 | Nr. | Entscheidung |
 |---|---|
-| N5 | HTTPS am Board mit **eigenem Zertifikat**, das iPhone vertraut ihm einmal |
+| N5 | HTTPS am Board mit **eigenem Zertifikat**, das iPhone vertraut ihm einmal *(hinfällig seit 13.10.2026: HTTPS über Netlify/Cloudflare)* |
 | E15 | **Nur Bedrock**, Java gibt es nirgendwo |
 | E16 | Das Board bekommt eine **Sitzung**, die lebt, solange das Board läuft. „Aufs Board“ fügt den Inhalt als **Widget an der ersten freien Stelle** ein, am Handy verschieb- und entfernbar. |
 | E8 | Themes für Sammelobjekte, Banner, Rüstung: **vertagt**, wird an anderer Stelle geklärt |
@@ -85,8 +85,8 @@ Frühere Entscheidungen (01.10.2026): Strang C als ganzer Biom-Import, N1 (abgeh
 | **B2** Accounts mit PIN | Board-PIN, dann Account wählen oder anlegen (Name + eigene PIN, 4–8 Ziffern). Die PIN wird nur als **scrypt-Hash** gespeichert. Sperre je Gerät und Account. Das Token ist der **Geräteschlüssel**. `werBistDu()` gekapselt an Board und Companion. | Board `identitaet.js`, Companion `IDENTITAET`, Sheet „Beitreten“ |
 | **E15** Nur Bedrock | Portal-Prüfung mit festem Suchradius ±128 (`PORTAL_SUCHRADIUS`), kein Umschalter, kein `edition` mehr im Kontext der Karten. Der Welt-Import weist Java-Welten mit klarer Meldung ab. | `companion/board-karten.js`, Portal-Verwaltung in `companion-prototyp.html` |
 | **CI** | Drei Jobs bei jedem PR und Push auf `main`, Screenshots als Download „bilder“ | `.github/workflows/tests.yml` |
-| **B3–B5** Offline | nicht gebaut. N5 ist entschieden (eigenes Zertifikat), kann losgehen. | – |
-| **E16** Sitzung | nicht gebaut. Zuerst Bauplan zum Abnicken. | – |
+| **B3–B5** Offline | nicht gebaut. N5 ist hinfällig (HTTPS über Netlify/Cloudflare); B3 neu zugeschnitten, siehe Nachtrag im Offline-Bauplan. Gebaut ist davon schon der Service Worker mit versioniertem Cache (Umbau Phase 5). | `companion/sw.js` |
+| **E16** Sitzung | nicht gebaut. Bauplan liegt vor (`bauplaene/Bauplan-Sitzung.md`, 13.10.2026), wartet auf OK. | – |
 | **A7** Größenstufen | nicht gebaut: Planungsrunde mit Max (E6) | – |
 
 Pfade unter `model/`, `lib/`, `components/` und `features/` liegen in `companion/widgets/src/` (`model/`, `lib/` und `components/` unter `features/workspace/`). „Board“ meint `koordinaten-board/server/src/`.
@@ -182,9 +182,9 @@ Voraussetzungen für die Playwright-Tests:
 - **Die Playwright-Tests laufen gegen `dist`.** Nach Änderungen an den Widgets erst `npm run build`, sonst testet man den alten Stand.
 - **Tests auf dem langsameren Runner:** Nach dem Beitreten öffnet die Companion bei einem leeren Board „Noch keine Welt“ erst nach dem Laden der Welten. Ein Test, der Sheets schließt, muss vorher auf dieses Sheet warten (`.sheet-kopf h2` = „Welt“), sonst überdeckt es später den nächsten Klick. Nachstellen lässt sich so etwas mit einer Verzögerung per `page.route("**/api/orte/welten", …)`.
 - **Seit Umbau Phase 1:** Die Anzeige braucht auch auf dem Board-Gerät den Anzeige-Link (`daten/anzeige-link.txt`, Konsole). Tests, die ein Board starten, holen ihn mit `anzeigeLinkQuery()` aus `companion/tests/hilfen.mjs`. Liefert ein Test die Companion von einem anderen Ursprung aus als das Board, braucht das Board `ERLAUBTE_URSPRUENGE` mit diesem Ursprung (so in `board.test.mjs`, `anzeigeschema.test.mjs`). Die Test-PIN ist `471100`.
-- **Am Handy läuft die Companion über `http://192.168…`, also nicht in einem sicheren Kontext.**
+- **Im Betrieb läuft die Companion über `https://mainhubv1.com/app/`** (sicherer Kontext, Service Worker aktiv). Nur lokal vom Board unter `http://localhost:3000` gilt noch:
   - `crypto.randomUUID` gibt es dort nicht. Deshalb erzeugt `neueEintragId()` die IDs aus `getRandomValues`.
-  - Service Worker gehen dort gar nicht. Deshalb kommt mit B3 HTTPS (N5).
+  - Service Worker sind dort aus (`konfig.pwa` fehlt).
 - **Alte Anmeldungen:** Tokens von vor B2 werden abgelehnt. Die Companion prüft beim Start mit `IDENTITAET.werBistDu()` und öffnet dann das Beitreten. Die Accounts bleiben, auch wenn man `geheim.txt` löscht (nur die Anmeldungen verfallen).
 - **Umzug nach SQLite (Umbau Phase 4):** Beim ersten Start mit leerer `daten.db` übernimmt `daten.js` die alte `daten.json` und `biome/*.json` einmal und liest sie danach nie wieder (Sicherung). Tests, die den Stand nach dem Speichern prüfen, laden ein zweites `Daten` statt Dateien zu lesen. Der Server braucht Node 22.13+ (`node:sqlite`), die npm-Skripte setzen `--disable-warning=ExperimentalWarning`.
 - **Migrationen beim Laden (nur noch beim Übernehmen von `daten.json`):**
@@ -217,7 +217,7 @@ Voraussetzungen für die Playwright-Tests:
 ## 9. Nächste Schritte
 
 0. ~~**Umbau auf Netlify + Raspberry Pi**~~ **abgeschlossen (13.10.2026)**, siehe `UMBAUPLAN.md`: Phasen 1–6 in Betrieb unter `mainhubv1.com`, Aufräumen erledigt (E18). Entschieden: `/app/` bekommt den Prototyp, der Prototyp ist der Hauptstand; das Anzeigegerät bleibt offen (technisch egal). Noch zu entscheiden: die Startseite der Domain (E20, Anzeige oder Dashboard).
-1. **Bauplan „Sitzung“ (E16)** als `planung/bauplaene/Bauplan-Sitzung.md`, dann Max fragen. Fest steht:
+1. **Bauplan „Sitzung“ (E16)** liegt vor: `bauplaene/Bauplan-Sitzung.md` (13.10.2026), **wartet auf das OK von Max** (fünf Fragen am Ende). Danach S1–S4 je auf eigenem Branch, Haltepunkte H9 und H10. Fest stand vorher:
    - Die Sitzung lebt, solange das Board läuft. Ein Neustart beginnt leer; das gespeicherte Layout der Anzeige (A6) bleibt.
    - Inhalte lassen sich während der Laufzeit live ändern.
    - „Aufs Board“ fügt den Inhalt als **Widget an der ersten freien Stelle** ein (Größe aus dem Größen-Vertrag, Passt-Prüfung aus A2). Am Handy lässt er sich in „Anzeige anordnen“ verschieben oder entfernen.
@@ -227,12 +227,10 @@ Voraussetzungen für die Playwright-Tests:
    - Was passiert, wenn kein Platz frei ist.
    - Ob `/anzeige` wegfällt. Dann brauchen der QR-Code zum Beitreten und die Orte mit Kennblöcken eigene Widgets, der Anzeige-Link zeigt auf `/dashboard`, und die Startskripte bauen das Dashboard mit.
    - Wie die Anzeigeschemas (`BOARD_KARTEN`, Quelle wie `portal:<id>`) auf Widget-Typen mit Quelle abgebildet werden. `WIDGETS` und `quellenVon` in Board `widgets.js` sind der Anknüpfungspunkt.
-2. **Offline B3–B5 mit HTTPS** auf einem eigenen Branch (der Bauplan verlangt `bereich/offline`):
-   - **HTTPS am Board:** Das Board erzeugt beim ersten Start eine eigene Zertifizierungsstelle und daraus ein Server-Zertifikat mit der IP im Heimnetz (SAN), höchstens 825 Tage gültig, sonst lehnt iOS es ab.
-   - **Am iPhone:** Das Zertifikat der Zertifizierungsstelle gibt es über http als Profil zum Laden. Danach unter Einstellungen → Allgemein → Info → Zertifikatsvertrauenseinstellungen voll vertrauen. Der QR-Code führt danach auf `https://…`.
-   - `companion/sw.js` mit versioniertem Cache (die Seite kommt heute bewusst ohne Cache, `OHNE_CACHE`), IndexedDB statt `localStorage`, Test mit `context.setOffline(true)`.
-   - ⏸ Haltepunkt am echten iPhone (Home-Bildschirm-App, Flugmodus).
-   - Danach B4 (Offline-Regel, Warteschlange je Account) und B5 (Zustandswechsel, zuerst beim Abhaken der Sammelobjekte).
+2. **Offline B3–B5** auf `bereich/offline`, neu zugeschnitten am 13.10.2026 (N5 hinfällig, HTTPS und Service Worker sind da; Einzelheiten im Nachtrag von `bauplaene/Bauplan-Offline-Sync-und-Identitaet.md`):
+   - **B3:** Live-Modus ohne Netz statt DEMO-Rückfall (`betriebErkennen`), Datenspiegel der Bereiche in IndexedDB, Server `GET /api/aenderungen?seit=<nr>` plus `nr` in `geaendert`, Nachladen nach Wiederverbinden, Playwright offline **mit Daten**.
+   - ⏸ Haltepunkt am echten iPhone (Home-Bildschirm-App, Flugmodus, mit Daten).
+   - Danach B4 (Offline-Regel, Warteschlange je Account) und B5 (Zustandswechsel, zuerst beim Abhaken der Sammelobjekte; `von`/`am` bei Wiederholung nicht überschreiben).
 3. **Nach A7:** echte Stufen statt der Platzhalter im Register, `SEITENLEISTEN_BREITE` setzen, größte Rasterstufe bauen.
 4. **Inhalte**, sobald beschrieben: Typen mit Quelle bekommen ihre Quelle in `widgets.js` (`quellenVon`) und ein Anzeigeschema in `board-karten.js`.
 5. **E8**, wenn an anderer Stelle geklärt: die Platzhalter-Themes in `themes.css` ersetzen. Am Widget-Code ändert sich nichts.
