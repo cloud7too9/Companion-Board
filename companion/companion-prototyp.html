@@ -3830,7 +3830,7 @@ const IDENTITAET = Object.freeze({
   /** → { id, anzeigename, echterName, rolle:"Besitzer" } oder null (nicht angemeldet, PIN nötig, wartet auf Freigabe) */
   async werBistDu(){
     const r = await api("/ich");
-    if(!r.ok) return null;
+    if(!r.ok || !r.data) return null;
     // Altes Board (vor dem Pi-Update) antwortet noch mit { id, name }
     const b = r.data.benutzer ?? { id:r.data.id, anzeigename:r.data.name };
     if(r.data.pinNoetig || r.data.freigegeben === false){ zurAnmeldung(); return null; }

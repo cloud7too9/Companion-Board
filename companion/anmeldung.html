@@ -245,9 +245,10 @@ function verbindung(){
   const v = lsLesen("board.verbindung");
   return v?.adresse === BOARD_ADRESSE && v.token ? v : null;
 }
-/** Abgemeldet oder Gerät unbekannt: nichts vom Konto bleibt auf dem Gerät */
+/** Abgemeldet oder Gerät unbekannt: nichts vom Konto bleibt auf dem Gerät (auch nicht der Spiegel der Companion, Offline B3) */
 function vergessen(){
   for(const k of ["board.verbindung", "board.pinLokal", "board.kontakt", "board.stand", "anmeldung.willkommen"]) lsSchreiben(k, null);
+  try { indexedDB.deleteDatabase("companion-spiegel"); } catch {}
 }
 const kontaktMerken = () => lsSchreiben("board.kontakt", Date.now());
 /** PIN auf diesem Gerät richtig eingegeben: Hash für die PIN-Sperre ohne Netz ablegen (nur mit WebCrypto) */

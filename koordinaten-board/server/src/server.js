@@ -184,7 +184,7 @@ const angemeldet = (req, reply) => {
   reply.code(401).send({ error: 'anmeldung', fehler: 'Nicht angemeldet', message: 'Nicht angemeldet' });
   return false;
 };
-app.get('/api/ich', async (req, reply) => angemeldet(req, reply) && ident.ich(req.nutzer));
+app.get('/api/ich', async (req, reply) => (angemeldet(req, reply) ? ident.ich(req.nutzer) : reply));
 app.post('/api/pin', async (req, reply) => {
   if (!angemeldet(req, reply)) return reply;
   try {
@@ -210,7 +210,7 @@ app.post('/api/abmelden', async (req, reply) => {
   geraeteTrennen((v) => v.nutzer?.geraetId === req.nutzer.geraetId, 4001, 'Abgemeldet');
   return { ok: true };
 });
-app.get('/api/konten', async (req, reply) => angemeldet(req, reply) && { konten: ident.konten() });
+app.get('/api/konten', async (req, reply) => (angemeldet(req, reply) ? { konten: ident.konten() } : reply));
 app.post('/api/konten/:id/freigeben', async (req, reply) => {
   if (!angemeldet(req, reply)) return reply;
   try {
