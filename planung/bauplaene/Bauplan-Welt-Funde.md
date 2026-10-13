@@ -2,7 +2,7 @@
 
 Stand: 13.10.2026 · Grundlage: Frage von Max („Was kann man aus dem .mcworld-Upload alles bekommen?“, 13.10.2026) und Auswertung der Testwelt `companion/tests/daten/fixture-seed.mcworld` · Setzt voraus: Welt-Import (Strang C, im Archiv: `docs/bauplaene/Bauplan-Welt-Import.md`, `docs/plaene/PLAN-welt-import-biome.md`)
 
-> **Status: W0, W1 und W2 gebaut (13.10.2026), W3 Entwurf.** Auf Wunsch von Max kam zuerst W0: den Weltordner direkt wählen oder hineinziehen, nur die gebrauchten Dateien behalten. Danach W1 („mergen und weiter“, Max 13.10.2026): Die Funde werden gelesen, die Companion zeigt sie noch nicht. **Max hat Frage 1, 4 und 5 beantwortet (13.10.2026, Abschnitt „Entscheidungen“):** automatisch übernehmen mit einem Schalter je Art, Portale ohne Gegenstück auf die Karte, kein Bild der Welt. Frage 2 und 3 gelten weiter nach Vorschlag.
+> **Status: W0 bis W3 gebaut (13.10.2026), es fehlen nur die Proben von Max (H11–H13).** Auf Wunsch von Max kam zuerst W0: den Weltordner direkt wählen oder hineinziehen, nur die gebrauchten Dateien behalten. Danach W1 („mergen und weiter“, Max 13.10.2026): Die Funde werden gelesen, die Companion zeigt sie noch nicht. **Max hat Frage 1, 4 und 5 beantwortet (13.10.2026, Abschnitt „Entscheidungen“):** automatisch übernehmen mit einem Schalter je Art, Portale ohne Gegenstück auf die Karte, kein Bild der Welt. Frage 2 und 3 gelten weiter nach Vorschlag.
 
 Dieser Bauplan beschreibt die technischen Entscheidungen. Er baut auf dem auf, was im Repo liegt (Stand `main` vom 13.10.2026).
 
@@ -149,6 +149,19 @@ Die Beute-Tabelle steht nur in **ungeöffneten** Behältern (`loot_tables/chests
 - **Ort-Detail**: „Herkunft · aus dem Welt-Import“.
 - **Tests**: Server `api.test.js` (Welt-Info, Funde in einem Rutsch, Abgelehntes, je Bereich eine Meldung, Grenzen) und `regeln.test.js`; Playwright `karte-mcworld` mit der Fundewelt im DEMO (Zeilen, Schalter, Übernehmen, zweiter Import, Portale ohne Gegenstück) und live (Lena sieht die Orte sofort, Board hat alles).
 
+## W3: Strukturen ohne Truhe (gebaut 13.10.2026)
+
+Max (13.10.2026): „mergen und weiter mit W3“.
+
+- **Strukturbereiche** (Chunk-Tag 57): Anzahl als Int32, je Bereich ein Kasten aus 2 × 3 Int32 und ein Byte Typ: 1 Netherfestung (Nether), 2 Hexenhütte, 3 Ozeanmonument, 5 Plünderer-Außenposten (Oberwelt); 4 (entfallen) und Typen in der falschen Dimension fallen weg. Ort ist die Mitte des Kastens.
+- **Dörfer** (`VILLAGE_<uuid>_INFO`, auch `VILLAGE_Overworld_<uuid>_INFO`): Mitte aus `X0…Z1`. Das Spiel führt Dörfer, die geladen waren, also auch selbst gebaute mit Betten und Dorfbewohnern.
+- **Endtransitportale**: Block-Entity `EndGateway` im End, je Tor ein Ort (Nähe 8).
+- **Enderdrache**: `TheEnd` → `DragonFight.DragonKilled` als `info.drache`, in der Prüfliste „End · Enderdrache besiegt“ bzw. „lebt“.
+- **Zusammen mit W1**: Bereiche und Dörfer gehen in dieselben Strukturen wie Truhen und Spawner. Koordinate: der Spawner, sonst die Mitte eines Bereichs oder Dorfs, sonst der Fund nahe dem Mittelpunkt. So liegt ein Außenposten auf seinem Kasten statt an der Truhe, die Netherfestung bleibt beim Lohenspawner.
+- **Übernehmen**: nichts Neues nötig. Die Prüfliste (W2) bekommt die Arten Hexenhütte, Ozeanmonument, Endtransitportal automatisch, mit Schalter.
+- **Tests**: `welt-funde.test.mjs` (Fundewelt mit Bereichen, zwei Dörfern, einem gelöschten Dorf, zwei Transittoren, Drache; kaputter Strukturbereich), `karte-mcworld` (Zeilen der neuen Arten, das Transittor bei X 96 · Z 0 kennt der Mock schon, Drache in der Prüfliste, live 15 Orte).
+- **Nur aus der Beschreibung des Formats**: Tag 57, die Dorf-Schlüssel, `EndGateway` und `TheEnd` kommen in der Testwelt von Max nicht vor. H12 zeigt, ob eine echte Welt sie so schreibt.
+
 ## Phasen, Haltepunkte, Branches
 
 | Phase | Inhalt | Tests |
@@ -156,7 +169,7 @@ Die Beute-Tabelle steht nur in **ungeöffneten** Behältern (`loot_tables/chests
 | **W0** Weltordner statt ZIP · **gebaut 13.10.2026** | Ordner wählen oder hineinziehen, nur gebrauchte Dateien, Auswahl bei mehreren Welten, ZIP bleibt als Rückweg | `node --test` (Ordner = ZIP, auch Testwelt von Max; Ablage rekursiv), Playwright `karte-mcworld`. ⏸ **H11:** Max wählt am iPhone den Weltordner (und probiert das Hineinziehen aus der Dateien-App) |
 | **W1** Funde lesen · **gebaut 13.10.2026** | `nbt.js`, `welt-funde.js`, Sammler im Durchlauf von `biom-welt.js`, Worker und `welt-pruefen.mjs` geben Funde aus. Truhen, Spawner, Loren, Kies, Tresore, Portale, Spieler, Behälter-Inhalte, Banner, Rüstungsständer, Welt-Info | `node --test welt-funde.test.mjs`: NBT-Leser; Testwelt ergibt genau 6 Verliese und 1 Schatz an den bekannten Koordinaten; `fundeweltBauen` mit Portalen, Bannern, Rüstung und Vorlagen; unbekannte Beute-Tabelle wird gemeldet. ⏸ **H12:** Max lässt `welt-pruefen.mjs` (oder Claude mit seiner Datei) über seine echte Welt laufen und vergleicht die Liste mit dem Spiel |
 | **W2** Übersicht und automatisch Übernehmen · **gebaut 13.10.2026** | Je Art eine Zeile mit Anzahl und Schalter (Entscheidungen 13.10.2026), „schon bekannt“, Portal-Paare (`zielSuchen` aus `board-karten.js`), Portale ohne Gegenstück als „Eigene Orte · Netherportal“, Lederfarbe → `FARBEN`, Übernehmen über `POST /welten/:id/funde`, `quelle:"welt"` und Welt-Info am Server, Welt-Info im Welt-Sheet | Playwright `karte-mcworld` (DEMO) und live gegen das Board: Funde erscheinen, schon bekannte sind ausgegraut, Übernehmen legt Orte, Verbindung, Sammelobjekt, Set und Banner an, zweiter Import legt nichts doppelt an. ⏸ **H13:** Max importiert am iPhone und schaut Prüfliste und Karte an |
-| **W3** Strukturen ohne Truhe | Strukturbereiche (Tag 57), Dörfer, End-Transittore (Bild der Welt entfällt, Frage 5) | wie W1, an einer Welt von Max mit diesen Strukturen |
+| **W3** Strukturen ohne Truhe · **gebaut 13.10.2026** | Strukturbereiche (Tag 57), Dörfer, End-Transittore, Enderdrache (Bild der Welt entfällt, Frage 5) | wie W1, an einer Welt von Max mit diesen Strukturen |
 
 Jede Phase ein PR gegen `main`, gemergt nach Rückfrage. Branch: der Branch der Sitzung (`claude/…`), wie bei Bauplan „Sitzung“.
 
@@ -182,5 +195,5 @@ Jede Phase ein PR gegen `main`, gemergt nach Rückfrage. Branch: der Branch der 
 2. ~~Fragen 1, 4 und 5 beantworten~~ Max 13.10.2026; 2 und 3 gelten nach Vorschlag
 3. ~~W1 Funde lesen~~ gebaut 13.10.2026, ⏸ H12
 4. ~~W2 Übersicht und automatisch übernehmen~~ gebaut 13.10.2026, ⏸ H13
-5. W3 → PR
-6. Danach zieht der Bauplan ins Archiv (`docs/bauplaene/`).
+5. ~~W3 Strukturen ohne Truhe~~ gebaut 13.10.2026
+6. Nach H11–H13 zieht der Bauplan ins Archiv (`docs/bauplaene/`).
