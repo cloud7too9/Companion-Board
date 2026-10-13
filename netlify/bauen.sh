@@ -2,7 +2,7 @@
 # Baut die Netlify-Seite (Umbau Phase 5) nach netlify/dist:
 #   /            Anzeige (koordinaten-board/client, Vite)          /icons/   Kennblöcke für die Anzeige
 #   /app/        Companion-PWA (companion/, statische Dateien)     /dashboard/  Widget-Dashboard (companion/widgets, Vite)
-# API_URL (z. B. https://api.deinedomain.de) landet in VITE_API_URL (Anzeige, Dashboard) und in app/konfig.js (Companion).
+# API_URL (z. B. https://api.mainhubv1.com) landet in VITE_API_URL (Anzeige, Dashboard) und in app/konfig.js (Companion).
 # Lokal: API_URL=http://127.0.0.1:3000 bash netlify/bauen.sh  → dann netlify/dist mit einem statischen Server ausliefern.
 # OHNE_INSTALL=1 überspringt npm ci (wenn node_modules schon da sind, z. B. in den Tests), ZIEL=… baut woanders hin.
 set -euo pipefail

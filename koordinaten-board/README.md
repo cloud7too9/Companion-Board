@@ -35,18 +35,17 @@ Alles läuft offline im eigenen Netz: keine Cloud, kein Konto; die Texterkennung
 
 Voraussetzung: [Node.js](https://nodejs.org) **22.13 oder neuer** (seit Umbau Phase 4 wegen `node:sqlite`; Node 22 LTS passt).
 
-**Windows:** `start.bat` doppelklicken. Beim ersten Start werden die Pakete installiert und die Oberfläche gebaut, danach öffnet sich die Anzeige im Edge-Vollbild. Windows fragt beim ersten Start nach der Firewall – **Private Netzwerke erlauben**, sonst kommen die Handys nicht durch.
+**Betrieb:** Der Server läuft auf dem Raspberry Pi als Dienst hinter einem Cloudflare-Tunnel (`api.mainhubv1.com`), die Seiten kommen von Netlify (`mainhubv1.com`). Einrichtung und Update: [`pi/ANLEITUNG.md`](pi/ANLEITUNG.md). Die Startskripte für den Betrieb vom Laptop aus (`start.bat`, `start.sh`, Firewall-Freigabe, LAN-Erkennung) sind mit Umbau Phase 6 entfallen (E18, 13.10.2026).
 
-**Raspberry Pi / Linux:** `./start.sh` – startet Server und Chromium im Kiosk-Modus.
-
-**Von Hand:**
+**Lokal (Entwicklung):**
 ```bash
 npm run installieren
 npm run build
 npm start
 ```
+Ohne `OEFFENTLICHE_URL` zeigen QR-Code und Anzeige-Link auf `http://localhost:3000`. Sollen Handys im WLAN den lokalen Server erreichen, die eigene Adresse setzen (`OEFFENTLICHE_URL=http://192.168.178.23:3000`) und die Firewall des Rechners für den Port freigeben.
 
-**Anzeige und Dashboard von einem anderen Server** (Umbau Phase 2): Beide lesen beim Bauen `VITE_API_URL` (z. B. `https://api.deinedomain.de`) für `fetch` und WebSocket; leer heißt eigener Ursprung. Die Companion liest ihre Board-Adresse aus `companion/konfig.js`. Der Server braucht dann den Ursprung der Seiten in `ERLAUBTE_URSPRUENGE`.
+**Anzeige und Dashboard von einem anderen Server** (Umbau Phase 2): Beide lesen beim Bauen `VITE_API_URL` (z. B. `https://api.mainhubv1.com`) für `fetch` und WebSocket; leer heißt eigener Ursprung. Die Companion liest ihre Board-Adresse aus `companion/konfig.js`. Der Server braucht dann den Ursprung der Seiten in `ERLAUBTE_URSPRUENGE`.
 
 **Widget-Dashboard** (in Arbeit, ersetzt später `/anzeige`): einmal `npm run dashboard:installieren && npm run dashboard:build`, dann mit demselben Anzeige-Link `http://…:3000/dashboard?anzeige=…&schluessel=…`.
 
@@ -56,16 +55,18 @@ Die Konsole zeigt dann die Adresse für die Handys und die PIN. Einfacher: den Q
 - Die Konsole nennt ihn beim Start: `Anzeige auf anderem Gerät: http://192.168.…:3000/anzeige?anzeige=a_1&schluessel=…`
 - In der Companion unter **Board → Anzeigen**: Link kopieren oder als QR-Code zeigen (mit dem Tablet abscannen), Anzeigen anlegen und umbenennen. **Neuer Schlüssel** macht alte Links ungültig; verbundene Anzeigen mit altem Link werden getrennt.
 - Der Browser merkt sich den Schlüssel – nach einem Neustart des TVs reicht `http://…:3000/anzeige`.
-- Wie bei den Handys muss die **Firewall** des Board-Rechners Geräte im eigenen Netz durchlassen (Windows: „Private Netzwerke erlauben“ bzw. `firewall-freigeben.bat`).
-- **Auch der Board-Rechner selbst braucht den Link** (Umbau Phase 1: hinter einem Tunnel käme sonst jede Anfrage aus dem Internet als `localhost` herein). Der Server schreibt den Link der ersten Anzeige nach `server/daten/anzeige-link.txt`; `start.bat` (über `anzeige-oeffnen.bat`) und `start.sh` öffnen den Kiosk damit. Den Notschalter `ANZEIGE_OFFEN` gibt es nicht mehr.
+- **Auch das Gerät, auf dem der Server läuft, braucht den Link** (Umbau Phase 1: hinter einem Tunnel käme sonst jede Anfrage aus dem Internet als `localhost` herein). Der Server schreibt den Link der ersten Anzeige nach `<Datenordner>/anzeige-link.txt` (auf dem Pi `/var/lib/companion-board/`). Den Notschalter `ANZEIGE_OFFEN` gibt es nicht mehr.
 
 ## Handy verbindet nicht?
 
-1. **Firewall (Windows):** `firewall-freigeben.bat` ausführen (fragt einmal nach Admin-Rechten). Das Skript entfernt Blockier-Regeln für `node.exe` – die legt Windows an, wenn man die Firewall-Abfrage beim ersten Start wegklickt – und gibt den Port nur für Geräte im eigenen Netz frei. `start.bat` macht das beim ersten Start automatisch.
-2. **Richtige Adresse:** Der Server wählt die Adresse, über die der Rechner ins Netz geht. Zeigt der QR-Code trotzdem eine falsche an: die richtige Adresse (`ipconfig` → WLAN-Adapter) einmal von Hand am Handy eingeben – das Board merkt sich die Adresse, über die ein Gerät tatsächlich hereinkam, und nutzt sie ab dann für den QR-Code (gespeichert in `server/daten/adresse.txt`). Hat der Rechner mehrere Adapter (WSL, Hyper-V, Docker, VirtualBox, VPN), zeigen Konsole und Anzeige unter „Klappt nicht? Andere Adressen“ die Alternativen. Zur Not fest einstellen: `set OEFFENTLICHE_URL=http://192.168.178.23:3000`.
+**Im Betrieb (Pi + Netlify):** `https://api.mainhubv1.com/api/server` muss `{"name":"koordinaten-board"}` liefern. Kommt nichts, am Pi `sudo systemctl status companion-board cloudflared` und `journalctl -u companion-board -f` ansehen (Fehlersuche in `pi/ANLEITUNG.md`). Kommt ein CORS-Fehler in der App, fehlt der Ursprung der Seiten in `ERLAUBTE_URSPRUENGE` (`/etc/companion-board.env`).
+
+**Lokaler Server im WLAN:**
+1. **Adresse:** `OEFFENTLICHE_URL=http://<eigene IP>:3000` setzen (`ipconfig` → WLAN-Adapter, `ip a` unter Linux); sonst zeigt der QR-Code auf `localhost`.
+2. **Firewall:** eingehende Verbindungen auf dem Port für das eigene Netz erlauben (Windows: „Private Netzwerke erlauben“ beim ersten Start, oder eine Regel für `node.exe` in der Firewall).
 3. **Selbes Netz:** Handy im gleichen WLAN wie der Rechner – nicht im Gäste-WLAN (Geräte sind dort voneinander abgeschottet) und nicht über mobile Daten.
 4. **Adresse genau so eingeben:** `http://…:3000` – mit Port, ohne `https`.
-5. **Gegenprobe:** Die Adresse aus dem QR-Code im Browser auf dem Board-Rechner selbst öffnen. Lädt sie dort, aber nicht am Handy, liegt es an Firewall oder Netz.
+5. **Gegenprobe:** Die Adresse aus dem QR-Code im Browser auf dem Rechner selbst öffnen. Lädt sie dort, aber nicht am Handy, liegt es an Firewall oder Netz.
 
 ## Ablauf mit der Seed Map
 
@@ -124,11 +125,11 @@ Alles liegt in `server/daten/`:
 | Variable | Standard | Zweck |
 |---|---|---|
 | `PORT` | `3000` | Port des Servers |
-| `ERLAUBTE_URSPRUENGE` | `http://localhost:5173,http://127.0.0.1:5173` | Ursprünge (kommagetrennt), die `/api` und `/ws` aus dem Browser nutzen dürfen, z. B. später `https://deinedomain.de`. Der eigene Ursprung des Servers gilt immer |
+| `ERLAUBTE_URSPRUENGE` | `http://localhost:5173,http://127.0.0.1:5173` | Ursprünge (kommagetrennt), die `/api` und `/ws` aus dem Browser nutzen dürfen, z. B. später `https://mainhubv1.com`. Der eigene Ursprung des Servers gilt immer |
 | `HOST` | `0.0.0.0` | Lausch-Adresse. Im Heimnetz bleibt `0.0.0.0` (Handys im WLAN); auf dem Pi hinter `cloudflared` `127.0.0.1`, dann erreicht den Server nur der Tunnel |
 | `RAUM_PIN` | zufällig, in `pin.txt` | feste Board-PIN setzen, mindestens 6 Ziffern (sonst startet der Server nicht) |
-| `OEFFENTLICHE_URL` | automatisch | Adresse im QR-Code und im Anzeige-Link, falls die automatische LAN-IP falsch ist; auf dem Pi die Netlify-Adresse (`https://deinedomain.de`) |
+| `OEFFENTLICHE_URL` | `http://localhost:3000` | Adresse im QR-Code und im Anzeige-Link; auf dem Pi die Netlify-Adresse (`https://mainhubv1.com`), lokal fürs WLAN die eigene IP. Die automatische LAN-Erkennung ist mit Umbau Phase 6 entfallen |
 | `COMPANION_PFAD` | `/` | Pfad der Companion unter dieser Adresse: lokal `/`, auf Netlify `/app/` (Umbau Phase 5) |
 | `DATEN_ORDNER` | `server/daten` | Speicherort |
 | `COMPANION_ORDNER` | `../companion` | Ordner mit Companion-Seite, `regeln.js`, `icons/`, `ruestungs-baukasten/` und den Dateien des Welt-Imports (`biom-*.js`, `vendor/`) |
-| `COMPANION_DATEI` | `companion-prototyp.html` | Seite, die unter `/` ausgeliefert wird (später z. B. `modul-a-live-karte.html`) |
+| `COMPANION_DATEI` | `companion-prototyp.html` | Seite, die unter `/` ausgeliefert wird (der Prototyp ist der Hauptstand, Entscheidung von Max, 13.10.2026) |

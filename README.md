@@ -9,7 +9,7 @@ Zwei Projekte für eine gemeinsame Minecraft-Welt im Raum – seit dem 29.09.202
 | [`companion/`](companion/) | **Companion**: die App am Handy – Karte, Sammelobjekte, Portal-Verwaltung, Banner, Rüstung (eine HTML-Seite + `regeln.js`, Vanilla JS) | aktuelle Arbeit |
 | [`companion/widgets/`](companion/widgets/) | **Widgets**: Widget-Dashboard fürs Board unter `/dashboard` (Vite + React + TypeScript, aus MainHub): 13 Widget-Typen, Karten vom Board, Bereichs-Themes, Layout je Anzeige | A0–A6 gebaut, A7 offen |
 | [`koordinaten-board/`](koordinaten-board/) | **Koordinaten-Board**: Server der Companion (Daten, Live-Sync) und Anzeige im Zimmer (Fastify + React) | zusammengeführt |
-| [`planung/`](planung/) | **Planung**: Umbauplan Netlify + Pi ([`UMBAUPLAN.md`](planung/UMBAUPLAN.md)), Gesamtplan Widget-Dashboard, Offline-Sync, Welt-Import ([`PLAN.md`](planung/PLAN.md)) plus Ideen und Baupläne der Planungskommission | Umbau: Phasen 1–5 gebaut, Phase 6 wartet auf Max |
+| [`planung/`](planung/) | **Planung**: Umbauplan Netlify + Pi ([`UMBAUPLAN.md`](planung/UMBAUPLAN.md)), Gesamtplan Widget-Dashboard, Offline-Sync, Welt-Import ([`PLAN.md`](planung/PLAN.md)) plus Ideen und Baupläne der Planungskommission | Umbau abgeschlossen (13.10.2026): Betrieb unter `mainhubv1.com`, Server auf dem Pi |
 | [`referenz/`](referenz/) | **Gemeinsame Referenz**: Datenmodell, Seed-Map-Screenshots, Dashboard-Vorbild | – |
 
 **Neuer Chat / Weitermachen:** zuerst [`UEBERGABE.md`](UEBERGABE.md) lesen (Arbeitsweise, Zusammenspiel, offene Entscheidungen), danach die Übergabe des Projekts, um das es geht. Stand der Umsetzung des Plans: [`planung/UEBERGABE.md`](planung/UEBERGABE.md). Was auf Max wartet, steht in [`planung/WARTELISTE.md`](planung/WARTELISTE.md).
@@ -26,13 +26,13 @@ Zwei Projekte für eine gemeinsame Minecraft-Welt im Raum – seit dem 29.09.202
 
 ## Netlify (Umbau Phase 5)
 
-`netlify.toml` baut die Seite aus diesem Repo: Anzeige unter `/`, Companion-PWA unter `/app/`, Widget-Dashboard unter `/dashboard/` (`netlify/bauen.sh`, Routen in `netlify/_redirects`). In Netlify: Site aus dem GitHub-Repo anlegen (Branch `main`), unter *Site configuration → Environment variables* `API_URL` auf die Adresse der API setzen (`https://api.deinedomain.de`; ohne sie laufen die Seiten im DEMO-/Beispiel-Modus). Der Build wird lokal geprüft: `companion/tests/netlify.test.mjs`. Schritte für Domain, Tunnel und Pi: [`koordinaten-board/pi/ANLEITUNG.md`](koordinaten-board/pi/ANLEITUNG.md).
+`netlify.toml` baut die Seite aus diesem Repo: Anzeige unter `/`, Companion-PWA unter `/app/`, Widget-Dashboard unter `/dashboard/` (`netlify/bauen.sh`, Routen in `netlify/_redirects`). In Netlify: Site aus dem GitHub-Repo anlegen (Branch `main`), unter *Site configuration → Environment variables* `API_URL` auf die Adresse der API setzen (`https://api.mainhubv1.com`; ohne sie laufen die Seiten im DEMO-/Beispiel-Modus). Der Build wird lokal geprüft: `companion/tests/netlify.test.mjs`. Schritte für Domain, Tunnel und Pi: [`koordinaten-board/pi/ANLEITUNG.md`](koordinaten-board/pi/ANLEITUNG.md).
 
 ## Schnellstart
 
 ```bash
 # Alles zusammen: Board starten, dann am Handy den QR-Code der Anzeige scannen
-cd koordinaten-board && npm run installieren && npm run build && npm start   # Windows: start.bat, Linux: ./start.sh
+cd koordinaten-board && npm run installieren && npm run build && npm start   # lokal; der Betrieb läuft auf dem Pi, siehe koordinaten-board/pi/ANLEITUNG.md
 #   Companion: http://<ip>:3000/?pin=<PIN>   Anzeige: Anzeige-Link aus der Konsole (auch am Board-Gerät, Umbau Phase 1)
 #   Anzeige auf einem anderen Gerät (TV, Tablet): Anzeige-Link aus der Konsole oder Companion → Board → Anzeigen
 #   Widget-Dashboard (in Arbeit): npm run dashboard:installieren && npm run dashboard:build, dann der Anzeige-Link mit /dashboard statt /anzeige

@@ -17,7 +17,6 @@ interface Beitritt {
   beitrittsUrl: string;
   adresse: string;
   pin: string;
-  weitere: { name: string; url: string }[];
 }
 
 function useJetzt(intervall = 1000) {
@@ -111,7 +110,7 @@ export function Anzeige() {
         })
         .catch(() => {});
     holen();
-    // QR-Code folgt der Adresse, über die sich zuletzt ein Handy verbunden hat
+    // regelmäßig neu holen, damit Adresse und PIN nach einem Neustart des Servers stimmen
     const t = window.setInterval(holen, 10_000);
     return () => clearInterval(t);
   }, []);
@@ -243,14 +242,6 @@ export function Anzeige() {
             <div className="adresse mono">{beitritt.adresse}</div>
             <div className="kicker">PIN</div>
             <div className="pin">{beitritt.pin}</div>
-            {beitritt.weitere.length > 0 && (
-              <div className="a-weitere">
-                <div className="kicker">Klappt nicht? Andere Adressen</div>
-                {beitritt.weitere.slice(0, 3).map((w) => (
-                  <div key={w.url} className="mono">{w.url.replace('http://', '')} <span>{w.name}</span></div>
-                ))}
-              </div>
-            )}
           </div>
         )}
         <div className="a-karte a-verlauf">

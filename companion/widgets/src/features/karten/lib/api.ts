@@ -1,4 +1,4 @@
-// Adresse der API (Umbau Phase 2). Beim Bauen über VITE_API_URL gesetzt, z. B. https://api.deinedomain.de,
+// Adresse der API (Umbau Phase 2). Beim Bauen über VITE_API_URL gesetzt, z. B. https://api.mainhubv1.com,
 // wenn das Dashboard von Netlify kommt und die API vom Pi. Leer = derselbe Ursprung wie die Seite
 // (das Board liefert /dashboard selbst aus, oder der Vite-Proxy im Dev-Betrieb).
 export const API_URL = (import.meta.env.VITE_API_URL ?? "").replace(/\/+$/, "");
