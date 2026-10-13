@@ -1,6 +1,6 @@
 # Bauplan: Anmeldung und Dashboard-Zugang
 
-> Für Claude Code · Repo `Companion-Board` · Stand 13.10.2026 · Entscheidungen von Max (Chat vom 13.10.2026), Nachfragen AN1–AN3, AN5–AN7 und AN10–AN12 beantwortet (L15–L18, Kapitel 9)
+> Für Claude Code · Repo `Companion-Board` · Stand 13.10.2026 · Entscheidungen von Max (Chat vom 13.10.2026), Nachfragen AN1–AN3, AN5–AN7 und AN10–AN13 beantwortet (L15–L19, Kapitel 9)
 > Grundlage: Klick-Prototyp [`companion/entwuerfe/anmeldung-prototyp.html`](../../companion/entwuerfe/anmeldung-prototyp.html) (Mock, im Browser öffnen) und das SQL-Referenzschema [`planung/schema/`](../schema/README.md) (Tabellen `benutzer`, `geraete`, `zugaenge`, `anzeige_geraete` mit ihren Sichten)
 >
 > Er nennt Dateien, Routen und Branches und baut auf dem Stand von `main` vom 13.10.2026 auf (Netlify + Pi, SQLite, Bauplan „Sitzung“, B3). Er setzt Strang B aus [`PLAN.md`](../PLAN.md) fort (B1/B2 gebaut, B3 gebaut).
@@ -12,7 +12,7 @@
 1. Lies `UEBERGABE.md`, `planung/UEBERGABE.md`, `koordinaten-board/UEBERGABE.md` und `koordinaten-board/pi/ANLEITUNG.md`. Öffne den Prototyp im Browser und klick ihn einmal durch (Knopf „Simulation“ oben rechts).
 2. Arbeite die Phasen in Kapitel 7 der Reihe nach ab. Jede Phase endet mit Tests, README-Notiz und Commit.
 3. **Haltepunkte (⏸):** stoppen, Max Screenshots zeigen, erst nach seinem OK weiter.
-4. Was in Kapitel 9 als **offene Nachfrage** (AN4, AN13) steht, baust du nicht vorweg. Steht eine Annahme (⚠) dabei, baust du die Annahme und meldest es Max.
+4. Was in Kapitel 9 als **offene Nachfrage** (AN4, AN14) steht, baust du nicht vorweg. Steht eine Annahme (⚠) dabei, baust du die Annahme und meldest es Max.
 5. Konventionen wie immer: Deutsch in Code, UI und Commits · nach jedem Commit `Commit erstellt: …` · ansagen, wann gepusht wird · **gemergt wird nur nach Rückfrage bei Max** · Datenmodell minimal.
 
 ---
@@ -54,6 +54,7 @@ Die **Anmeldeseite wird der Einstieg** unter `/` – das, was man über die Doma
 | L16 | Bestehende Konten | Werden **neu angelegt** (AN2). Die bisherigen Konten (ohne Passwort und echten Namen) entfallen bei der Migration samt ihren Geräten |
 | L17 | Anzeige-Link | Wird durch **„Code generieren“** ersetzt (AN3), kein Parallelbetrieb |
 | L18 | Echter Name | Sichtbar für **alle Konten** des Boards (AN10) |
+| L19 | Freigabe neuer Konten | Ein neues Konto gilt erst, **wenn ein bestehendes Konto es freigibt** (AN13). Bis dahin kommt es nicht in die Companion. Einzelheiten ⚠ AN14 |
 
 ---
 
@@ -86,6 +87,8 @@ benutzer: [{
   passwortHash,        // scrypt wie pinHashen()
   pinHash,             // scrypt, PIN 4–8 Ziffern
   pinGeaendertAm,      // ISO-Zeit; Geräte mit älterer pinBestaetigtAm brauchen die neue PIN
+  freigegebenAm,       // ISO-Zeit oder null = wartet auf Freigabe (L19)
+  freigegebenVon,      // Benutzer-ID des freigebenden Kontos, null beim ersten Konto (⚠ AN14)
   rolle: 'Besitzer',   // bleibt laut Bauplan Offline-Sync (im SQL-Schema noch nicht)
   am,
 }],
@@ -132,8 +135,11 @@ anzeigeGeraete: [{     // per Dashboard-Login angemeldete Anzeigen (TV, Tablet �
 | Methode | Route | Inhalt |
 |---|---|---|
 | POST | `/api/anmelden` | `{ anzeigename, passwort }` → `{ token }`, legt ein Gerät an. Fehlertext immer „Anzeigename oder Passwort stimmt nicht“ |
-| POST | `/api/registrieren` | `{ echterName, anzeigename, passwort, pin }` → `{ token }` |
-| GET | `/api/ich` | `{ benutzer, pinNoetig, grund }` mit `grund` = `offline:<Minuten>` oder `pinwechsel`. Wo Konten anderer erscheinen, gehört der echte Name dazu (L18) |
+| POST | `/api/registrieren` | `{ echterName, anzeigename, passwort, pin }` → `{ token }`. Das Konto wartet auf Freigabe (L19); ⚠ das **erste** Konto gilt sofort als freigegeben |
+| GET | `/api/ich` | `{ benutzer, pinNoetig, grund, freigegeben }` mit `grund` = `offline:<Minuten>` oder `pinwechsel` |
+| GET | `/api/konten` | Konto (freigegeben) | Alle Konten mit Anzeigename, **echtem Namen** (L18) und `freigegebenAm` |
+| POST | `/api/konten/:id/freigeben` | Konto (freigegeben) | Wartendes Konto freigeben → `freigegebenAm`, `freigegebenVon` |
+| DELETE | `/api/konten/:id` | Konto (freigegeben) | Wartendes Konto ablehnen = löschen (nur solange es wartet) |
 | POST | `/api/pin` | `{ pin }` → setzt `pinBestaetigtAm` und `letzterKontakt` |
 | POST | `/api/pin/zuruecksetzen` | `{ passwort, neuePin }` → neue PIN, `pinGeaendertAm = jetzt`, **dieses** Gerät gilt sofort als bestätigt |
 | POST | `/api/abmelden` | Gerät löschen |
@@ -174,11 +180,11 @@ Alle neuen Pfade kommen in die CORS-Liste in `server.js`, weil Anmeldeseite (Net
 
 - Aus dem Prototyp übernehmen: Aufbau, Texte, Styles (Oberwelt-Theme wie die Companion). **Mock und Simulation entfernen**, stattdessen die API aus Kapitel 5.
 - Eine Datei, Vanilla JS, kein Build, wie die Companion. **Netlify:** `netlify/bauen.sh` kopiert sie als `index.html` in die Wurzel, `konfig.js` mit der API-Adresse daneben; in `netlify/_redirects` fällt die Zeile `/ → /dashboard/` weg. **Lokal:** das Board liefert sie unter `/` aus, die Companion unter `/app` (ohne Cache, `OHNE_CACHE`).
-- Ansichten (wie im Prototyp): Anmeldung · Registrierung · Willkommenskarte · PIN-Sperre (Ziffernblock, 4–8 Ziffern, OK-Taste) · PIN zurücksetzen · Dashboard-Login (nur Feld „Zugangs-Code“) · Dashboard-PIN · Layout wählen.
+- Ansichten (wie im Prototyp): Anmeldung · Registrierung · Wartet auf Freigabe · Willkommenskarte · PIN-Sperre (Ziffernblock, 4–8 Ziffern, OK-Taste) · PIN zurücksetzen · Dashboard-Login (nur Feld „Zugangs-Code“) · Dashboard-PIN · Layout wählen.
 - Die Platzhalter „Companion · Startbereich“ und die Gerätedaten aus dem Prototyp werden **nicht** übernommen; sie stehen dort nur stellvertretend für `/app/`.
 - Der Konto-Token liegt im `localStorage` wie heute; der Anzeige-Token getrennt davon (eigener Schlüssel).
 - Nach erfolgreicher Anmeldung bzw. richtiger PIN → **direkt `/app/`** (Startbereich der Companion).
-- Nach dem Registrieren → **Willkommenskarte** (eigene Ansicht der Anmeldeseite, Knopf „Weiter zur Companion“) → `/app/`. Bis Max den Inhalt liefert, steht dort ein Platzhalter.
+- Nach dem Registrieren → ⚠ Ansicht **„Wartet auf Freigabe“** (Anzeigename, Knopf „Erneut prüfen“, „Abmelden“). Sobald das Konto freigegeben ist → **Willkommenskarte** (eigene Ansicht der Anmeldeseite, Knopf „Weiter zur Companion“) → `/app/`. Bis Max den Inhalt liefert, steht dort ein Platzhalter.
 - Nach „Anzeige starten“ → `/dashboard/`.
 - Ein Gerät mit gültigem Token und ohne PIN-Pflicht springt direkt weiter: Konto → `/app/`, Anzeige → „Layout wählen“.
 
@@ -217,12 +223,13 @@ Branch: **`board/anmeldung`** für alles. Nach jeder Phase pushen.
   - PIN zurücksetzen → das eigene Gerät läuft weiter, ein zweites Gerät bekommt 423
   - Prüfung vor Aktualisierung: nach 31 Min. bleibt es bei 423, bis die PIN kommt
   - 5 falsche PINs → 429
+  - neues Konto → 403 „wartet auf Freigabe“ bei allen Pfaden außer `/api/ich` und `/api/abmelden`; nach Freigabe geht es durch; das erste Konto ist sofort frei; ablehnen löscht nur wartende Konten
 - Commit: „Anmeldung mit Passwort, PIN nach 30 Minuten offline“
 
 ### Phase L3 · Anmeldeseite unter `/`
 
 - Kapitel 6.1 (nur Reiter Companion-App) und 6.2 (Weiterleitungen, 423, Offline-Sperre), `netlify/bauen.sh` und `_redirects`; `companion/tests/netlify.test.mjs` prüft den Build.
-- Playwright: Anmelden → landet auf `/app/`, Registrieren → Willkommenskarte → `/app/`, PIN-Sperre nach simulierter Offline-Zeit (Zeit am Server per Test-Schalter vorstellen), PIN zurücksetzen. Screenshots nach `companion/tests/bilder/`.
+- Playwright: Anmelden → landet auf `/app/`, Registrieren → „Wartet auf Freigabe“ → zweites Konto gibt frei → Willkommenskarte → `/app/`, PIN-Sperre nach simulierter Offline-Zeit (Zeit am Server per Test-Schalter vorstellen), PIN zurücksetzen. Screenshots nach `companion/tests/bilder/`.
 - Commit: „Anmeldeseite als Einstieg unter /“
 - ⏸ **Haltepunkt:** Max die Screenshots zeigen (Anmeldung, Registrierung, PIN-Sperre, PIN zurücksetzen) und am Handy anmelden lassen.
 
@@ -278,4 +285,5 @@ Branch: **`board/anmeldung`** für alles. Nach jeder Phase pushen.
 | ~~AN10~~ | **Entschieden (Max, 13.10.2026): alle Konten des Boards** sehen den echten Namen (L18). | – | – |
 | ~~AN11~~ | **Bestätigt (Max, 13.10.2026): Platzhalter** mit „Willkommen, <Anzeigename>“ und „Weiter zur Companion“, bis Max den Inhalt liefert. | – | – |
 | ~~AN12~~ | **Bestätigt (Max, 13.10.2026): ja**, lokaler scrypt-Hash der Konto-PIN im `localStorage`. | – | – |
-| AN13 | **Neu durch L15:** Ohne Board-PIN kann sich jeder registrieren, der `mainhubv1.com` erreicht. Registrieren offen lassen, nur mit einer Einladung (z. B. einem Code wie beim Dashboard, erzeugt in der Companion) oder neue Konten erst nach Freigabe durch ein bestehendes Konto? | – | L2 |
+| ~~AN13~~ | **Entschieden (Max, 14.10.2026): Neue Konten gelten erst, wenn ein bestehendes Konto sie freigibt** (L19). | – | – |
+| AN14 | ⚠ **Freigabe im Einzelnen:** Das erste Konto gilt sofort als freigegeben (nach der Migration gibt es keins, das freigeben könnte). Jedes freigegebene Konto darf freigeben und ablehnen; ablehnen löscht das wartende Konto. Freigegeben wird im **Board-Sheet unter „Konten“**. Ein wartendes Konto sieht nach der Anmeldung nur „Wartet auf Freigabe“. | so wie links | – |
