@@ -137,9 +137,9 @@ anzeigeGeraete: [{     // per Dashboard-Login angemeldete Anzeigen (TV, Tablet �
 | POST | `/api/anmelden` | `{ anzeigename, passwort }` → `{ token }`, legt ein Gerät an. Fehlertext immer „Anzeigename oder Passwort stimmt nicht“ |
 | POST | `/api/registrieren` | `{ echterName, anzeigename, passwort, pin }` → `{ token }`. Das Konto wartet auf Freigabe (L19); ⚠ das **erste** Konto gilt sofort als freigegeben |
 | GET | `/api/ich` | `{ benutzer, pinNoetig, grund, freigegeben }` mit `grund` = `offline:<Minuten>` oder `pinwechsel` |
-| GET | `/api/konten` | Konto (freigegeben) | Alle Konten mit Anzeigename, **echtem Namen** (L18) und `freigegebenAm` |
-| POST | `/api/konten/:id/freigeben` | Konto (freigegeben) | Wartendes Konto freigeben → `freigegebenAm`, `freigegebenVon` |
-| DELETE | `/api/konten/:id` | Konto (freigegeben) | Wartendes Konto ablehnen = löschen (nur solange es wartet) |
+| GET | `/api/konten` | Nur freigegebene Konten: Alle Konten mit Anzeigename, **echtem Namen** (L18) und `freigegebenAm` |
+| POST | `/api/konten/:id/freigeben` | Nur freigegebene Konten: Wartendes Konto freigeben → `freigegebenAm`, `freigegebenVon` |
+| DELETE | `/api/konten/:id` | Nur freigegebene Konten: Wartendes Konto ablehnen = löschen (nur solange es wartet) |
 | POST | `/api/pin` | `{ pin }` → setzt `pinBestaetigtAm` und `letzterKontakt` |
 | POST | `/api/pin/zuruecksetzen` | `{ passwort, neuePin }` → neue PIN, `pinGeaendertAm = jetzt`, **dieses** Gerät gilt sofort als bestätigt |
 | POST | `/api/abmelden` | Gerät löschen |
