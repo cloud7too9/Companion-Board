@@ -3963,7 +3963,7 @@ async function liveAktualisieren({ bereich, weltId }){
   if(bereich === "banner") return bannerLaden();
   if(bereich === "ruestung") return ruestungLaden();
   if(bereich === "einstellungen") return boardEinstellungenLaden();
-  if(bereich === "anzeigen"){ bd.anzeigen = null; await boardAnzeigenLaden(); return boardSitzungLaden(); }
+  if(bereich === "anzeigen"){ await boardAnzeigenLaden(); return boardSitzungLaden(); }   // Liste frisch, danach die Sitzung der ersten Anzeige
   if(bereich === "layout") return boardSitzungLaden();
   if(bereich === "welten"){ await weltenAuffrischen(); return boardEinstellungenLaden(); }
   if(weltId && weltId !== st.weltId) return weltenAuffrischen();
