@@ -125,7 +125,8 @@ test('Welt-Import: Biome hochladen (auch über 1 MB), lesen, ersetzen, löschen'
   r = await anfrage('GET', `/api/welten/${welt.id}/biome`, lena);
   assert.deepEqual([r.daten.import.dateiname, r.daten.kacheln.length, r.daten.kacheln[0].daten], ['Archiv.zip', 600, daten]);
   for (let i = 0; i < 20 && !meldungen.some((m) => m.bereich === 'biome'); i += 1) await new Promise((ok) => setTimeout(ok, 50));
-  assert.deepEqual(meldungen.find((m) => m.bereich === 'biome'), { art: 'geaendert', bereich: 'biome', weltId: welt.id });
+  const { nr: _nr, lauf: _lauf, ...biomMeldung } = meldungen.find((m) => m.bereich === 'biome');
+  assert.deepEqual(biomMeldung, { art: 'geaendert', bereich: 'biome', weltId: welt.id });
 
   r = await anfrage('PUT', `/api/welten/${welt.id}/biome`, max, { ...body, import: { ...body.import, seed: '1' } });
   assert.deepEqual([r.status, r.daten.message], [422, 'Diese Welt hat einen anderen Seed']);
@@ -193,6 +194,44 @@ test('Welt-Funde (Bauplan „Welt-Funde“, W2): Welt-Info im Import, viele Eint
   assert.deepEqual([r.status, r.daten.message], [422, 'orte: höchstens 5000 Einträge']);
   assert.equal((await anfrage('POST', '/api/welten/w_99/funde', max, {})).status, 404);
   assert.equal((await anfrage('POST', `/api/welten/${welt.id}/funde`, null, {})).status, 401);
+  ws.close();
+});
+
+test('Offline B3: geaendert mit Nummer, stand beim Verbinden, GET /api/aenderungen nennt die Bereiche seit einer Nummer', async () => {
+  const max = await beitreten('Max');
+  const ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws?token=${encodeURIComponent(max)}`);
+  const meldungen = [];
+  ws.onmessage = (e) => meldungen.push(JSON.parse(e.data));
+  await new Promise((ok) => { ws.onopen = ok; });
+  const warten = async (fn) => { for (let i = 0; i < 40 && !fn(); i += 1) await new Promise((ok) => setTimeout(ok, 50)); };
+  await warten(() => meldungen.some((m) => m.art === 'stand'));
+  const stand = meldungen.find((m) => m.art === 'stand');
+  assert.ok(typeof stand.lauf === 'string' && stand.lauf.length > 4 && Number.isInteger(stand.nr), JSON.stringify(stand));
+
+  const welt = (await anfrage('POST', '/api/orte/welten', max, { seed: '24681357' })).daten.welt;
+  await anfrage('POST', '/api/banner', max, { name: 'Neu', basis: 'red', ebenen: [] });
+  const ort = { dimensionId: `d_${welt.id}_overworld`, kategorie: 'Village', variante: null, y: null, z: 2, quelle: 'manuell' };
+  await anfrage('POST', '/api/orte/instanzen', max, { ...ort, x: 1 });
+  await anfrage('POST', '/api/orte/instanzen', max, { ...ort, x: 3 });
+  await warten(() => meldungen.filter((m) => m.art === 'geaendert').length >= 4);
+  const geaendert = meldungen.filter((m) => m.art === 'geaendert');
+  assert.deepEqual(geaendert.map((m) => [m.nr - stand.nr, m.bereich, m.lauf === stand.lauf]),
+    [[1, 'welten', true], [2, 'banner', true], [3, 'orte', true], [4, 'orte', true]]);
+
+  // Je Bereich einmal, in der Reihenfolge der ersten Änderung
+  let r = await anfrage('GET', `/api/aenderungen?seit=${stand.nr}&lauf=${stand.lauf}`, max);
+  assert.deepEqual(r.daten, { lauf: stand.lauf, nr: stand.nr + 4, alles: false,
+    aenderungen: [{ bereich: 'welten', weltId: welt.id }, { bereich: 'banner', weltId: null }, { bereich: 'orte', weltId: welt.id }] });
+  r = await anfrage('GET', `/api/aenderungen?seit=${stand.nr + 2}&lauf=${stand.lauf}`, max);
+  assert.deepEqual(r.daten.aenderungen, [{ bereich: 'orte', weltId: welt.id }]);
+  r = await anfrage('GET', `/api/aenderungen?seit=${stand.nr + 4}&lauf=${stand.lauf}`, max);
+  assert.deepEqual([r.daten.alles, r.daten.aenderungen], [false, []]);
+  // Server neu gestartet (anderer Lauf), Nummer aus der Zukunft oder Unsinn: alles neu laden
+  for (const q of [`seit=${stand.nr}&lauf=frueher`, `seit=${stand.nr + 99}&lauf=${stand.lauf}`, `seit=x&lauf=${stand.lauf}`, '']) {
+    r = await anfrage('GET', `/api/aenderungen?${q}`, max);
+    assert.deepEqual([r.status, r.daten.alles, r.daten.lauf, r.daten.nr], [200, true, stand.lauf, stand.nr + 4], q);
+  }
+  assert.equal((await anfrage('GET', '/api/aenderungen?seit=0')).status, 401);
   ws.close();
 });
 

@@ -14,6 +14,14 @@ Stand: 01.10.2026 · Grundlage: Offline-Sync-und-Identitaet · Nachtrag 13.10.20
 >   5. ⏸ Haltepunkt: Max am iPhone als Home-Bildschirm-App im Flugmodus, mit Daten.
 > - **Schritte 4–6 (B4, B5) unverändert.** Hinweis für B5: `PUT …/gefunden` und `…/erledigt` setzen schon einen Zielzustand, überschreiben bei Wiederholung aber `von` und `am` (`daten.js`, `sammelobjektSetzen`); idempotent heißt hier: unverändert lassen, wenn der Zustand schon stimmt.
 > - Branch bleibt `bereich/offline`.
+>
+> **B3 gebaut (13.10.2026, Max: „mergen und weiter“; Branch der Sitzung statt `bereich/offline`):**
+>
+> - **Live ohne Netz:** `betriebErkennen()` liefert `live`, `getrennt` oder `demo`. Antwortet das Board nicht (Netzfehler oder 5xx vom Tunnel), dieses Gerät ist aber beigetreten (`board.verbindung` für diese Adresse) und hat einen Spiegel, startet die Companion **live, getrennt** statt mit Beispieldaten. Der WebSocket versucht es weiter wie bisher.
+> - **Spiegel:** nicht je Bereich, sondern an einer Stelle: `api()` schreibt jede erfolgreiche GET-Antwort in IndexedDB (`companion-spiegel`, Schlüssel Board-Adresse + Pfad) und antwortet für GET aus dem Spiegel, wenn das Board nicht erreichbar ist (Netzfehler, 502–504, 530). So sind Welten, Orte, Biome, Sammelstand, Portale, Banner, Rüstung, Anzeigen ohne Extra-Code dabei. Status unten „Offline“ (roter Punkt), einmal der Hinweis „Offline · Stand vom 13.10., 10:39“. Schreiben meldet offline weiter „Keine Verbindung“ (das ist B4). Beim Trennen vom Board werden Spiegel und Stand gelöscht.
+> - **Nachladen:** Jede `geaendert`-Meldung trägt `nr` und `lauf`; beim Verbinden schickt der Server `{ art:"stand", lauf, nr }`. War die Companion getrennt oder hat sie aus dem Spiegel gelesen, holt sie `GET /api/aenderungen?seit=<nr>&lauf=<lauf>` → je Bereich einmal `{ bereich, weltId }` und lädt nur diese (wie `liveAktualisieren`), sonst `alles:true` → `allesNeuLaden()`. **Abweichung:** Die Nummern führt der Server im Speicher (die letzten 1 000), nicht aus der Tabelle `aenderungen`: Die schreibt verzögert und kennt die Biome nicht. Nach einem Neustart des Servers ist `lauf` neu, dann lädt die Companion alles.
+> - **Test:** `companion/tests/netlify.test.mjs`: Board beitreten, Ort da, offline neu laden → Orte aus dem Spiegel, Status „Offline“, Schreiben meldet „Keine Verbindung“; während dessen legt jemand einen Ort an; wieder online → verbindet neu, holt über `/api/aenderungen` nur die Orte nach (kein `/api/banner`). Server: `api.test.js` (Nummern, `stand`, `/api/aenderungen` mit Lücke, neuem Lauf, Unsinn).
+> - ⏸ **H14:** Max am iPhone als Home-Bildschirm-App im Flugmodus (siehe Warteliste).
 
 Dieser Bauplan beschreibt die technischen Entscheidungen. Die Anpassung an das konkrete Projekt (Koordinaten-Board, Companion PWA, Server) gehört nicht dazu.
 

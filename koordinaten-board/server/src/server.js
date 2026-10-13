@@ -205,7 +205,7 @@ app.put('/api/anzeige/reihen', async (req, reply) => {
   if (!a) return reply;
   const reihen = req.body?.reihen;
   if (!Number.isInteger(reihen) || reihen < 1 || reihen > 200) return reply.code(400).send({ fehler: 'Reihen müssen eine ganze Zahl von 1 bis 200 sein' });
-  if (daten.anzeigeReihenSetzen(a.id, reihen)) anAlle({ art: 'geaendert', bereich: 'anzeigen', weltId: null });
+  if (daten.anzeigeReihenSetzen(a.id, reihen)) geaendertMelden('anzeigen');
   return { reihen };
 });
 
@@ -218,7 +218,7 @@ await app.register(companionApi, {
   nutzer: (req) => ident.werBistDu(req),
   geaendert: (bereich, weltId = null, anzeigeId = null) => {
     // anzeigeId (Bauplan „Sitzung“): beim Bereich layout, damit nur die betroffene Anzeige neu lädt
-    anAlle({ art: 'geaendert', bereich, weltId, ...(anzeigeId ? { anzeigeId } : {}) });
+    geaendertMelden(bereich, weltId, anzeigeId);
     if (['welten', 'orte', 'einstellungen'].includes(bereich)) anAlle({ art: 'zustand', zustand: anzeigeSicht(daten) });
     if (bereich === 'anzeigen') {
       veralteteAnzeigenTrennen();
@@ -226,6 +226,7 @@ await app.register(companionApi, {
     }
   },
   anzeigeLink,
+  aenderungenSeit,
 });
 
 // Widgets des Dashboards: fertige Karte je Widget-Typ (und Quelle) aus den Daten der aktiven Welt.
@@ -265,6 +266,39 @@ function anAlle(nachricht) {
   for (const v of verbindungen) if (v.socket.readyState === 1) v.socket.send(text);
 }
 
+// ---------- Änderungsnummern (Bauplan Offline, B3): Nachladen nach einer Unterbrechung ----------
+// Jede geaendert-Meldung trägt eine fortlaufende Nummer nr und den lauf (ändert sich bei jedem Start des Servers).
+// Die Companion merkt sich { lauf, nr }; ist sie getrennt gewesen oder offline gestartet, fragt sie
+// GET /api/aenderungen?seit=<nr>&lauf=<lauf> und lädt nur die genannten Bereiche – oder alles, wenn der Server
+// neu gestartet ist oder die Lücke weiter zurückreicht, als er sich merkt. Gedächtnis nur im Speicher: Nach einem
+// Neustart lädt eh jeder alles neu (die Tabelle aenderungen in daten.db schreibt verzögert und kennt die Biome nicht).
+const AENDERUNGEN_MERKEN = 1000;
+const aenderungen = { lauf: randomBytes(6).toString('base64url'), nr: 0, liste: [] };
+
+function geaendertMelden(bereich, weltId = null, anzeigeId = null) {
+  aenderungen.nr += 1;
+  const eintrag = { nr: aenderungen.nr, bereich, weltId, ...(anzeigeId ? { anzeigeId } : {}) };
+  aenderungen.liste.push(eintrag);
+  if (aenderungen.liste.length > AENDERUNGEN_MERKEN) aenderungen.liste.shift();
+  anAlle({ art: 'geaendert', ...eintrag, lauf: aenderungen.lauf });
+}
+
+/** → { lauf, nr, alles:true } oder { lauf, nr, alles:false, aenderungen:[{ bereich, weltId, anzeigeId? }] } (je Bereich einmal) */
+function aenderungenSeit(seit, lauf) {
+  const { liste, nr } = aenderungen;
+  const stand = { lauf: aenderungen.lauf, nr };
+  const alt = Number(seit);
+  const vollstaendig = Number.isInteger(alt) && alt >= 0 && alt <= nr && (liste.length ? alt >= liste[0].nr - 1 : alt === nr);
+  if (lauf !== aenderungen.lauf || !vollstaendig) return { ...stand, alles: true };
+  const gesehen = new Set();
+  const bereiche = [];
+  for (const { nr: n, ...e } of liste) {
+    const schluessel = `${e.bereich}|${e.weltId}|${e.anzeigeId ?? ''}`;
+    if (n > alt && !gesehen.has(schluessel)) { gesehen.add(schluessel); bereiche.push(e); }
+  }
+  return { ...stand, alles: false, aenderungen: bereiche };
+}
+
 /**
  * „Aufs Board“ (Bauplan „Sitzung“): { art:"zeigen", quelle, anzeigeId?, anfrage } legt die Quelle als
  * Widget in die Sitzung der Anzeige (ohne anzeigeId: die erste); { art:"verbergen", instanzId } nimmt es weg.
@@ -280,10 +314,10 @@ async function sitzungBearbeiten(op, verbindung) {
       // Karte einmal bauen: ihr Titel steht in der Liste am Handy
       const { karte } = (await widgetKarte(daten, instanz.typ, instanz.quelle ?? '')) ?? { karte: null };
       if (karte && (neu || !instanz.titel)) daten.sitzungen.titelSetzen(anzeigeId, instanz.id, karte.titel);
-      anAlle({ art: 'geaendert', bereich: 'layout', weltId: null, anzeigeId });
+      geaendertMelden('layout', null, anzeigeId);
       senden(verbindung.socket, { art: 'ok', anfrage: op.anfrage, instanzId: instanz.id, titel: karte?.titel ?? instanz.titel });
     } else {
-      if (daten.sitzungEntfernen(anzeigeId, op.instanzId)) anAlle({ art: 'geaendert', bereich: 'layout', weltId: null, anzeigeId });
+      if (daten.sitzungEntfernen(anzeigeId, op.instanzId)) geaendertMelden('layout', null, anzeigeId);
       senden(verbindung.socket, { art: 'ok', anfrage: op.anfrage });
     }
   } catch (f) {
@@ -326,6 +360,7 @@ app.get('/ws', { websocket: true }, (socket, req) => {
 
   verbindungen.add(verbindung);
   senden(socket, { art: 'zustand', zustand: anzeigeSicht(daten) });
+  senden(socket, { art: 'stand', lauf: aenderungen.lauf, nr: aenderungen.nr });   // Offline B3: was die Companion verpasst hat
   teilnehmerMelden();
 
   socket.on('message', (roh) => {

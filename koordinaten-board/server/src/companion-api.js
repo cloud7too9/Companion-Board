@@ -13,9 +13,10 @@ const FUNDE_BYTES = 16 * 1024 * 1024;
  * @param {import('fastify').FastifyInstance} app
  * @param {{ daten: import('./daten.js').Daten, nutzer: (req) => ({ name: string } | null),
  *           geaendert: (bereich: string, weltId?: string | null) => void,
- *           anzeigeLink: (anzeige: { id: string, schluessel: string }) => string }} optionen
+ *           anzeigeLink: (anzeige: { id: string, schluessel: string }) => string,
+ *           aenderungenSeit: (seit: string, lauf: string) => object }} optionen
  */
-export async function companionApi(app, { daten, nutzer, geaendert, anzeigeLink }) {
+export async function companionApi(app, { daten, nutzer, geaendert, anzeigeLink, aenderungenSeit }) {
   app.addHook('onRequest', async (req, reply) => {
     const n = nutzer(req);
     if (!n) return reply.code(401).send({ error: 'anmeldung', message: 'Nicht angemeldet' });
@@ -27,6 +28,9 @@ export async function companionApi(app, { daten, nutzer, geaendert, anzeigeLink 
     req.log.error(f);
     return reply.code(500).send({ error: 'fehler', message: 'Serverfehler' });
   });
+
+  // ---- Was seit einer Änderungsnummer passiert ist (Offline B3, siehe server.js) ----
+  app.get('/aenderungen', async (req) => aenderungenSeit(req.query?.seit, req.query?.lauf));
 
   // ---- Welten + Orte ----
   app.get('/orte/welten', async () => ({ welten: daten.weltenListe() }));

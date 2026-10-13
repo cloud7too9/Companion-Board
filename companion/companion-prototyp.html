@@ -1467,7 +1467,10 @@ function koordinatenErkennen(text){
    Beitreten (Name + PIN, siehe 9f). Umsetzung: koordinaten-board/server/src/
    companion-api.js + daten.js, geprüft mit denselben Regeln aus regeln.js.
    Nach jeder Änderung meldet das Board per WebSocket { art:"geaendert", bereich,
-   weltId } – die Companion lädt dann den Bereich neu (liveAktualisieren).
+   weltId, nr, lauf } – die Companion lädt dann den Bereich neu (liveAktualisieren).
+   Offline B3: Beim Verbinden kommt { art:"stand", lauf, nr }; nach einer Unterbrechung
+   GET    /aenderungen?seit=<nr>&lauf=<lauf> → { lauf, nr, alles:false, aenderungen:[{ bereich, weltId }] }
+                                              | { lauf, nr, alles:true }  (dann alles neu laden)
    GET    /orte/welten                → { welten:[{ id, seed, anzahl }] }
    POST   /orte/welten   { seed }     → { welt }            (legt 3 Dimensionen an)
    GET    /orte/welten/:id            → { welt, dimensionen, typen, instanzen }
@@ -1536,13 +1539,18 @@ const DEMO = {
 /** Adresse des Boards (API und WebSocket): aus konfig.js (Netlify, Umbau Phase 2), sonst der Server dieser Seite */
 const BOARD_ADRESSE = String(window.COMPANION_KONFIG?.apiAdresse || "").replace(/\/+$/, "") || location.origin;
 const API_BASIS = `${BOARD_ADRESSE}/api`;
-/** Live-Betrieb, wenn das Board diese Seite ausliefert – sonst (Datei, fremder Server, ?demo=1) der Mock */
+/** "live", wenn das Board antwortet; "getrennt", wenn es nicht erreichbar ist, dieses Gerät aber schon beigetreten ist
+    und den Spiegel hat (Offline B3: weiter live mit dem letzten Stand statt Beispieldaten); sonst (Datei, fremder
+    Server, ?demo=1, nie beigetreten) "demo" mit dem Mock */
 async function betriebErkennen(){
-  if(!location.protocol.startsWith("http") || new URLSearchParams(location.search).get("demo") === "1") return false;
+  if(!location.protocol.startsWith("http") || new URLSearchParams(location.search).get("demo") === "1") return "demo";
   try {
     const r = await fetch(`${API_BASIS}/server`, { cache:"no-store" });
-    return r.ok && (await r.json())?.name === "koordinaten-board";
-  } catch { return false; }
+    if(r.ok) return (await r.json().catch(() => null))?.name === "koordinaten-board" ? "live" : "demo";
+    if(r.status < 500) return "demo";
+  } catch {}
+  const v = lsLesen("board.verbindung");
+  return v?.adresse === BOARD_ADRESSE && await spiegelLesen("/orte/welten") ? "getrennt" : "demo";
 }
 
 const MOCK = (() => {
@@ -1872,6 +1880,44 @@ function mockApi(path, opts){
   return fehler(404, "Unbekannter Pfad");
 }
 
+// --- Offline (Bauplan Offline, B3): Spiegel der Daten in IndexedDB -----------
+/* Live schreibt api() jede erfolgreiche GET-Antwort in IndexedDB (Datenbank „companion-spiegel“, je Board-Adresse
+   und Pfad). Ist das Board nicht erreichbar (offline, Funkloch, Pi aus), antwortet api() für GET aus dem Spiegel –
+   so startet die App auch offline mit dem letzten Stand statt mit Beispieldaten. Schreiben geht offline noch nicht
+   (B4). Beim Trennen vom Board wird der Spiegel geleert. Fehlt IndexedDB, läuft alles wie bisher ohne Spiegel. */
+const SPIEGEL = { db:null, aus:false, seit:null, gemeldet:false };   // aus: Angezeigtes kommt (teils) aus dem Spiegel
+function spiegelOeffnen(){
+  return (SPIEGEL.db ??= new Promise((ok, fehl) => {
+    const r = indexedDB.open("companion-spiegel", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("antworten");
+    r.onsuccess = () => ok(r.result);
+    r.onerror = () => fehl(r.error);
+  }));
+}
+async function spiegelVorgang(modus, schritt){
+  const db = await spiegelOeffnen();
+  return new Promise((ok, fehl) => {
+    const t = db.transaction("antworten", modus), anfrage = schritt(t.objectStore("antworten"));
+    t.oncomplete = () => ok(anfrage?.result);
+    t.onerror = t.onabort = () => fehl(t.error);
+  });
+}
+const spiegelSchluessel = (pfad) => `${BOARD_ADRESSE}|${pfad}`;
+const spiegelSchreiben = (pfad, daten) => spiegelVorgang("readwrite", (s) => s.put({ daten, am:new Date().toISOString() }, spiegelSchluessel(pfad))).catch(() => {});
+const spiegelLesen = (pfad) => spiegelVorgang("readonly", (s) => s.get(spiegelSchluessel(pfad))).catch(() => null);
+const spiegelLeeren = () => spiegelVorgang("readwrite", (s) => s.clear()).catch(() => {});
+/** Eine Antwort kam aus dem Spiegel: Status „Offline“, einmal ein Hinweis mit dem Stand */
+function spiegelGenutzt(am){
+  if(!SPIEGEL.seit || am < SPIEGEL.seit) SPIEGEL.seit = am;
+  if(!SPIEGEL.aus){ SPIEGEL.aus = true; renderStatus(); }
+  if(!SPIEGEL.gemeldet){
+    SPIEGEL.gemeldet = true;
+    const d = new Date(SPIEGEL.seit);
+    // kurz, der Toast ist einzeilig; wer offline ändern will, bekommt „Keine Verbindung“
+    toast(`Offline · Stand vom ${d.toLocaleDateString("de-DE", { day:"numeric", month:"numeric" })}, ${d.toLocaleTimeString("de-DE", { hour:"2-digit", minute:"2-digit" })}`);
+  }
+}
+
 // --- Auth + fetch-Wrapper (gleiches Muster wie Modul A) --------------------
 function authHeaders(){
   const t = bd.verbindung?.token;
@@ -1886,12 +1932,21 @@ async function api(path, opts){
   }
   const json = opts.body != null && !(opts.body instanceof FormData);
   const headers = Object.assign(json ? { "Content-Type":"application/json" } : {}, authHeaders(), opts.headers || {});
+  const spiegeln = (opts.method || "GET").toUpperCase() === "GET" && !path.startsWith("/aenderungen");   // Offline B3
+  /** Board nicht erreichbar: GET aus dem Spiegel, sonst „Keine Verbindung“ */
+  const ohneBoard = async () => {
+    const s = spiegeln ? await spiegelLesen(path) : null;
+    if(s){ spiegelGenutzt(s.am); return { ok:true, status:200, data:s.daten, ausSpiegel:true }; }
+    return { ok:false, status:0, data:{ error:"network", message:"Keine Verbindung" } };
+  };
   let res;
   try { res = await fetch(API_BASIS + path, Object.assign({}, opts, { headers })); }
-  catch(e){ return { ok:false, status:0, data:{ error:"network", message:"Keine Verbindung" } }; }
+  catch(e){ return ohneBoard(); }
+  if(res.status >= 502 && res.status <= 504 || res.status === 530) return ohneBoard();   // Tunnel da, Board aus
   let data = null;
   try { data = await res.json(); } catch {}
   if(res.status === 401) anmeldungAbgelaufen();
+  if(res.ok && spiegeln && data != null) spiegelSchreiben(path, data);
   return { ok:res.ok, status:res.status, data };
 }
 const meldungAus = (r) => r?.data?.message || (r?.status === 0 ? "Keine Verbindung" : `Fehler ${r?.status}`);
@@ -4016,6 +4071,30 @@ async function liveAktualisieren({ bereich, weltId }){
   if(bereich === "portale") return portaleLaden();
   if(bereich === "biome") return biomeLaden();
 }
+/* ---- Nachladen nach einer Unterbrechung (Offline B3) ------------------------
+   Jede geaendert-Meldung trägt { lauf, nr }; die Companion merkt sich den Stand (localStorage „board.stand“).
+   Beim Verbinden schickt das Board { art:"stand" }. War die Companion getrennt oder hat sie aus dem Spiegel
+   gelesen, fragt sie GET /aenderungen?seit=&lauf= und lädt nur die genannten Bereiche – oder alles. */
+const standMerken = ({ lauf, nr }) => { if(lauf && Number.isInteger(nr)) lsSchreiben("board.stand", { adresse:BOARD_ADRESSE, lauf, nr }); };
+async function standPruefen(n){
+  const alt = lsLesen("board.stand"), bekannt = alt?.adresse === BOARD_ADRESSE ? alt : null;
+  const noetig = SPIEGEL.aus || bd.warVerbunden;   // offline gestartet, aus dem Spiegel gelesen oder Verbindung war weg
+  bd.warVerbunden = true;
+  if(noetig && !(bekannt && bekannt.lauf === n.lauf && bekannt.nr === n.nr)){
+    const r = bekannt ? await api(`/aenderungen?seit=${bekannt.nr}&lauf=${encodeURIComponent(bekannt.lauf)}`) : null;
+    if(r?.ok && !r.ausSpiegel && r.data.alles === false){ for(const a of r.data.aenderungen) await liveAktualisieren(a); }
+    else await allesNeuLaden();
+  }
+  standMerken(n);
+  if(SPIEGEL.aus){ Object.assign(SPIEGEL, { aus:false, seit:null, gemeldet:false }); renderStatus(); }
+}
+/** Alles neu vom Board: nach langer Pause, Neustart des Boards oder unbekanntem Stand */
+async function allesNeuLaden(){
+  if(DEMO.enabled) return;
+  await weltenAuffrischen();
+  await Promise.all([orteAuffrischen(), biomeLaden(), samLaden(), portaleLaden(), bannerLaden(), ruestungLaden(),
+    boardEinstellungenLaden(), boardAnzeigenLaden().then(() => boardSitzungLaden())]);
+}
 async function weltenAuffrischen(){
   const r = await api("/orte/welten"); if(!r.ok) return;
   st.welten = r.data.welten;
@@ -4047,7 +4126,8 @@ function boardVerbinden(){
       const w = bd.offen.get(n.anfrage); bd.offen.delete(n.anfrage);
       return n.art === "ok" ? w?.ok() : w?.fehler(n.text || "Board hat abgelehnt");
     }
-    if(n.art === "geaendert") return liveAktualisieren(n);
+    if(n.art === "geaendert"){ standMerken(n); return liveAktualisieren(n); }
+    if(n.art === "stand") return standPruefen(n);
     if(n.art === "teilnehmer") bd.teilnehmer = n.namen || [];
     else if(n.art === "zustand"){
       bd.orte = n.zustand?.orte?.length ?? null;
@@ -4163,8 +4243,10 @@ function boardZeigenKnoepfe(){
 }
 function boardTrennen(){
   boardSocketZu();
-  Object.assign(bd, { verbindung:null, status:"aus", teilnehmer:[], orte:null, sitzung:null, anzeigen:null, einstellungen:null, wartezeit:500 });
+  Object.assign(bd, { verbindung:null, status:"aus", teilnehmer:[], orte:null, sitzung:null, anzeigen:null, einstellungen:null, wartezeit:500, warVerbunden:false });
   lsSchreiben("board.verbindung", null);
+  lsSchreiben("board.stand", null); spiegelLeeren();   // Offline B3: nichts vom Board bleibt auf dem Gerät
+  Object.assign(SPIEGEL, { aus:false, seit:null, gemeldet:false });
   boardAnzeigen();
 }
 
@@ -4187,6 +4269,7 @@ function boardKnopfRendern(){
 }
 function boardAnzeigen(){
   boardKnopfRendern();
+  renderStatus();
   profilKarteRendern();
   samFussRendern();
   boardZeigenKnoepfe();
@@ -5360,8 +5443,12 @@ function dimWechseln(dim){
   karte.neuAnpassen();
   render();
 }
+/** Status in der Bottom-Bar: Demo, Verbunden, Getrennt (verbindet neu) oder Offline (zeigt den Spiegel, Offline B3) */
 function renderStatus(){
-  document.getElementById("orteStatusLab").textContent = DEMO.enabled ? "Demo" : "Verbunden";
+  const [punkt, text] = DEMO.enabled ? ["", "Demo"] : SPIEGEL.aus ? ["off", "Offline"]
+    : bd.status === "verbunden" || !bd.verbindung ? ["", "Verbunden"] : bd.status === "verbindet" ? ["warte", "Verbindet"] : ["off", "Getrennt"];
+  document.getElementById("orteStatusLab").textContent = text;
+  document.getElementById("orteStatusDot").className = `status-dot ${punkt}`;
 }
 
 // Reiter, Ansicht, Liste
@@ -5701,7 +5788,8 @@ async function init(){
   document.getElementById("kopfIcon").innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON.karte}</svg>`;
   applyTheme(st.dim);
   uhr(); setInterval(uhr, 30000);
-  DEMO.enabled = !(await betriebErkennen());
+  const betrieb = await betriebErkennen();
+  DEMO.enabled = betrieb === "demo";
   if(!DEMO.enabled){
     // Live: Das Board ist BOARD_ADRESSE – eine Verbindung zu einem anderen gilt hier nicht
     if(bd.verbindung && bd.verbindung.adresse !== BOARD_ADRESSE) bd.verbindung = null;

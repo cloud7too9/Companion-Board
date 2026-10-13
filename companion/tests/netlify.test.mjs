@@ -132,7 +132,25 @@ try {
   await kontext.setOffline(true);
   await p.reload().catch(() => {});
   pruefe(await warteAuf(p, () => typeof BOARD_ADRESSE !== "undefined" && document.querySelector("header"), null, 10000), "Offline: Seite kommt aus dem Cache des Service Workers");
+  // Offline B3: live mit dem letzten Stand aus dem Spiegel (IndexedDB) statt Beispieldaten
+  pruefe(await warteAuf(p, (id) => !DEMO.enabled && SPIEGEL.aus && st.instanzen.some((i) => i.id === id), ort.instanz.id, 10000), "Offline: Orte aus dem Spiegel, kein Demo");
+  const offen = await p.evaluate(() => ({ status: document.getElementById("orteStatusLab").textContent, welt: st.welt?.id,
+    toast: document.getElementById("orteToast").textContent.replace(/\s+/g, " "), titel: bd.einstellungen?.titel ?? null }));
+  pruefe(offen.status === "Offline" && offen.welt === welt.id && /^Offline · Stand vom \d+\.\d+\., \d\d:\d\d$/.test(offen.toast),
+    `Offline: Status „Offline“, Hinweis mit dem Stand (${offen.status} · ${offen.toast})`);
+  await p.screenshot({ path: `${DIR}/n5-offline-spiegel.png` });
+  // Ändern geht offline noch nicht (B4): klare Meldung statt Absturz
+  pruefe((await p.evaluate(() => api("/banner", { method: "POST", body: JSON.stringify({ name: "x", basis: "red", ebenen: [] }) }))).status === 0, "Offline: Schreiben meldet „Keine Verbindung“");
+  // Während das Handy offline ist, legt jemand anderes einen Ort an
+  const verpasst = await api("POST", "/api/orte/instanzen", { dimensionId: `d_${welt.id}_overworld`, kategorie: "Village", variante: null, x: 640, y: null, z: -1120, quelle: "manuell" });
+  const anfragen = [];
+  p.on("request", (r) => { if (r.url().startsWith(BOARD)) anfragen.push(new URL(r.url()).pathname); });
   await kontext.setOffline(false);
+  pruefe(await warteAuf(p, (id) => st.instanzen.some((i) => i.id === id) && !SPIEGEL.aus && bd.status === "verbunden"
+    && document.getElementById("orteStatusLab").textContent === "Verbunden", verpasst.instanz.id, 25000),
+    "Wieder online: verbindet neu und holt den verpassten Ort nach");
+  pruefe(anfragen.includes("/api/aenderungen") && anfragen.includes(`/api/orte/welten/${welt.id}`) && !anfragen.includes("/api/banner"),
+    `Nachladen nur, was sich geändert hat (GET /api/aenderungen, dann die Orte; ${[...new Set(anfragen)].join(", ")})`);
 } catch (e) {
   pruefe(false, `Abbruch: ${e.stack || e}`);
 } finally {
