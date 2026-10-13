@@ -4009,7 +4009,7 @@ function boardVerbinden(){
       bd.orte = n.zustand?.orte?.length ?? null;
       if(!bd.sitzung) boardSitzungLaden();   // erste Nachricht nach dem Verbinden: das Token gilt → Sitzung der Anzeige laden
     }
-    else return;                             // „gezeigt“ (alte Anzeige, bis S4) braucht das Handy nicht mehr
+    else return;
     boardAnzeigen();
   };
   ws.onclose = (e) => {

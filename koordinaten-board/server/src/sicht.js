@@ -1,5 +1,5 @@
-// Was die Anzeige im Zimmer zeigt: die Orte der aktiven Welt in der Form, die
-// Anzeige.tsx kennt (client/src/lib/typen.ts → Ort). So bleibt die Anzeige
+// Was die Anzeige im Zimmer zeigt: die Orte der aktiven Welt in der Form, die die Widgets der Anzeige
+// kennen (companion/widgets/src/features/anzeige/anzeige.types.ts → Ort). So bleibt die Anzeige
 // unabhängig vom Datenmodell der Companion. Biome sind keine Orte (sie kommen aus dem Welt-Import).
 import { texterkennung } from './texterkennung.js';
 import { regeln } from './regeln.js';
