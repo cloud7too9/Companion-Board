@@ -146,6 +146,9 @@ try {
     "Handbuch-Eintrag: „Bereich geplant“");
 
   // ---- Bereichs-Themes (A5) ----
+  // Das Standard-Layout ist seit S3 voller: Orte wegnehmen, damit der Bauplan Platz hat
+  await p.locator('[data-panel-id="w-orte"] [aria-label="Entfernen"]').click();
+  pruefe(await p.locator('[data-panel-id="w-orte"]').count() === 0, "Widget entfernen (Orte der Welt)");
   await p.getByRole("button", { name: "Widget hinzufügen" }).first().click();
   await p.fill('input[aria-label="Widgets suchen"]', "bauplan");
   await p.click('[data-widget-typ="bauplaene.bauplan"]');

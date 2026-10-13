@@ -147,7 +147,7 @@ try {
   const layout = await layoutAmBoard();
   await api("PUT", `/api/anzeigen/${anzeigeId}/layout`, { ...layout, layer: layout.layer.map((l) => l.id === layout.aktiverLayer
     ? { ...l, instanzen: l.instanzen.filter((i) => i.id !== "w-gesamtkarte") } : l) });
-  pruefe(await warteBis(async () => (await max.$$eval("[data-panel-id]", (l) => l.length)) === 4 && !(await max.$('[data-panel-id="w-gesamtkarte"]'))),
+  pruefe(await warteBis(async () => (await max.$$eval("[data-panel-id]", (l) => l.length)) === 6 && !(await max.$('[data-panel-id="w-gesamtkarte"]'))),
     "Änderung von einem anderen Handy (Gesamtkarte weg) kommt beim Anordnen an");
 
   // ---- Entfernen ----
