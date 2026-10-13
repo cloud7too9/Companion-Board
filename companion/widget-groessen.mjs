@@ -37,6 +37,11 @@ export const WIDGET_GROESSEN = Object.freeze({
   'bauplaene.bauplan': { stufen: platzhalter(8, 6, 'ein einzelner Bauplan') },
   'banner.banner': { stufen: platzhalter(8, 6, 'Motiv und Herstellungsschritte') },
   'ruestung.set': { stufen: platzhalter(8, 6, 'Set mit Teilen und Besätzen') },
+  // Widgets der Anzeige (Bauplan „Sitzung“, S3): rendert das Dashboard selbst aus zustand/teilnehmer
+  'karte.orte': { stufen: [stufe('standard', 12, 8, 'Orte je Dimension mit Kennblock und Umrechnung'), stufe('groß', 20, 10, 'dazu die angehefteten Orte groß')], vollbild: true },
+  'board.beitreten': { stufen: platzhalter(6, 6, 'QR-Code zum Beitreten, Adresse und PIN') },
+  'board.spieler': { stufen: platzhalter(6, 4, 'wer gerade mit dem Handy am Board ist') },
+  'board.zuletzt': { stufen: platzhalter(8, 8, 'die zuletzt gespeicherten Orte mit Urheber') },
 });
 
 /** Stufe eines Typs nach Name; ohne Treffer die Standardstufe. null bei unbekanntem Typ. */

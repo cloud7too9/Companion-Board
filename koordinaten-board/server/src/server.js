@@ -10,6 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Daten, DatenFehler } from './daten.js';
 import { identitaet, AnmeldeFehler, BOARD_PIN } from './identitaet.js';
+import QRCode from 'qrcode';
 import { companionApi } from './companion-api.js';
 import { anzeigeSicht } from './sicht.js';
 import { COMPANION_ORDNER } from './regeln.js';
@@ -179,6 +180,12 @@ app.get('/api/anzeige', async (req, reply) => {
     adresse: OEFFENTLICHE_URL,
     pin: PIN,
   };
+});
+
+// QR-Code zum Beitreten als SVG fürs Widget „Beitreten“ des Dashboards (Bauplan „Sitzung“, S3)
+app.get('/api/anzeige/qr', async (req, reply) => {
+  if (!anzeigeZugang(req).erlaubt) return reply.code(403).send({ fehler: 'Anzeige nur mit Anzeige-Link' });
+  return { svg: await QRCode.toString(`${OEFFENTLICHE_URL}${COMPANION_PFAD}?pin=${PIN}`, { type: 'svg', margin: 0, errorCorrectionLevel: 'M' }) };
 });
 
 // Widget-Dashboard (A6): Die Anzeige liest ihr Layout und meldet ihre Reihen. Welche Anzeige sie ist,

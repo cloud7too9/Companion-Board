@@ -5,7 +5,7 @@ import { galerieGruppen, quellenFiltern } from "@/features/workspace/components/
 
 describe("Widget-Struktur", () => {
   it("Bereichs-IDs wie in BEREICHE der Companion", () => {
-    expect(BEREICHE.map((b) => b.id)).toEqual(["karte", "sammelobjekte", "portale", "handbuch", "bauplaene", "banner", "ruestung"]);
+    expect(BEREICHE.map((b) => b.id)).toEqual(["karte", "sammelobjekte", "portale", "handbuch", "bauplaene", "banner", "ruestung", "board"]);
   });
 
   it("jeder Typ gehört zu einem Bereich, IDs sind stabil und eindeutig", () => {
@@ -16,10 +16,11 @@ describe("Widget-Struktur", () => {
     expect(new Set(WIDGET_TYPEN.map((t) => t.id)).size).toBe(WIDGET_TYPEN.length);
   });
 
-  it("Register mit allen 13 Typen aus dem Bauplan plus der Portal-Verbindung (Bauplan Sitzung): mehrfach genau die Typen mit Quelle", () => {
-    expect(WIDGET_TYPEN).toHaveLength(14);
+  it("Register mit allen 13 Typen aus dem Bauplan plus der Portal-Verbindung und den Widgets der Anzeige (Bauplan Sitzung): mehrfach genau die Typen mit Quelle", () => {
+    expect(WIDGET_TYPEN).toHaveLength(18);
     expect(WIDGET_TYPEN.filter((t) => !t.mehrfach).map((t) => t.id)).toEqual([
-      "karte.gesamtkarte", "sammelobjekte.gesamtauflistung", "sammelobjekte.status", "portale.verbindungen"]);
+      "karte.gesamtkarte", "karte.orte", "sammelobjekte.gesamtauflistung", "sammelobjekte.status", "portale.verbindungen",
+      "board.beitreten", "board.spieler", "board.zuletzt"]);
     expect(WIDGET_TYPEN.every((t) => t.mehrfach === Boolean(t.quelle))).toBe(true);
     expect(WIDGET_TYPEN.filter((t) => t.optional).map((t) => t.id)).toEqual(["karte.einzelkoordinate", "karte.koordinatensammlung"]);
     expect(widgetTyp("banner.banner")).toMatchObject({ quelle: "Banner", mehrfach: true });
@@ -45,8 +46,8 @@ describe("Widget-Struktur", () => {
 describe("Galerie", () => {
   it("gruppiert nach Bereich in der Reihenfolge der Companion", () => {
     const g = galerieGruppen("");
-    expect(g.map((x) => x.bereich.id)).toEqual(["karte", "sammelobjekte", "portale", "handbuch", "bauplaene", "banner", "ruestung"]);
-    expect(g.map((x) => x.typen.length)).toEqual([3, 4, 2, 2, 1, 1, 1]);
+    expect(g.map((x) => x.bereich.id)).toEqual(["karte", "sammelobjekte", "portale", "handbuch", "bauplaene", "banner", "ruestung", "board"]);
+    expect(g.map((x) => x.typen.length)).toEqual([4, 4, 2, 2, 1, 1, 1, 3]);
     expect(g[1].typen.map((t) => t.id)).toEqual(["sammelobjekte.gesamtauflistung", "sammelobjekte.eigeneliste", "sammelobjekte.einzelobjekt", "sammelobjekte.status"]);
   });
 

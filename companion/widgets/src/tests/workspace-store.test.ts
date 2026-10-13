@@ -175,6 +175,7 @@ describe("widgets act on the active layer only", () => {
 
   it("moves inward when the new stage would cross the edge", () => {
     store().moveItem("w-sammelstatus", 12, 15);
+    expect(store().moveItem("w-beitreten", 12, 8)).toBe(true);   // aus dem Weg (Standard-Layout seit S3)
     expect(store().moveItem("w-portale", 22, 10)).toBe(true);
     // 12×9 ab (22,10) ragte rechts und unten hinaus → rückt nach (20,9)
     expect(store().setStufe("w-portale", "groß")).toBe(true);

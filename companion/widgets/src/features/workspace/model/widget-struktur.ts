@@ -8,7 +8,7 @@
 import type { Groessenstufe, WidgetVertrag } from "./widget-vertrag";
 
 /** Bereichs-IDs wie in `BEREICHE` der Companion (companion-prototyp.html, Abschnitt 9b) */
-export type BereichId = "karte" | "sammelobjekte" | "portale" | "handbuch" | "bauplaene" | "banner" | "ruestung";
+export type BereichId = "karte" | "sammelobjekte" | "portale" | "handbuch" | "bauplaene" | "banner" | "ruestung" | "board";
 
 export interface Bereich {
   id: BereichId;
@@ -24,6 +24,8 @@ export const BEREICHE: readonly Bereich[] = [
   { id: "bauplaene", name: "Baupläne" },
   { id: "banner", name: "Banner" },
   { id: "ruestung", name: "Rüstung" },
+  // Widgets der Anzeige selbst (Bauplan „Sitzung“, S3): Beitreten, Spieler, Zuletzt gespeichert
+  { id: "board", name: "Board" },
 ];
 
 export interface Zusatzinhalt {

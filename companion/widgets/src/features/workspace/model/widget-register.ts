@@ -27,11 +27,12 @@ function typ(id: string, bereich: BereichId, name: string, extra: Extra = {}): W
   return { id, bereich, name, vertrag: vertragRegistrieren(id, { stufen, mindest, maximal, vollbild: g.vollbild }), mehrfach: Boolean(extra.quelle), ...extra };
 }
 
-/** Alle 13 Typen aus dem Bauplan, je Bereich in der Reihenfolge der Tabelle, plus die Portal-Verbindung (Bauplan „Sitzung“) */
+/** Alle 13 Typen aus dem Bauplan, je Bereich in der Reihenfolge der Tabelle, plus Portal-Verbindung und die Widgets der Anzeige (Bauplan „Sitzung“) */
 export const WIDGET_TYPEN: readonly WidgetTyp[] = [
   typ("karte.gesamtkarte", "karte", "Gesamtkarte"),
   typ("karte.einzelkoordinate", "karte", "Einzelkoordinate", { optional: true, quelle: "Koordinate" }),
   typ("karte.koordinatensammlung", "karte", "Koordinatensammlung", { optional: true, quelle: "Sammlung" }),
+  typ("karte.orte", "karte", "Orte der Welt"),
   typ("sammelobjekte.gesamtauflistung", "sammelobjekte", "Alle Sammelobjekte"),
   typ("sammelobjekte.eigeneliste", "sammelobjekte", "Eigene Liste", { quelle: "Liste" }),
   typ("sammelobjekte.einzelobjekt", "sammelobjekte", "Einzelobjekt", { quelle: "Objekt" }),
@@ -44,6 +45,10 @@ export const WIDGET_TYPEN: readonly WidgetTyp[] = [
   typ("bauplaene.bauplan", "bauplaene", "Bauplan", { quelle: "Bauplan" }),
   typ("banner.banner", "banner", "Banner", { quelle: "Banner" }),
   typ("ruestung.set", "ruestung", "Rüstungs-Set", { quelle: "Set" }),
+  // Widgets der Anzeige (Bauplan „Sitzung“, S3), gerendert aus dem Zustand des Boards
+  typ("board.beitreten", "board", "Beitreten"),
+  typ("board.spieler", "board", "Spieler"),
+  typ("board.zuletzt", "board", "Zuletzt gespeichert"),
 ];
 
 const NACH_ID = new Map(WIDGET_TYPEN.map((t) => [t.id, t]));

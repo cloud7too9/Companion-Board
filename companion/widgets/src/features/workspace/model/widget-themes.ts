@@ -40,6 +40,7 @@ export const BEREICH_THEMES: Readonly<Record<BereichId, ThemeQuelle>> = {
   bauplaene: fest("bauplaene"),
   banner: fest("banner"),
   ruestung: fest("ruestung"),
+  board: fest("standard"),
 };
 
 export function themeFuer(bereich: BereichId | undefined, zustand: WidgetZustand = {}): ThemeId {

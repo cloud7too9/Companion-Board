@@ -4,6 +4,7 @@ import { widgetTyp } from "../features/workspace/model/widget-register";
 import { WidgetInhalt } from "../features/workspace/components/WidgetInhalt";
 import { themeFuer } from "../features/workspace/model/widget-themes";
 import { useKarte } from "../features/karten/hooks/useKarte";
+import { LokalesWidget, istLokalesWidget } from "../features/anzeige/lokale-widgets";
 import { Button } from "../shared/ui/Button";
 import { navigieren } from "../app/navigation";
 
@@ -19,7 +20,8 @@ export function VollbildPage({ instanzId }: { instanzId: string }) {
   const nurAnzeige = useWorkspaceStore((s) => s.nurAnzeige);
   const item = useWorkspaceStore((s) => s.layers.flatMap((l) => l.instanzen).find((i) => i.id === instanzId));
   const typ = item && widgetTyp(item.typ);
-  const antwort = useKarte(item?.typ ?? "", item?.quelle);
+  const lokal = item ? istLokalesWidget(item.typ) : false;
+  const antwort = useKarte(lokal ? "" : item?.typ ?? "", item?.quelle);
 
   useEffect(() => {
     loadWorkspace();
@@ -45,7 +47,7 @@ export function VollbildPage({ instanzId }: { instanzId: string }) {
       </header>
       <main className="min-h-0 flex-1 overflow-auto p-3 sm:p-5">
         {erlaubt && item ? (
-          <WidgetInhalt instanz={item} antwort={antwort} vollbild />
+          lokal ? <LokalesWidget typ={item.typ} gross /> : <WidgetInhalt instanz={item} antwort={antwort} vollbild />
         ) : (
           <p role="status" className="text-sm text-text-muted">
             {item ? "Dieses Widget hat kein Vollbild." : "Dieses Widget gibt es nicht (mehr)."}

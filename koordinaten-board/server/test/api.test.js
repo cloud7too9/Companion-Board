@@ -273,6 +273,8 @@ test('Widget-Layout: Handy speichert, Anzeige liest ihres und meldet ihre Reihen
   // Die Anzeige „Board“ liest mit ihrem Link; ohne Link ist auch localhost gesperrt
   const q = new URL(board.link).search;
   assert.equal((await anfrage('GET', '/api/anzeige/layout')).status, 403, 'localhost ohne Link');
+  assert.equal((await anfrage('GET', '/api/anzeige/qr')).status, 403, 'QR-Code nur mit Link');
+  assert.match((await anfrage('GET', `/api/anzeige/qr${q}`)).daten.svg, /^<svg[\s\S]*<\/svg>\s*$/, 'QR-Code zum Beitreten als SVG');
   let r = await anfrage('GET', `/api/anzeige/layout${q}`);
   assert.deepEqual([r.status, r.daten.anzeige.id], [200, board.id]);
   const ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws${q}&rolle=anzeige`);

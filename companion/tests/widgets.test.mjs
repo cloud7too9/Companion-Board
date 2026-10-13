@@ -55,7 +55,7 @@ try {
       `${name}: Fläche 32 × ${r.reihen} quadratische Zellen à ${r.zelle.toFixed(1)} px`);
     // Widgets liegen auf ganzen Zellen (Abstand innerhalb der Zelle abgezogen)
     const aufZellen = r.panels.every((x) => [x.links, x.oben, x.breite, x.hoehe].every((v) => Math.abs(v - Math.round(v)) < 0.3));
-    pruefe(aufZellen && r.panels.length === 4, `${name}: 4 Widgets auf ganzen Zellen`);
+    pruefe(aufZellen && r.panels.length === 6, `${name}: 6 Widgets auf ganzen Zellen`);
     await p.getByRole("button", { name: "Bearbeiten" }).click();
     await p.waitForTimeout(200);
     pruefe((await p.$$eval('[data-testid="stufe"]', (l) => l.map((e) => e.textContent))).every((t) => /^\S+ · \d+×\d+$/.test(t)),
@@ -77,7 +77,9 @@ try {
   const karteText = (id) => p.$eval(`[data-panel-id="${id}"] [data-testid="karte"]`, (k) => k.textContent);
   pruefe((await karteText("w-sammelstatus")).includes("5 von 18") && (await karteText("w-portale")).includes("Hauptbasis"),
     "Widgets rendern Karten (Titel und Zeilen)");
-  pruefe(await p.$$eval('[data-panel-id] [data-testid="karte"]', (l) => l.length) === 4, "alle 4 Start-Widgets mit Karte");
+  pruefe(await p.$$eval('[data-panel-id] [data-testid="karte"]', (l) => l.length) === 6, "alle 6 Start-Widgets mit Karte (vier vom Board, Orte und Beitreten aus dem Zustand)");
+  pruefe(await p.$$eval('[data-testid="ort-zeile"]', (l) => l.length) >= 3 && await p.isVisible('[data-testid="pin"]') && await p.$('[data-testid="qr"] svg') !== null,
+    "Ohne Board: Orte, QR-Code und PIN aus dem Beispiel-Zustand");
   await p.screenshot({ path: `${DIR}/w5-beispielkarten.png` });
   await p.getByRole("button", { name: "Bearbeiten" }).click();
   const stufe = (id) => p.$eval(`[data-panel-id="${id}"] [data-testid="stufe"]`, (e) => e.textContent);
@@ -116,8 +118,8 @@ try {
   await p.getByRole("button", { name: "Widget hinzufügen" }).first().click();
   await p.waitForSelector("[data-widget-typ]");
   const gruppen = await p.$$eval("section[data-bereich]", (l) => l.map((s) => [s.dataset.bereich, s.querySelectorAll("[data-widget-typ]").length]));
-  pruefe(JSON.stringify(gruppen) === JSON.stringify([["karte", 3], ["sammelobjekte", 4], ["portale", 2], ["handbuch", 2], ["bauplaene", 1], ["banner", 1], ["ruestung", 1]]),
-    `Galerie mit allen 13 Typen plus Portal-Verbindung (Bauplan Sitzung) nach Bereich: ${JSON.stringify(gruppen)}`);
+  pruefe(JSON.stringify(gruppen) === JSON.stringify([["karte", 4], ["sammelobjekte", 4], ["portale", 2], ["handbuch", 2], ["bauplaene", 1], ["banner", 1], ["ruestung", 1], ["board", 3]]),
+    `Galerie mit allen 13 Typen plus Portal-Verbindung und Board-Widgets (Bauplan Sitzung) nach Bereich: ${JSON.stringify(gruppen)}`);
   const vorschau = await p.$eval('[data-widget-typ="portale.verbindungen"] [data-testid="vorschau"]', (e) => [e.offsetWidth, e.offsetHeight]);
   pruefe(vorschau[0] === 90 && vorschau[1] === 54, `Vorschau in der kleinsten Stufe (10×6 Zellen → ${vorschau.join("×")} px)`);
   await p.screenshot({ path: `${DIR}/w4-galerie.png` });
@@ -144,6 +146,9 @@ try {
     "Handbuch-Eintrag: „Bereich geplant“");
 
   // ---- Bereichs-Themes (A5) ----
+  // Das Standard-Layout ist seit S3 voller: Orte wegnehmen, damit der Bauplan Platz hat
+  await p.locator('[data-panel-id="w-orte"] [aria-label="Entfernen"]').click();
+  pruefe(await p.locator('[data-panel-id="w-orte"]').count() === 0, "Widget entfernen (Orte der Welt)");
   await p.getByRole("button", { name: "Widget hinzufügen" }).first().click();
   await p.fill('input[aria-label="Widgets suchen"]', "bauplan");
   await p.click('[data-widget-typ="bauplaene.bauplan"]');

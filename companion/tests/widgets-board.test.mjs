@@ -2,6 +2,8 @@
 // aus den Daten der aktiven Welt (GET /api/widgets/:typ) und laden nach Änderungen live neu. Jede
 // Anzeige zeigt ihr Layout vom Server (A6) ohne Bearbeiten und meldet ihre Reihen; ein neues Layout
 // kommt live an. Eine gelöschte Quelle zeigt den leeren Zustand. Von außen nur mit Anzeige-Link.
+// Die Widgets der Anzeige (Bauplan „Sitzung“, S3: Orte, Beitreten, Spieler, Zuletzt, Kopf) rendern
+// aus `zustand`/`teilnehmer` vom /ws; Screenshot w12 für den Haltepunkt H9.
 // Vorher: npm --prefix ../widgets run build
 import { chromium } from "playwright";
 import { fileURLToPath } from "node:url";
@@ -63,9 +65,57 @@ try {
   pruefe((await karteText('[data-panel-id="w-gesamtkarte"]')).includes("Hauptbasis") === false
     && (await karteText('[data-panel-id="w-gesamtkarte"]')).includes("1 Orte"), "Gesamtkarte: Orte je Dimension");
 
+  // ---- Widgets der Anzeige (Bauplan „Sitzung“, S3) im Standard-Layout ----
+  const warteAuf = (fn, arg, ms = 8000) => p.waitForFunction(fn, arg, { timeout: ms }).then(() => true, () => false);
+  pruefe(await warteAuf(() => [...document.querySelectorAll('[data-panel-id="w-orte"] [data-dimension="oberwelt"] [data-testid="ort-zeile"]')]
+    .some((z) => z.textContent.includes("Hauptbasis") && z.textContent.includes("X 260 · Y 80 · Z −420") && z.textContent.includes("Nether 32 / −53"))),
+    "Orte: Hauptbasis in der Oberwelt-Spalte mit Koordinaten und Umrechnung");
+  pruefe(await warteAuf(() => document.querySelector('[data-panel-id="w-beitreten"] [data-testid="qr"] svg')
+    && document.querySelector('[data-panel-id="w-beitreten"] [data-testid="pin"]')?.textContent === "471100"), "Beitreten: QR-Code vom Board und PIN");
+  pruefe(await warteAuf(() => document.querySelector('[data-panel-id="w-spieler"] [data-testid="spieler-leer"]')), "Spieler: niemand mit dem Handy verbunden");
+  pruefe(await p.textContent('[data-testid="anzeige-titel"]') === "Unsere Welt"
+    && (await p.textContent('[data-testid="anzeige-welt"]')).includes("Seed 68891…0698 · 1 Ort")
+    && /^\d\d:\d\d$/.test(await p.textContent('[data-testid="uhr"]'))
+    && await warteAuf(() => document.querySelector('[data-testid="verbunden"]')?.dataset.verbunden === "true"),
+    "Kopf der Anzeige: Titel, Seed, Anzahl der Orte, Uhr, verbunden");
+
+  // Max verbindet sich mit dem Handy → Spieler-Chip; ein neuer, angehefteter Ort kommt live mit Kennblock
+  const handy = new WebSocket(`ws://127.0.0.1:${PORT}/ws?token=${token}`);
+  await new Promise((ok, fehl) => { handy.onopen = ok; handy.onerror = fehl; });
+  pruefe(await warteAuf(() => [...document.querySelectorAll('[data-panel-id="w-spieler"] [data-testid="spieler-chip"]')].map((c) => c.textContent).join() === "Max"),
+    "Spieler: Max ist mit dem Handy verbunden (live)");
+  const burg = (await api("POST", "/api/orte/instanzen",
+    { dimensionId: `d_${welt.id}_overworld`, kategorie: "Stronghold", variante: null, x: 1824, y: null, z: -96, quelle: "manuell" })).instanz;
+  await api("PUT", `/api/orte/instanzen/${burg.id}/angeheftet`, { angeheftet: true });
+  pruefe(await warteAuf(() => {
+    const a = document.querySelector('[data-panel-id="w-orte"] [data-testid="angeheftet"]');
+    return a?.textContent.includes("Stronghold") && a.querySelector('[data-testid="neu"]')
+      && a.querySelector("img.kennblock")?.getAttribute("src").endsWith("stronghold.png") && a.querySelector("img.kennblock").naturalWidth > 0;
+  }), "Orte: angehefteter Stronghold live oben, mit Kennblock und „Neu“");
+  pruefe(await warteAuf(() => document.querySelector('[data-testid="anzeige-welt"]')?.textContent.includes("2 Orte")), "Kopf: 2 Orte (live)");
+
+  // Alle Blöcke der alten Anzeige nebeneinander (16:9) – Screenshot für H9
+  const [anzeigeBoard] = (await api("GET", "/api/anzeigen")).anzeigen;
+  const anzeigeLayout = { aktiverLayer: "a1", layer: [{ id: "a1", name: "Anzeige", instanzen: [
+    { id: "a-orte", typ: "karte.orte", stufe: "groß", x: 0, y: 0 },
+    { id: "a-beitreten", typ: "board.beitreten", stufe: "standard", x: 20, y: 0 },
+    { id: "a-spieler", typ: "board.spieler", stufe: "standard", x: 26, y: 0 },
+    { id: "a-zuletzt", typ: "board.zuletzt", stufe: "standard", x: 20, y: 6 },
+    { id: "a-sammelstatus", typ: "sammelobjekte.status", stufe: "standard", x: 28, y: 4 },
+    { id: "a-portale", typ: "portale.verbindungen", stufe: "standard", x: 0, y: 10 },
+  ] }] };
+  await api("PUT", `/api/anzeigen/${anzeigeBoard.id}/layout`, anzeigeLayout);
+  pruefe(await warteAuf(() => [...document.querySelectorAll('[data-panel-id="a-zuletzt"] [data-testid="zuletzt-zeile"]')].map((z) => z.textContent)
+    .map((t) => t.replace(/^.*?(Max|Lena|Jemand)/, "$1")).join("|") === "Max → Stronghold|Max → Hauptbasis"),
+    "Zuletzt: neueste zuerst, mit Urheber (Max → Stronghold, Max → Hauptbasis)");
+  await p.waitForTimeout(400);
+  await p.screenshot({ path: `${DIR}/w12-anzeige-widgets.png` });
+  handy.close();
+  pruefe(await warteAuf(() => document.querySelector('[data-panel-id="a-spieler"] [data-testid="spieler-leer"]')), "Spieler: Handy getrennt → wieder leer");
+
   // ---- Live: Änderung am Handy → Widget lädt neu ----
   await api("PUT", `/api/sammelobjekte/welten/${welt.id}/eye`, { gefunden: true });
-  pruefe(await p.waitForFunction(() => document.querySelector('[data-panel-id="w-sammelstatus"] [data-testid="karte"]')?.textContent.includes("2 von 18"),
+  pruefe(await p.waitForFunction(() => document.querySelector('[data-panel-id="a-sammelstatus"] [data-testid="karte"]')?.textContent.includes("2 von 18"),
     null, { timeout: 8000 }).then(() => true, () => false), "Live: Sammelobjekt abgehakt → 2 von 18 ohne Neuladen");
 
   // ---- Anzeige (A6): kein Bearbeiten, meldet ihre Reihen ----
@@ -78,7 +128,7 @@ try {
 
   // ---- Layout am Server (wie es später das Handy speichert) → kommt live an ----
   const quellen = (await api("GET", "/api/widgets/karte.einzelkoordinate/quellen")).quellen;
-  pruefe(quellen.length === 1 && quellen[0].name === "Hauptbasis", "Quellen für die Einzelkoordinate vom Board");
+  pruefe(quellen.map((q) => q.name).sort().join() === "Hauptbasis,Stronghold", "Quellen für die Einzelkoordinate vom Board");
   const festung = (await api("POST", "/api/orte/instanzen",
     { dimensionId: `d_${welt.id}_nether`, kategorie: "Nether Fortress", variante: null, x: -200, y: 70, z: 96, quelle: "manuell" })).instanz;
   const layout = { aktiverLayer: "l1", layer: [{ id: "l1", name: "Start", instanzen: [
@@ -124,11 +174,12 @@ try {
     tv.on("pageerror", (e) => fehler.push(e.message));
     await tv.goto(`http://${AUSSEN}:${PORT}/dashboard/`);
     pruefe(await tv.waitForFunction(() => document.querySelector('[data-panel-id="w-sammelstatus"] [data-testid="widget-leer"]')?.textContent
-      === "Diese Anzeige braucht ihren Anzeige-Link", null, { timeout: 8000 }).then(() => true, () => false), "Anderes Gerät ohne Link: Hinweis auf den Anzeige-Link");
+      === "Diese Anzeige braucht ihren Anzeige-Link" && document.querySelector('[data-panel-id="w-beitreten"] [data-testid="widget-leer"]')?.textContent
+      === "Diese Anzeige braucht ihren Anzeige-Link", null, { timeout: 8000 }).then(() => true, () => false), "Anderes Gerät ohne Link: Hinweis auf den Anzeige-Link, auch in den Widgets der Anzeige");
     const link = new URL(tablet.link);
     await tv.goto(`http://${AUSSEN}:${PORT}/dashboard${link.search}`);
     pruefe(await tv.waitForFunction(() => document.querySelector('[data-panel-id="w-sammelstatus"] [data-testid="karte"]')?.textContent.includes("2 von 18")
-      && document.querySelector('[data-testid="anzeige-name"]')?.textContent === "Anzeige Tablet" && document.querySelectorAll("[data-panel-id]").length === 4,
+      && document.querySelector('[data-testid="anzeige-name"]')?.textContent === "Anzeige Tablet" && document.querySelectorAll("[data-panel-id]").length === 6,
       null, { timeout: 8000 }).then(() => true, () => false), "Mit Anzeige-Link: „Tablet“ mit eigenem Layout (noch das Start-Layout) und Karten vom Board");
     const tvReihen = await tv.$eval('[data-testid="raster-flaeche"]', (f) => Number(f.dataset.grid.split("x")[1]));
     pruefe(await warteBis(async () => (await api("GET", "/api/anzeigen")).anzeigen.find((a) => a.id === tablet.id).reihen === tvReihen)
