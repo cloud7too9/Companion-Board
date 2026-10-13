@@ -1,6 +1,9 @@
-# Routen der Anzeige (React, eigene Pfade) und des Dashboards (eigene Routen wie /dashboard/vollbild/…) → ihre index.html
-/anzeige        /index.html            200
-/anzeige/*      /index.html            200
+# Die Anzeige ist das Widget-Dashboard (Bauplan „Sitzung“, S4): die Startseite und alte Anzeige-Links führen
+# auf /dashboard/. Netlify reicht die Query weiter, der Anzeige-Link (?anzeige=…&schluessel=…) bleibt also erhalten.
+/               /dashboard/            301
+/anzeige        /dashboard/            301
+/anzeige/*      /dashboard/            301
+# Eigene Routen des Dashboards (z. B. /dashboard/vollbild/…) → seine index.html
 /dashboard      /dashboard/            301
 /dashboard/*    /dashboard/index.html  200
 /app            /app/                  301

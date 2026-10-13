@@ -1,4 +1,5 @@
-# Netlify baut alles Sichtbare (Umbau Phase 5): Anzeige unter /, Companion unter /app/, Widget-Dashboard unter /dashboard/.
+# Netlify baut alles Sichtbare (Umbau Phase 5): Companion unter /app/, die Anzeige (Widget-Dashboard) unter /dashboard/;
+# / leitet aufs Dashboard (Bauplan „Sitzung“, S4).
 # Die API läuft woanders (Pi hinter dem Cloudflare-Tunnel); ihre Adresse kommt aus der Umgebungsvariable API_URL
 # (in Netlify unter Site configuration → Environment variables setzen, z. B. https://api.mainhubv1.com).
 # Ohne API_URL laufen die Seiten im Beispiel-/DEMO-Modus (gut für eine erste Vorschau).
