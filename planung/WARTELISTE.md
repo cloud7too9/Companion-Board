@@ -17,6 +17,7 @@ Bei jedem Haltepunkt stehen Branch und Screenshots. Die Screenshots erzeugen die
 | H11 | **Wartet auf Max (13.10.2026).** **Welt-Import: Weltordner statt ZIP** (Bauplan „Welt-Funde“, W0): Karte → Welt → Welt-Import → „Weltordner wählen“ → in der Dateien-App den Ordner der Welt (z. B. `z2l2cn0rmkA=`) oder gleich `minecraftWorlds` wählen. Geht das am iPhone (Safari ab iOS 18.4)? Steht „Gebraucht: … von … Dateien“ da, stimmt der Weltname? Und: Lässt sich der Ordner aus der Dateien-App auf die gestrichelte Fläche ziehen? | `claude/festive-euler-a82up2` (PR #19) | `m4-import-start.png`, `m6b-weltordner.png`, `m6c-welt-waehlen.png` |
 | H12 | **Wartet auf Max (13.10.2026).** **Welt-Funde an einer echten Welt** (Bauplan „Welt-Funde“, W1): Was der Import aus der Welt liest (Verliese, Schätze, Strukturen, Portale, Schmiedevorlagen, Rüstung, Banner, Welt-Info; seit W3 auch Außenposten, Hexenhütten, Ozeanmonumente, Netherfestungen ohne Truhe, Dörfer, Endtransitportale, Enderdrache), mit dem Spiel vergleichen. Am PC mit Node 22: `cd companion/tools && node welt-pruefen.mjs <Welt.mcworld oder Weltordner>` (oder die Welt an Claude geben). Stimmen Orte und Koordinaten? Fehlt etwas, das du kennst? Steht „Andere Spieler“ da (Realm-Welt)? | `claude/festive-euler-a82up2` (PR W1) | Ausgabe von `welt-pruefen.mjs`, Abschnitt „Funde“ |
 | H13 | **Wartet auf Max (13.10.2026).** **Welt-Funde übernehmen am iPhone** (Bauplan „Welt-Funde“, W2): Welt-Import mit deiner Welt, in „Welt prüfen“ die Karte „Aus der Welt“ ansehen (je Art Anzahl und Schalter, alle an), Unerwünschtes abschalten (z. B. Verliese), „Übernehmen“. Stimmen Orte, Portal-Verbindungen, Schmiedevorlagen, Rüstungs-Sets, Banner und die Welt-Info? Ein zweiter Import derselben Welt sollte überall „schon bekannt“ zeigen. | `claude/festive-euler-a82up2` (PR W1/W2) | `m12-funde.png` |
+| H14 | **Wartet auf Max (13.10.2026).** **Offline mit Daten** (Bauplan Offline, B3): Companion als Home-Bildschirm-App öffnen, einmal Karte, Sammelobjekte und Portale ansehen (dann liegen sie im Spiegel). Flugmodus an, App ganz schließen und neu öffnen: Siehst du deine Orte (unten „Offline“, oben kurz „Offline · Stand vom …“) statt Beispieldaten? Lena legt in der Zeit einen Ort an. Flugmodus aus: Nach ein paar Sekunden „Verbunden“ und Lenas Ort ist da? | `claude/festive-euler-a82up2` (PR B3) | `n5-offline-spiegel.png` |
 
 Später: B3 am echten iPhone im Flugmodus, mit Daten.
 
@@ -65,6 +66,10 @@ Die Typen stehen im Register und in der Galerie, liefern aber nur einen Hinweis 
 - [ ] **Sicherung läuft?** Am Pi `sudo -u board crontab -l` muss die Zeile `15 3 * * * /opt/companion-board/koordinaten-board/pi/sicherung.sh` zeigen; Kopien liegen unter `/var/lib/companion-board/sicherung/`.
 - [ ] **Kopie vom Pi wegholen**, sonst liegt alles auf einer SD-Karte: vom Laptop aus z. B. `rsync -a board@<pi>:/var/lib/companion-board/sicherung/ ~/companion-sicherung/` (Befehl steht in `koordinaten-board/pi/ANLEITUNG.md`, Abschnitt Sicherung).
 - [ ] **Ratenbegrenzung bei Cloudflare** für `api.mainhubv1.com/api/beitreten*` (10 je Minute und IP) unter *Security → WAF → Rate limiting rules*. Die Sperre im Server (5 Fehlversuche je Adresse, 60 s) bleibt zusätzlich.
+
+**Pi-Update (13.10.2026):** Seit W2 (PR #20) und B3 braucht die Companion neue Routen am Board (`POST /api/welten/:id/funde`, `GET /api/aenderungen`). Ohne Update am Pi übernimmt der Welt-Import nur die Biome („Funde nicht: …“), und das Nachladen lädt alles neu. Am Pi:
+
+- [ ] `cd /opt/companion-board && sudo -u board git pull && cd koordinaten-board/server && sudo -u board npm ci --omit=dev && sudo systemctl restart companion-board` (wie in `koordinaten-board/pi/ANLEITUNG.md`, „Update“)
 
 **GitHub:**
 

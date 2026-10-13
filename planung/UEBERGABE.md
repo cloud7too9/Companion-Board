@@ -20,7 +20,7 @@
   - **Nur Bedrock (E15):** Java gibt es nirgendwo mehr
 - **Als Nächstes** (Kapitel 9):
   1. ⏸ **H10**: Probe nach dem Umschalten auf das Dashboard (Max, `koordinaten-board/pi/ANLEITUNG.md`). Danach wandert auch der Bauplan „Sitzung“ ins Archiv.
-  2. **Offline B3–B5**, neu zugeschnitten (13.10.2026): B3 = Live-Modus ohne Netz, IndexedDB, Nachladen über `/api/aenderungen` (Nachtrag im Offline-Bauplan).
+  2. **Offline:** **B3 gebaut** (13.10.2026): live ohne Netz aus dem Spiegel in IndexedDB, Nachladen über `/api/aenderungen`; ⏸ H14 am iPhone im Flugmodus. Als Nächstes B4 und B5 (Nachtrag im Offline-Bauplan).
   3. A7 (Größenstufen je Widget): Planungsrunde mit Max
   4. Inhalte, die noch nicht beschrieben sind (Warteliste, Kapitel 4)
   5. **Bauplan „Welt-Funde“** (erweiterter Welt-Import, E21): [`bauplaene/Bauplan-Welt-Funde.md`](bauplaene/Bauplan-Welt-Funde.md). **W0 gebaut** (13.10.2026): Weltordner direkt wählen oder hineinziehen, nur die gebrauchten Dateien gehen an den Worker; ⏸ H11 am iPhone. **W1 gebaut** (13.10.2026): Der Import liest Strukturen, Portale, Spieler, Vorlagen, Rüstung, Banner und Welt-Info mit (`nbt.js`, `welt-funde.js`), die Companion zeigt sie noch nicht; ⏸ H12 an einer echten Welt. Fragen 1, 4 und 5 hat Max am 13.10.2026 beantwortet (automatisch übernehmen mit Schalter je Art, Portale ohne Gegenstück als Ort, kein Bild der Welt). **W2 gebaut** (13.10.2026): Prüfliste mit Welt-Info und einer Zeile je Art samt Schalter, „Übernehmen“ legt alles Eingeschaltete über `POST /welten/:id/funde` an; ⏸ H13 am iPhone. **W3 gebaut** (13.10.2026): Strukturbereiche (Außenposten, Hexenhütte, Ozeanmonument, Netherfestung), Dörfer, Endtransitportale, Enderdrache.
@@ -46,7 +46,7 @@
 | **B2** Accounts mit PIN | Board-PIN, dann Account wählen oder anlegen (Name + eigene PIN, 4–8 Ziffern). Die PIN wird nur als **scrypt-Hash** gespeichert. Sperre je Gerät und Account. Das Token ist der **Geräteschlüssel**. `werBistDu()` gekapselt an Board und Companion. | Board `identitaet.js`, Companion `IDENTITAET`, Sheet „Beitreten“ |
 | **E15** Nur Bedrock | Portal-Prüfung mit festem Suchradius ±128 (`PORTAL_SUCHRADIUS`), kein Umschalter, kein `edition` mehr im Kontext der Karten. Der Welt-Import weist Java-Welten mit klarer Meldung ab. | `companion/board-karten.js`, Portal-Verwaltung in `companion-prototyp.html` |
 | **CI** | Drei Jobs bei jedem PR und Push auf `main`, Screenshots als Download „bilder“ | `.github/workflows/tests.yml` |
-| **B3–B5** Offline | nicht gebaut. N5 ist hinfällig (HTTPS über Netlify/Cloudflare); B3 neu zugeschnitten, siehe Nachtrag im Offline-Bauplan. Gebaut ist davon schon der Service Worker mit versioniertem Cache (Umbau Phase 5). | `companion/sw.js` |
+| **B3–B5** Offline | **B3 gebaut** (13.10.2026): `betriebErkennen` → live, getrennt oder demo; `api()` spiegelt GET-Antworten in IndexedDB und antwortet offline daraus; Server `GET /api/aenderungen`, `nr`/`lauf` in `geaendert`, `stand` beim Verbinden; ⏸ H14. B4 und B5 nicht gebaut. N5 ist hinfällig (HTTPS über Netlify/Cloudflare). | `companion/sw.js`, `companion-prototyp.html` (Abschnitt Offline), `server.js` |
 | **Umbau** Netlify + Pi | Phasen 1–6: Server abgesichert (Anzeige nur mit Link, `HOST`, `CF-Connecting-IP`, CORS, 6-stellige PIN), API-Adresse konfigurierbar, Texterkennung am Handy, SQLite, Netlify-Build mit PWA, Pi mit Tunnel. Plan im Archiv. | `netlify/`, `koordinaten-board/pi/`, `docs/plaene/UMBAUPLAN.md` |
 | **E16** Sitzung | S1–S4 gebaut (13.10.2026): Sitzung je Anzeige am Server, „Aufs Board“ mit Quelle, Widgets der Anzeige (Orte, Beitreten, Spieler, Zuletzt), Kopf der Anzeige, Dashboard ist die einzige Anzeige. ⏸ H10 offen. | Board `sitzung.js`, `companion/widget-groessen.mjs`, `features/anzeige/`, `netlify/_redirects` |
 | **A7** Größenstufen | nicht gebaut: Planungsrunde mit Max (E6) | – |
@@ -165,7 +165,9 @@ Voraussetzungen für die Playwright-Tests:
   - echte Gesamtkarte mit Markern (braucht einen neuen Karten-Block)
   - die Bereiche Handbuch und Baupläne
 - **Realm-Welt am iPhone** importieren (Laufzeit, Speicher). Rest von H2.
-- **Später:** B3 am echten iPhone (Home-Bildschirm-App, Flugmodus); E8 (Themes) an anderer Stelle.
+- **H14:** Offline mit Daten am iPhone (Home-Bildschirm-App, Flugmodus, B3).
+- **Pi-Update** für die neuen Routen von W2 und B3 (Warteliste, Erinnerungen).
+- **Später:** E8 (Themes) an anderer Stelle.
 
 ---
 
@@ -173,8 +175,8 @@ Voraussetzungen für die Playwright-Tests:
 
 1. ⏸ **H10** (Max): Probe nach dem Umschalten, Schritte in `koordinaten-board/pi/ANLEITUNG.md`. Kommt dabei etwas zurück, gehört es in den Bauplan „Sitzung“. Danach zieht der Bauplan nach `docs/bauplaene/`.
 2. **Offline B3–B5** auf `bereich/offline`, neu zugeschnitten am 13.10.2026 (N5 hinfällig, HTTPS und Service Worker sind da; Einzelheiten im Nachtrag von `bauplaene/Bauplan-Offline-Sync-und-Identitaet.md`):
-   - **B3:** Live-Modus ohne Netz statt DEMO-Rückfall (`betriebErkennen`), Datenspiegel der Bereiche in IndexedDB, Server `GET /api/aenderungen?seit=<nr>` plus `nr` in `geaendert`, Nachladen nach Wiederverbinden, Playwright offline **mit Daten**.
-   - ⏸ Haltepunkt am echten iPhone (Home-Bildschirm-App, Flugmodus, mit Daten).
+   - **B3 gebaut** (13.10.2026): Live-Modus ohne Netz statt DEMO-Rückfall, Spiegel in IndexedDB (in `api()`), Server `GET /api/aenderungen?seit=<nr>&lauf=` plus `nr`/`lauf` in `geaendert`, Nachladen nach Wiederverbinden, Playwright offline mit Daten (`netlify.test.mjs`).
+   - ⏸ **H14** am echten iPhone (Home-Bildschirm-App, Flugmodus, mit Daten).
    - Danach B4 (Offline-Regel, Warteschlange je Account) und B5 (Zustandswechsel, zuerst beim Abhaken der Sammelobjekte; `von`/`am` bei Wiederholung nicht überschreiben).
 3. **Nach A7:** echte Stufen statt der Platzhalter im Register, `SEITENLEISTEN_BREITE` setzen, größte Rasterstufe bauen.
 4. **Inhalte**, sobald beschrieben: Typen mit Quelle bekommen ihre Quelle in `widgets.js` (`quellenVon`) und ein Anzeigeschema in `board-karten.js`.
