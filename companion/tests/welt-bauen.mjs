@@ -365,6 +365,19 @@ const bereiche = (cx, cz, dim, ...kaesten) => {
   for (const [x1, y1, z1, x2, y2, z2, typ] of kaesten) p.i32(x1).i32(y1).i32(z1).i32(x2).i32(y2).i32(z2).u8(typ);
   return [chunkSchluessel(cx, cz, dim, 57), p.fertig()];
 };
+/** Strukturbereiche ab Bedrock 1.26 (Tag 119, AABBVolumes): Namen [nr, name], Teile [teil, x1, y1, z1, x2, y2, z2],
+    Zuordnung verschachtelter Strukturen a: [teil, nr], fester Strukturen b: [teil, nr, kennung] (Aufbau in welt-funde.js) */
+const volumen = (cx, cz, dim, { namen, teile, a = [], b = [] }) => {
+  const p = new Puffer().u32(1).u32(namen.length);
+  for (const [nr, name] of namen) p.u32(nr).u16(name.length).text(name);
+  p.u32(teile.length);
+  for (const [teil, ...k] of teile) { p.u32(teil); for (const v of k) p.i32(v); }
+  p.u32(a.length);
+  for (const [teil, nr] of a) p.u32(teil).u32(nr).u32(0);
+  p.u32(b.length);
+  for (const [teil, nr, kennung = 0] of b) p.u32(teil).u32(nr).u32(0).u32(kennung);
+  return [chunkSchluessel(cx, cz, dim, 119), p.fertig()];
+};
 const dorf = (schluessel, [x0, y0, z0, x1, y1, z1]) => [text(schluessel), nbtBauen({ X0: x0, Y0: y0, Z0: z0, X1: x1, Y1: y1, Z1: z1, Tick: nbt.long(9) })];
 
 /**
@@ -440,6 +453,17 @@ export function fundeweltBauen() {
     be(6, 0, "end", { id: "EndGateway", x: 96, y: 75, z: 0, Age: nbt.long(100), ExitPortal: [1100, 60, 50] }),
     be(68, 3, "end", { id: "EndGateway", x: 1100, y: 60, z: 50, Age: nbt.long(100), ExitPortal: [96, 75, 0] }),
     [text("TheEnd"), nbtBauen({ data: { DragonFight: { DragonKilled: nbt.byte(1), DragonSpawned: nbt.byte(0), PreviouslyKilled: nbt.byte(1) } } })],
+    // W4: Strukturbereiche ab 1.26 (Tag 119) – Monument (feste Struktur, zwei Chunks), Lager mit Prüfungskammer im selben
+    // Eintrag, Außenposten nur mit Spawnbereich bis zur Bauhöhe, ein unbekannter Name, ein ungültiger Kasten
+    volumen(62, 62, "overworld", { namen: [[0, "minecraft:monument"]],
+      teile: [[1, 1000, 39, 1000, 1028, 61, 1028], [2, 1000, 39, 1000, 1057, 61, 1057]], b: [[1, 0], [2, 0, 1]] }),
+    volumen(64, 64, "overworld", { namen: [[0, "minecraft:monument"]], teile: [[1, 1029, 39, 1029, 1057, 61, 1057]], b: [[1, 0]] }),
+    volumen(125, 125, "overworld", { namen: [[2, "minecraft:abandoned_camp_taiga"], [0, "minecraft:trial_chambers"]],
+      teile: [[3, 2000, 70, 2000, 2006, 74, 2006], [2, 2004, 70, 2004, 2010, 75, 2010], [1, 2020, -30, 2020, 2030, -20, 2030]],
+      a: [[3, 2], [2, 2], [1, 0]] }),
+    volumen(-80, 80, "overworld", { namen: [[0, "minecraft:pillager_outpost"]], teile: [[1, -1280, 63, 1280, -1265, 319, 1295]], b: [[1, 0, 1]] }),
+    volumen(-90, 90, "overworld", { namen: [[0, "minecraft:mystery_tower"], [1, "minecraft:igloo"]],
+      teile: [[1, -1440, 70, 1440, -1430, 80, 1450], [2, -1400, 70, 1400, -1410, 80, 1410]], b: [[1, 0], [2, 1]] }),
   ];
   const log = [
     [chunkSchluessel(-40, 30, "overworld", 49), null],

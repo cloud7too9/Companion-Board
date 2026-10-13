@@ -247,6 +247,7 @@ function funde(f) {
 
   const u = f.unbekannt;
   if (u.beute.length) console.log(`\nUnbekannte Beute-Tabellen: ${u.beute.map((b) => `${b.name} (${b.anzahl})`).join(", ")}`);
+  if (u.strukturen?.length) console.log(`Unbekannte Strukturen (Tag 119): ${u.strukturen.join(", ")}`);
   if (u.muster.length) console.log(`Unbekannte Banner-Muster: ${u.muster.join(", ")}`);
   if (u.ruestung.length) console.log(`Unbekannte Rüstungsteile: ${u.ruestung.join(", ")}`);
   if (f.fehler) console.log(`Nicht lesbare Einträge: ${f.fehler}`);

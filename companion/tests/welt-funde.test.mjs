@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 import path from "node:path";
 import { nbtLesen, nbtAlleLesen, levelDatNbt } from "../nbt.js";
-import { fundeSammler, beuteZuordnen, BEUTE, SPAWNER, BEREICHE, NAEHE, BANNER_FARBEN, BANNER_MUSTER, RUESTUNG_MATERIAL } from "../welt-funde.js";
+import { fundeSammler, beuteZuordnen, BEUTE, SPAWNER, BEREICHE, NAEHE, BANNER_FARBEN, BANNER_MUSTER, RUESTUNG_MATERIAL, VOLUMEN, volumenZuordnen } from "../welt-funde.js";
 import { weltLesen } from "../biom-welt.js";
 import { levelDatLesen } from "../biom-dekoder.js";
 import { testweltBauen, fundeweltBauen, nbt, nbtBauen, levelDatBauen, SEED } from "./welt-bauen.mjs";
@@ -90,7 +90,7 @@ test("Testwelt von Max: genau 6 Verliese und 1 vergrabener Schatz, Spieler und W
     zuletztGespielt: "2026-09-29T17:12:51.000Z", hardcore: false, cheats: false, drache: null,
   });
   assert.deepEqual([funde.portale, funde.sammelobjekte, funde.ruestung, funde.banner, funde.andereSpieler], [[], [], [], [], 0]);
-  assert.deepEqual(funde.unbekannt, { beute: [], muster: [], ruestung: [] });
+  assert.deepEqual(funde.unbekannt, { beute: [], muster: [], ruestung: [], strukturen: [] });
   assert.equal(funde.fehler, 0);
   // Streaming und „komplett“ (Bibliothek) finden dasselbe
   const komplett = await weltLesen(await openAsBlob(FIXTURE), { weg: "komplett" });
@@ -111,13 +111,17 @@ test("Fundewelt: Orte je Struktur, Löschen und Überschreiben wie bei den Biome
   // Anzahl je Ort: Behälter/Spawner/Kies/Tresore/Prüfungs-Spawner/Strukturbereiche/Endtransitportale
   const orte = funde.orte.map((o) => `${o.dim} ${o.kategorie} ${o.x} ${o.y} ${o.z} · ${[o.behaelter, o.spawner, o.kies, o.tresore, o.pruefspawner, o.bereiche, o.tore].join("/")}`);
   assert.deepEqual(orte, [
+    "overworld Camp 2005 72 2005 · 0/0/0/0/0/1/0",
     "overworld Desert Temple 165 64 170 · 4/0/0/0/0/0/0",
     "overworld Desert Well 180 60 170 · 0/0/1/0/0/0/0",
     "overworld Mineshaft 300 20 -101 · 1/0/0/0/0/0/0",
     "overworld Monument -941 50 669 · 0/0/0/0/0/1/0",
+    "overworld Monument 1028 50 1028 · 0/0/0/0/0/2/0",
+    "overworld Outpost -1273 63 1287 · 0/0/0/0/0/1/0",
     "overworld Outpost 487 80 487 · 1/0/0/0/0/1/0",
     "overworld Shipwreck -310 60 490 · 1/0/0/0/0/0/0",
     "overworld Trial Chamber -150 -20 -150 · 0/0/0/1/1/0/0",
+    "overworld Trial Chamber 2025 -25 2025 · 0/0/0/0/0/1/0",
     "overworld Village -1970 70 2030 · 0/0/0/0/0/1/0",
     "overworld Village 360 70 10 · 2/0/0/0/0/1/0",
     "overworld Witch Hut 603 66 603 · 0/0/0/0/0/1/0",
@@ -128,9 +132,10 @@ test("Fundewelt: Orte je Struktur, Löschen und Überschreiben wie bei den Biome
     "end End Gateway 1100 60 50 · 0/0/0/0/0/0/1",
   ]);
   assert.deepEqual(funde.orte.find((o) => o.kategorie === "Nether Fortress").mobs, ["blaze"]);
-  assert.deepEqual(funde.orte.map((o) => o.naehe), [48, 16, 96, 96, 48, 48, 96, 96, 96, 32, 96, 16, 96, 8, 8]);
+  assert.deepEqual(funde.orte.map((o) => o.naehe), [48, 48, 16, 96, 96, 96, 48, 48, 48, 96, 96, 96, 96, 32, 96, 16, 96, 8, 8]);
   assert.deepEqual(funde.orte.find((o) => o.kategorie === "Desert Well").beute, ["desert_well_brushable_block"]);
   assert.deepEqual(funde.unbekannt.beute, [{ name: "mod_kiste", anzahl: 2 }]);
+  assert.deepEqual(funde.unbekannt.strukturen, ["mystery_tower"]);
   // Nur der kaputte Block-Eintrag zählt; das ~local_player-Füllstück der Standard-Testwelt ersetzt die .log später
   assert.equal(funde.fehler, 1);
 });
@@ -139,7 +144,7 @@ test("W3: Strukturbereiche, Dörfer, Endtransitportale und Drache – Mitte des 
   const { funde } = await weltLesen(new Blob([fundeweltBauen().zip]));
   const ort = (k, x) => funde.orte.find((o) => o.kategorie === k && (x == null || o.x === x));
   // Außenposten: Mitte des Kastens statt der Truhe; Netherfestung: der Lohenspawner bleibt die Koordinate
-  assert.deepEqual([ort("Outpost").x, ort("Outpost").z, ort("Outpost").beute], [487, 487, ["pillager_outpost"]]);
+  assert.deepEqual([ort("Outpost", 487).x, ort("Outpost", 487).z, ort("Outpost", 487).beute], [487, 487, ["pillager_outpost"]]);
   assert.deepEqual([ort("Nether Fortress").x, ort("Nether Fortress").bereiche], [100, 1]);
   // Dorf: Mitte aus VILLAGE_…_INFO; das dritte Dorf hat die .log gelöscht; Typ 4 und ein Monument im Nether fallen weg
   assert.equal(funde.orte.filter((o) => o.kategorie === "Village").length, 2);
@@ -148,6 +153,23 @@ test("W3: Strukturbereiche, Dörfer, Endtransitportale und Drache – Mitte des 
   // Kaputter Strukturbereich: nur er fehlt
   const s = fundeSammler();
   s.aufnehmen(Uint8Array.of(1, 0, 0, 0, 1, 0, 0, 0, 57), Uint8Array.of(2, 0, 0, 0, 1, 2, 3), false);
+  assert.equal(s.auswerten().fehler, 1);
+});
+
+test("W4: Strukturbereiche ab 1.26 (Tag 119) – Namen, beide Zuordnungslisten, Spawnbereich, Kaputtes", async () => {
+  const { funde } = await weltLesen(new Blob([fundeweltBauen().zip]));
+  const ort = (k, x) => funde.orte.find((o) => o.kategorie === k && (x == null || o.x === x));
+  // Monument über zwei Chunks → ein Ort; Lager und Prüfungskammer aus einem Eintrag getrennt
+  assert.equal(funde.orte.filter((o) => o.kategorie === "Monument").length, 2);
+  assert.deepEqual([ort("Camp").x, ort("Camp").y, ort("Camp").z], [2005, 72, 2005]);
+  assert.ok(ort("Trial Chamber", 2025));
+  // Außenposten nur mit Spawnbereich (63 … 319): Y ist die Unterkante, nicht 191
+  assert.equal(ort("Outpost", -1273).y, 63);
+  // Iglu mit ungültigem Kasten (min > max) fällt weg, der unbekannte Name wird gemeldet
+  assert.ok(!funde.orte.some((o) => o.kategorie === "Igloo"));
+  // Abgeschnittener Eintrag kostet nur ihn
+  const s = fundeSammler();
+  s.aufnehmen(Uint8Array.of(1, 0, 0, 0, 1, 0, 0, 0, 119), Uint8Array.of(1, 0, 0, 0, 5, 0, 0, 0), false);
   assert.equal(s.auswerten().fehler, 1);
 });
 
@@ -211,7 +233,7 @@ const vorlage = (id) => ({ Count: nbt.byte(1), Damage: nbt.short(0), WasPickedUp
 
 test("Kategorien, Banner, Rüstung und Vorlagen passen zu regeln.js", () => {
   const { FEATURE_KATEGORIEN, FARBEN, MUSTER, RUESTUNGEN, SAMMELOBJEKTE } = regeln;
-  const kategorien = [...BEUTE.map(([, k, dims]) => [k, dims]), ...Object.values(SPAWNER), ...Object.values(BEREICHE),
+  const kategorien = [...BEUTE.map(([, k, dims]) => [k, dims]), ...Object.values(SPAWNER), ...Object.values(BEREICHE), ...Object.values(VOLUMEN),
     ["Trial Chamber", ["overworld"]], ["Village", ["overworld"]], ["End Gateway", ["end"]]];
   for (const [k, dims] of kategorien) {
     for (const d of dims) assert.ok(FEATURE_KATEGORIEN[d].includes(k), `${k} gibt es nicht in ${d}`);
@@ -240,4 +262,11 @@ test("Beute-Tabellen: Pfade aus Truhen und Kies", () => {
   assert.equal(beuteZuordnen("loot_tables/chests/buried_treasure.json").kategorie, "Treasure");
   assert.ok(beuteZuordnen("loot_tables/chests/spawn_bonus_chest.json").ohneOrt);
   assert.ok(beuteZuordnen("loot_tables/chests/irgendwas.json").unbekannt);
+  // W4: Lager, Töpfe und Spender der Prüfungskammern (an Max' Welt gesehen)
+  assert.equal(beuteZuordnen("loot_tables/chests/abandoned_camp_common_chest.json").kategorie, "Camp");
+  assert.equal(beuteZuordnen("loot_tables/chests/barrels/abandoned_camp_barrel.json").kategorie, "Camp");
+  assert.ok(beuteZuordnen("loot_tables/pots/trial_chambers/corridor.json").ohneOrt);
+  assert.ok(beuteZuordnen("loot_tables/dispensers/trial_chambers/chamber.json").ohneOrt);
+  assert.deepEqual(volumenZuordnen("minecraft:abandoned_camp_cherry_grove"), ["Camp", ["overworld"]]);
+  assert.equal(volumenZuordnen("minecraft:irgendwas"), null);
 });
