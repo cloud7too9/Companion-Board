@@ -1,5 +1,5 @@
 /**
- * Raster des Dashboards (planung/bauplaene/Bauplan-Raster-32-Spalten.md):
+ * Raster des Dashboards (docs/bauplaene/Bauplan-Raster-32-Spalten.md):
  * 32 Spalten auf jedem Gerät, quadratische Zellen, die Zahl der Reihen ergibt
  * sich aus der Höhe der Fläche. Kein Widget kennt die Zahl 32 hart – alles
  * liest `RASTER_SPALTEN`. Positionen und Größen stehen immer in Zellen,

@@ -43,11 +43,6 @@ Ein Gerät im Zimmer zeigt die Orte der aktiven Welt groß an. Alle anderen öff
 - **Git**: Der Verlauf ist mit allen Commits im Repo erhalten (Ordner `koordinaten-board/`). Letzter Commit hier: „QR-Code lernt die tatsächlich erreichbare Adresse“ (früher `75b00b2`).
 - ⚠️ **Ein Commit fehlt noch**: Laut alter Übergabe steht `main` bei Max auf `0b1d2f4` mit 15 Tests (Netzwerk 4). Dieser Commit war nicht im Zip. Bei Gelegenheit aus dem lokalen Board-Repo nachziehen, z. B. per `git format-patch 75b00b2..0b1d2f4` und im Repo mit `git am --directory=koordinaten-board` einspielen.
 
-## Gelöst bei Max (Betrieb vom Laptop aus, bis Umbau Phase 6)
-
-- Der QR-Code zeigte die Hyper-V-Adresse `172.24.0.1` statt WLAN `192.168.8.184`. Gelöst war das über Routen-Wahl und Adress-Lernen (`netzwerk.js`, `adresse.txt`); **beides ist seit dem 13.10.2026 entfernt** (E18), weil der Server auf dem Pi mit `OEFFENTLICHE_URL` läuft. Lokal gilt `http://localhost:3000`, fürs WLAN setzt man `OEFFENTLICHE_URL` von Hand.
-- Die Firewall-Freigabe (Skript entfernt) brauchte ein **Admin-Terminal**.
-
 ## Bezug zur Companion
 
 - Das Board ist das Raum-Dashboard. Die Bereiche der Companion sollen später als Widgets darauf laufen (siehe `../UEBERGABE.md` → Zusammenspiel).

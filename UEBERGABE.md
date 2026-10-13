@@ -4,14 +4,16 @@ Stand: 13.10.2026 · Einstieg für einen neuen Chat
 
 > **Repo-Umzug (05.10.2026):** Dieses Repo `Companion-Board` hat mit dem Stand von `flexibel-visionboard` (`main` 9d5be46) als einem Start-Commit begonnen. Der alte Verlauf, die alten Branches und die alten PR-Nummern liegen weiter in [`flexibel-visionboard`](https://github.com/cloud7too9/flexibel-visionboard). Mitgenommen wurde nur `bereich/karte-mcworld` als eigener Stand ohne Eltern (nicht mergen, nur nachschlagen).
 >
-> **Umbau auf Netlify + Raspberry Pi:** Plan und Haken in [`planung/UMBAUPLAN.md`](planung/UMBAUPLAN.md), Stand der Phasen in [`planung/UEBERGABE.md`](planung/UEBERGABE.md). **Der Umbau ist seit dem 13.10.2026 abgeschlossen:** Seiten von Netlify unter `mainhubv1.com`, Server auf dem Pi hinter dem Tunnel `api.mainhubv1.com`, Betrieb vom Laptop aus entfernt (E18). Die Einrichtung steht in [`koordinaten-board/pi/ANLEITUNG.md`](koordinaten-board/pi/ANLEITUNG.md).
+> **Umbau auf Netlify + Raspberry Pi:** Plan und Haken im Archiv unter [`docs/plaene/UMBAUPLAN.md`](docs/plaene/UMBAUPLAN.md). **Der Umbau ist seit dem 13.10.2026 abgeschlossen:** Seiten von Netlify unter `mainhubv1.com`, Server auf dem Pi hinter dem Tunnel `api.mainhubv1.com`, Betrieb vom Laptop aus entfernt (E18). Die Einrichtung steht in [`koordinaten-board/pi/ANLEITUNG.md`](koordinaten-board/pi/ANLEITUNG.md).
 
 > **Stand der Umsetzung von `planung/PLAN.md`** (Widget-Dashboard, Welt-Import, Accounts): [`planung/UEBERGABE.md`](planung/UEBERGABE.md) – was gebaut ist, Branches, Starten, Tests, nächste Schritte. Was auf Max wartet: [`planung/WARTELISTE.md`](planung/WARTELISTE.md).
 
 Diese Datei enthält, was **für beide Projekte** gilt: Arbeitsweise, Zusammenspiel, gemeinsame Referenz und projektübergreifende Entscheidungen. Alles Projektspezifische steht in der Übergabe des jeweiligen Projekts:
 
 - [`companion/UEBERGABE.md`](companion/UEBERGABE.md): Stand der Bereiche, Aufbau des Prototyps, Checkliste, API, Tests, recherchierte Spielfakten
-- [`koordinaten-board/UEBERGABE.md`](koordinaten-board/UEBERGABE.md): Stand, gelöste Probleme bei Max, Anbindung an die Companion
+- [`koordinaten-board/UEBERGABE.md`](koordinaten-board/UEBERGABE.md): Stand, Anbindung an die Companion
+
+Erledigtes (abgeschlossene Pläne, Verlauf der Runden, entschiedene Fragen) liegt im Archiv [`docs/`](docs/README.md).
 
 ---
 
@@ -49,8 +51,10 @@ README.md                 ← Überblick
 UEBERGABE.md              ← diese Datei (projektübergreifend)
 companion/                ← Companion: Seite + regeln.js + icons/ + ruestungs-baukasten/, Tests, Entwürfe, eigene Referenzbilder
 companion/widgets/        ← Widget-Ansicht fürs Board (Vite + React + TS, aus MainHub), Umbau laut planung/PLAN.md
-koordinaten-board/        ← Board: Server der Companion (Fastify) + Anzeige (React)
-planung/                  ← Umbauplan (UMBAUPLAN.md), Gesamtplan (PLAN.md), Ideen und Baupläne der Planungskommission
+koordinaten-board/        ← Board: Server der Companion (Fastify), Pi-Dienst; die Anzeige ist companion/widgets
+netlify/, netlify.toml    ← Build der Seiten für Netlify (Companion unter /app/, Dashboard unter /dashboard/)
+planung/                  ← was offen ist: Gesamtplan (PLAN.md), Übergabe, Warteliste, offene Ideen und Baupläne
+docs/                     ← Archiv, was erledigt ist: abgeschlossene Pläne und Baupläne, Verlauf, erledigte Entscheidungen
 referenz/                 ← gemeinsame Referenz (Datenmodell, Seed-Map, Dashboard-Vorbild)
 ```
 
@@ -68,7 +72,7 @@ Was wohin gehört:
 - **Git**: Bei jedem Schritt sagen, wann committet und gepusht wird. Nach einem eigenen Commit kurz bestätigen, z. B. „Commit erstellt: …“.
   - Companion: jeder Bereich bekommt einen eigenen Branch `bereich/<name>`.
   - Board: Änderungen auf einem Branch `board/<thema>`.
-  - Umbau (Netlify + Pi): je Phase ein Branch `umbau/<phase>` mit PR, wie in `planung/UMBAUPLAN.md` beschrieben.
+  - Umbau (Netlify + Pi, abgeschlossen): je Phase ein Branch `umbau/<phase>` mit PR, wie in `docs/plaene/UMBAUPLAN.md` beschrieben.
   - **Gemergt wird nur nach Rückfrage bei Max**, auch wenn Claude den Merge ausführt (Wunsch von Max, 04.10.2026).
 - **Bereiche geht Max einzeln durch.** Erst steht der Rahmen, dann folgen die Details. Nichts ausbauen, was nicht besprochen ist.
 - **Datenmodell minimal halten.** Es wird nur erweitert, wenn ein Bereich es konkret braucht. FeatureTypes werden nicht erfunden.
@@ -143,14 +147,10 @@ Daten: koordinaten-board/server/daten/daten.db (SQLite; daten.json bleibt als Si
 
 ## Offene Entscheidungen (projektübergreifend)
 
-**Entschieden am 29.09.2026** (Zusammenführung): Datenhaltung → Board im Heimnetz; OCR-Anbindung → umgesetzt; https ↔ http → im Heimnetz gelöst, weil Companion und API vom selben Server kommen; Board-Steuerung → durch die Companion ersetzt.
+Entschiedene stehen im Archiv: [`docs/verlauf/Entscheidungen-und-Haltepunkte.md`](docs/verlauf/Entscheidungen-und-Haltepunkte.md).
 
-1. **Welt-Import an echten Welten prüfen**: Biome kommen jetzt aus dem Weltordner (entschieden, Biom-Popups braucht es nicht mehr). An der Fixture-Welt von Max bestätigt: Höhenkarte, Stichproben gegen Chunkbase, ID 195 = Dappled Forest. Offen ist die Realm-Welt am iPhone (Laufzeit). Die IDs von Cherry Grove, Pale Garden und Sulfur Caves kommen seit 05.10.2026 aus Mojangs eigener Biom-Liste (`companion/tools/mojang-biomes.json`, siehe `companion/PLAN-welt-import-biome.md`, Kapitel 3.6).
+1. **Welt-Import an echten Welten prüfen**: Biome kommen jetzt aus dem Weltordner (entschieden, Biom-Popups braucht es nicht mehr). An der Fixture-Welt von Max bestätigt: Höhenkarte, Stichproben gegen Chunkbase, ID 195 = Dappled Forest. Offen ist die Realm-Welt am iPhone (Laufzeit). Die IDs von Cherry Grove, Pale Garden und Sulfur Caves kommen seit 05.10.2026 aus Mojangs eigener Biom-Liste (`companion/tools/mojang-biomes.json`, siehe `docs/plaene/PLAN-welt-import-biome.md`, Kapitel 3.6).
 2. **Dashboard**:
    - Eine Seite pro Bereich (wie die Kontrollzentrum-Seiten)?
-   - Wird am Handy oder an der Anzeige im Zimmer bearbeitet?
    - Welche Ansichten bekommt jeder Bereich? (wird beim jeweiligen Bereich geklärt)
-3. ~~Aufs Board~~ – **entschieden (04.10.2026):** Das Board bekommt eine Sitzung, die lebt, solange das Board läuft. „Aufs Board“ fügt den Inhalt als Widget an der ersten freien Stelle ein, am Handy verschieb- und entfernbar. **Gebaut (13.10.2026)** nach `planung/bauplaene/Bauplan-Sitzung.md`, S1–S4; das Dashboard ist die einzige Anzeige.
-4. **Aus der früheren Board-Steuerung** noch nicht übernommen: Notiz zu einem Ort, Kartenausschnitt als Bild, Export als JSON. Erweitert das Datenmodell.
-5. **Hetzner später**: Soll die Companion auch von unterwegs erreichbar sein (https, PWA installierbar)? Dann läuft derselbe Server dort, oder das Board verbindet sich nach außen.
-6. ~~Edition als Eigenschaft der Welt~~ – **entschieden (04.10.2026):** Es gibt nur Bedrock. Die Umschaltung Bedrock/Java in der Portal-Verwaltung ist entfernt.
+3. **Aus der früheren Board-Steuerung** noch nicht übernommen: Notiz zu einem Ort, Kartenausschnitt als Bild, Export als JSON. Erweitert das Datenmodell.

@@ -1,5 +1,7 @@
 # Welt-Export vom iPhone: Anleitung in der App
 
+> **Erledigt · Archiv** (umgesetzt über den Bauplan in `docs/bauplaene/Bauplan-Welt-Import.md`). Was noch offen ist, steht in [`planung/`](../../planung/); Übersicht über das Archiv: [`docs/README.md`](../../docs/README.md).
+
 Stand: 01.10.2026
 
 ## Ausgangslage

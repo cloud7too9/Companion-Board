@@ -46,12 +46,12 @@ Playwright-Tests mit Screenshots (vorher `npm run build`):
 
 Designregeln: Raster mit 32 Spalten und quadratischen Zellen, feste Fläche
 ohne Seiten-Scroll, getrennter Bearbeitungsmodus. Wie es weitergeht, steht in
-`planung/PLAN.md`. `docs/ROADMAP.md` ist die Roadmap aus MainHub und nur noch
-Hintergrund.
+`planung/PLAN.md`. Die Roadmap aus MainHub liegt als Hintergrund im Archiv
+(`docs/plaene/ROADMAP-MainHub.md` im Hauptordner).
 
 ## Raster (`src/features/workspace/lib/raster.ts`)
 
-Bauplan: `planung/bauplaene/Bauplan-Raster-32-Spalten.md`.
+Bauplan: `docs/bauplaene/Bauplan-Raster-32-Spalten.md`.
 
 - **32 Spalten** auf jedem Gerät (`RASTER_SPALTEN`), die Zelle ist
   quadratisch: `zellePx = Breite / 32`.
@@ -71,7 +71,7 @@ Bauplan: `planung/bauplaene/Bauplan-Raster-32-Spalten.md`.
 
 ## Größenstufen (`src/features/workspace/model/widget-vertrag.ts`)
 
-Bauplan: `planung/bauplaene/Bauplan-Widget-Groessensystem.md`.
+Bauplan: `docs/bauplaene/Bauplan-Widget-Groessensystem.md`.
 
 - **Größen-Vertrag** je Widget-Typ (`WidgetVertrag`): Stufen mit Name, Breite,
   Höhe und Informationsumfang, dazu Mindest- und Maximalgröße. Geprüft beim
@@ -98,7 +98,7 @@ Bauplan: `planung/bauplaene/Bauplan-Widget-Groessensystem.md`.
 
 ## Widget-Struktur (`src/features/workspace/model/widget-struktur.ts`)
 
-Bauplan: `planung/bauplaene/Bauplan-Widget-Struktur.md`.
+Bauplan: `docs/bauplaene/Bauplan-Widget-Struktur.md`.
 
 - **Bereich** (`BEREICHE`, IDs wie in der Companion: `karte`, `sammelobjekte`,
   `portale`, `handbuch`, `bauplaene`, `banner`, `ruestung`) ist nur eine
@@ -128,7 +128,7 @@ Bauplan: `planung/bauplaene/Bauplan-Widget-Struktur.md`.
 
 ## Inhalte: Karten vom Board (`src/features/karten/`)
 
-Bauplan: `planung/bauplaene/Bauplan-Widget-Inhalte.md`, Entscheidung E3.
+Bauplan: `docs/bauplaene/Bauplan-Widget-Inhalte.md`, Entscheidung E3.
 
 - **Gehäuse und Inhalt sind getrennt:** `WidgetGehaeuse` zeichnet Rahmen, Kopf
   mit dem Namen des Typs und markiert den Bereich (`data-bereich`, für die Themes
@@ -156,7 +156,7 @@ Bauplan: `planung/bauplaene/Bauplan-Widget-Inhalte.md`, Entscheidung E3.
 
 ## Bereichs-Themes (`src/features/workspace/model/widget-themes.ts`)
 
-Bauplan: `planung/bauplaene/Bauplan-Bereichs-Themes.md`.
+Bauplan: `docs/bauplaene/Bauplan-Bereichs-Themes.md`.
 
 - Am Gehäuse erkennt man den Bereich: Es setzt `data-theme` nach
   `WidgetTyp.bereich` (`BEREICH_THEMES`, fest oder dynamisch), dazu eine Leiste

@@ -1,8 +1,10 @@
 # Umbauplan Companion & Board
 
+> **Erledigt · Archiv** (alle sechs Phasen gebaut und in Betrieb seit 13.10.2026; die Startseite (E20) kam mit dem Bauplan „Sitzung“). Was noch offen ist, steht in [`planung/`](../../planung/); Übersicht über das Archiv: [`docs/README.md`](../../docs/README.md).
+
 Stand: 13.10.2026 · Max (Plan vom 05.10.2026, alle Haken gesetzt)
 
-> **Umsetzung:** Seit dem 05.10.2026 läuft der Umbau im Repo `cloud7too9/Companion-Board` (Start ohne Verlauf, der alte Verlauf liegt in `flexibel-visionboard`). Die Haken in den Phasen werden hier gesetzt; den Stand je Phase führt [`UEBERGABE.md`](UEBERGABE.md), Kapitel 1 und 9. Phasen 1–5 sind gebaut, gemergt (PRs #1–#7) und seit der Netlify-Probe am 13.10.2026 abgeschlossen; **Phase 6 ist seit dem 13.10.2026 abgeschlossen** (Pi, Tunnel, Domain `mainhubv1.com`, Probe über Mobilfunk, Aufräumen). Die Einrichtung steht in [`koordinaten-board/pi/ANLEITUNG.md`](../koordinaten-board/pi/ANLEITUNG.md).
+> **Umsetzung:** Seit dem 05.10.2026 läuft der Umbau im Repo `cloud7too9/Companion-Board` (Start ohne Verlauf, der alte Verlauf liegt in `flexibel-visionboard`). Die Haken in den Phasen werden hier gesetzt; den Stand je Phase führt [`UEBERGABE.md`](../../planung/UEBERGABE.md), Kapitel 1 und 9. Phasen 1–5 sind gebaut, gemergt (PRs #1–#7) und seit der Netlify-Probe am 13.10.2026 abgeschlossen; **Phase 6 ist seit dem 13.10.2026 abgeschlossen** (Pi, Tunnel, Domain `mainhubv1.com`, Probe über Mobilfunk, Aufräumen). Die Einrichtung steht in [`koordinaten-board/pi/ANLEITUNG.md`](../../koordinaten-board/pi/ANLEITUNG.md).
 
 ## Zielbild
 

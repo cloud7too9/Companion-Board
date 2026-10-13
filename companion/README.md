@@ -60,7 +60,7 @@ Im Code vorbereitet: `ansichten` im Modul-Vertrag der Registry `BEREICHE`. Welch
 
 ## Welt-Import: Biome aus dem Weltordner (`.zip` oder `.mcworld`)
 
-Bauplan: `PLAN-welt-import-biome.md` (von Max) und Strang C in `../planung/PLAN.md`. Biome kommen nur noch aus einer hochgeladenen Bedrock-Welt; die Companion liest sie im Browser (Web Worker) und zeigt sie flächig auf der Karte.
+Bauplan: `../docs/plaene/PLAN-welt-import-biome.md` (von Max, erledigt) und Strang C in `../planung/PLAN.md`. Biome kommen nur noch aus einer hochgeladenen Bedrock-Welt; die Companion liest sie im Browser (Web Worker) und zeigt sie flächig auf der Karte.
 
 **Anleitung für Max (iPhone):** In der Karte unten **Welt-Import** → die drei Schritte stehen direkt über dem Knopf:
 1. Dateien-App: Auf meinem iPhone › Minecraft › games › com.mojang › minecraftWorlds

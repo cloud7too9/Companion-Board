@@ -3,73 +3,28 @@
 > **Einstieg für den nächsten Chat:** zuerst [`../UEBERGABE.md`](../UEBERGABE.md) (Arbeitsweise, Konventionen), dann diese Datei, dann [`WARTELISTE.md`](WARTELISTE.md) (was auf Max wartet). Der Plan selbst steht in [`PLAN.md`](PLAN.md).
 >
 > Diese Datei beschreibt, was aus `PLAN.md` gebaut ist, wo es liegt, wie man es startet und testet und was als Nächstes kommt.
+>
+> **Erledigtes liegt im Archiv [`../docs/`](../docs/README.md):** abgeschlossene Pläne und Baupläne (Umbauplan, A1–A5, Welt-Import), der Verlauf der Runden mit allen PRs und die erledigten Haltepunkte und Entscheidungen.
 
 ---
 
 ## 1. Kurzfassung
 
 - **Gebaut und in `main`:**
-  - Strang C (ganzer Biom-Import), mit der Fixture-Welt von Max und Biom-ID 195 (Phase 1 abgeschlossen)
-  - der Anzeige-Link für andere Geräte
+  - Strang C (ganzer Biom-Import), mit der Fixture-Welt von Max und Biom-ID 195
   - das Widget-Dashboard A0–A6, einschließlich **Anordnen am Handy**
   - aus Strang B die Phasen **B1** (Datenmodell) und **B2** (Accounts mit PIN)
+  - der **Umbau auf Netlify + Raspberry Pi** (Phasen 1–6, in Betrieb unter `mainhubv1.com` seit 13.10.2026; Plan im Archiv: `docs/plaene/UMBAUPLAN.md`, Einrichtung: `koordinaten-board/pi/ANLEITUNG.md`)
+  - der **Bauplan „Sitzung“** (S1–S4, 13.10.2026): [`bauplaene/Bauplan-Sitzung.md`](bauplaene/Bauplan-Sitzung.md). **Das Widget-Dashboard ist die einzige Anzeige**, „Aufs Board“ legt ein Widget in die Sitzung der Anzeige, `/` und `/anzeige` leiten auf `/dashboard/` um.
   - **CI auf GitHub:** Bei jedem PR und jedem Push auf `main` laufen alle Tests (Kapitel 6)
-  - **Nur Bedrock (E15):** Java gibt es nirgendwo mehr, auch nicht bei den Portalen
-- **Umbau Netlify + Pi (`UMBAUPLAN.md`), Phasen 1–5 gebaut** (05.10.2026): Server abgesichert (Anzeige nur mit Link, `HOST`, `CF-Connecting-IP`, CORS, 6-stellige PIN), API-Adresse konfigurierbar (`konfig.js`, `VITE_API_URL`), Texterkennung am Handy (`texterkennung.js`, tesseract.js im Browser), SQLite (`daten.db`, `speicher.js`), Netlify-Build mit PWA (`netlify.toml`, `sw.js`). **Für Max:** neue 6-stellige PIN (QR-Code neu scannen); der Kiosk öffnet die Anzeige über `server/daten/anzeige-link.txt`; der Server braucht Node 22.13+; `daten.json` wird beim ersten Start nach `daten.db` übernommen.
+  - **Nur Bedrock (E15):** Java gibt es nirgendwo mehr
 - **Als Nächstes** (Kapitel 9):
-  0. ~~**Umbau**~~ **abgeschlossen (13.10.2026):** Phasen 1–6 sind gebaut und in Betrieb: Pi, Tunnel, Domain `mainhubv1.com`, Probe über Mobilfunk bestanden, Netlify-Probe (H8) bestanden. Aufgeräumt (E18): `netzwerk.js`, Adress-Lernen, Start- und Firewall-Skripte sind entfernt; ohne `OEFFENTLICHE_URL` gilt `localhost`. Die Einrichtung steht in `koordinaten-board/pi/ANLEITUNG.md`. Offen bleibt nur die Startseite der Domain (E20).
-  1. **Bauplan „Sitzung“** (E16) ist **gebaut** (13.10.2026, S1–S4): [`bauplaene/Bauplan-Sitzung.md`](bauplaene/Bauplan-Sitzung.md). **Das Widget-Dashboard ist die einzige Anzeige.** „Aufs Board“ legt ein Widget in die Sitzung der Anzeige (Layer „Sitzung“, nur im Speicher), die Companion schickt dafür nur die Quelle. Die Widgets der Anzeige (Orte, Beitreten, Spieler, Zuletzt) und der Kopf (Titel, Seed, Uhr, Verbunden) ersetzen die alte Anzeige. Seit S4 zeigt der Anzeige-Link auf `/dashboard`, `/` (Netlify) und `/anzeige` leiten dorthin um (E20 erledigt), `koordinaten-board/client/` und die Nachricht `gezeigt` sind entfernt. Jetzt ⏸ **H10**: Probe am Fernseher/Tablet und über Mobilfunk (`koordinaten-board/pi/ANLEITUNG.md`, Abschnitt „Probe nach dem Umschalten“).
-  2. **Offline B3–B5**, neu zugeschnitten (13.10.2026): N5 ist hinfällig, HTTPS kommt von Netlify/Cloudflare. B3 = Live-Modus ohne Netz, IndexedDB, Nachladen über `/api/aenderungen` (Nachtrag im Offline-Bauplan).
+  1. ⏸ **H10**: Probe nach dem Umschalten auf das Dashboard (Max, `koordinaten-board/pi/ANLEITUNG.md`). Danach wandert auch der Bauplan „Sitzung“ ins Archiv.
+  2. **Offline B3–B5**, neu zugeschnitten (13.10.2026): B3 = Live-Modus ohne Netz, IndexedDB, Nachladen über `/api/aenderungen` (Nachtrag im Offline-Bauplan).
   3. A7 (Größenstufen je Widget): Planungsrunde mit Max
   4. Inhalte, die noch nicht beschrieben sind (Warteliste, Kapitel 4)
-- **Git:**
-  - **Repo-Umzug am 05.10.2026** nach `Companion-Board` (Kapitel 3). `main` = Start-Commit ohne Verlauf, danach die Umbau-PRs #1–#7 (Phasen 1–5, Pi-Vorbereitung, Anleitung).
-  - **Gemergt wird nur nach Rückfrage bei Max**, auch wenn Claude den Merge ausführt.
+- **Git:** Gearbeitet wird im Repo `cloud7too9/Companion-Board` (seit 05.10.2026). **Gemergt wird nur nach Rückfrage bei Max**, auch wenn Claude den Merge ausführt. Die Runden mit allen PRs: `docs/verlauf/Runden-und-PRs.md`.
 - **Tests:** alle grün in `main`, lokal und in der CI (Kapitel 6).
-- **Für Max wichtig:** Seit B2 gelten alte Anmeldungen nicht mehr. Jedes Handy meldet sich einmal neu an, mit Name und eigener PIN.
-
-### Diese Runde (13.10.2026)
-
-| PR | Inhalt |
-|---|---|
-| #13 | Bauplan „Sitzung und eine Anzeige“ (abgenommen), Offline neu zugeschnitten (N5 hinfällig), Checkliste Pi/Cloudflare, Fix „Fertig“ in Anordnen |
-| #17 | S4 Umschalten: Anzeige-Link aufs Dashboard, `/` und `/anzeige` leiten um (E20), `koordinaten-board/client/` und `gezeigt` entfernt, Hinweis „Dieser Anzeige-Link gilt nicht mehr“, Tests auf das Dashboard umgeschrieben; ⏸ H10 wartet auf Max |
-| #16 | S3 Widgets der Anzeige: Orte, Beitreten (QR-Code vom Server), Spieler, Zuletzt, Kopf der Anzeige, neues Standard-Layout; ⏸ H9 wartet auf Max |
-| #15 | S2 Handy und Dashboard: „Aufs Board“ mit Quelle, Sitzung im Board-Sheet, Kennblock und Absender-Chip im Dashboard, Sitzungs-Layer gesperrt, Brücke `gezeigt` bis S4; Playwright-Tests zu „Aufs Board“ laufen live vom Board |
-| #14 | S1 Sitzung am Server: `sitzung.js`, `companion/widget-groessen.mjs` gemeinsam für Server und Dashboard, „Aufs Board“ mit Quelle, `portale.verbindung` |
-| #12 | Umbau abgeschlossen: Netlify-Probe (H8) und Phase 6 abgehakt, Domain `mainhubv1.com` statt Platzhalter, Betrieb vom Laptop aus entfernt (E18: `netzwerk.js`, Adress-Lernen, Start- und Firewall-Skripte), Entscheidungen zu `/app/` (Prototyp = Hauptstand) und Anzeigegerät (offen) festgehalten, E20 (Startseite) neu auf der Warteliste |
-
-### Vorige Runde (05./06.10.2026)
-
-| PR | Inhalt |
-|---|---|
-| #8 | Aufräumen: alte Handy-Oberfläche aus dem Anzeige-Client, überholter Entwurf, Doku-Stand nach Umbau Phase 5, Repo-Name |
-| #9 | Biom-IDs vollständig aus Mojangs `mojang-biomes.json` (Cherry Grove 192, Pale Garden 193, Sulfur Caves 194) |
-| #10 | Companion: Spielerprofil oben in der Sidebar (Name + Platzhalter), Knopf „Neue Version · Aktualisieren“ als PWA |
-
-Neu auf der Warteliste: H7 (Farben der neuen Biome), H8 (Probe bei Netlify), N6 („Aktualisieren“ auch bei neuen Daten?), E17 (Inhalt des Spielerprofils), E18 (Heimnetz-Betrieb vom Laptop behalten?), E19 (Sammelobjekt-Karten mit Struktur-Ansicht, Besatz-Icon und Biom-Hintergrund; Max liefert die Ansichten), Kapitel 5 (Branches löschen).
-
-### Runde davor (04.10.2026)
-
-| PR | Inhalt |
-|---|---|
-| #19 | Ergebnisse von Phase 1 des Biom-Plans nachgeholt: Fixture-Welt von Max, Biom-ID 195 = Dappled Forest, Höhenkarte `z*16 + x`. Lagen nur auf `bereich/karte-mcworld`. |
-| #20 | Die ganze Kette A2–A6 + B1/B2 + Anzeige-Link in einem Merge (ersetzt die gestapelten #12–#17) |
-| #21 | CI: `.github/workflows/tests.yml`, dazu ein Fix für eine Race Condition in `anzeige-link.test.mjs` |
-| #22 | Nur Bedrock: Java-Umschaltung entfernt. Entscheidungen festgehalten. Diese Übergabe. |
-
-Entscheidungen von Max (Details in `WARTELISTE.md` und `PLAN.md`, Kapitel 7):
-
-| Nr. | Entscheidung |
-|---|---|
-| N5 | HTTPS am Board mit **eigenem Zertifikat**, das iPhone vertraut ihm einmal *(hinfällig seit 13.10.2026: HTTPS über Netlify/Cloudflare)* |
-| E15 | **Nur Bedrock**, Java gibt es nirgendwo |
-| E16 | Das Board bekommt eine **Sitzung**, die lebt, solange das Board läuft. „Aufs Board“ fügt den Inhalt als **Widget an der ersten freien Stelle** ein, am Handy verschieb- und entfernbar. |
-| E8 | Themes für Sammelobjekte, Banner, Rüstung: **vertagt**, wird an anderer Stelle geklärt |
-| H1, H3–H6 | abgenommen |
-| Mergen | **nur nach Rückfrage bei Max** |
-
-Frühere Entscheidungen (01.10.2026): Strang C als ganzer Biom-Import, N1 (abgehakt wird im Bereich der Companion), N2 (Anordnen als React-Route `/dashboard/anordnen`), N4 (Board-PIN im QR-Code bleibt, Account-PIN kommt dazu), Arbeitsweise „Was Eingaben braucht, kommt auf die Warteliste, alles andere wird erledigt“.
 
 ---
 
@@ -78,7 +33,7 @@ Frühere Entscheidungen (01.10.2026): Strang C als ganzer Biom-Import, N1 (abgeh
 | Phase | Ergebnis | Wichtige Dateien |
 |---|---|---|
 | **C** Welt-Import | `.zip`/`.mcworld` im Browser lesen (Web Worker). Biome als Kacheln ans Board, je Welt in `biome/<weltId>.json`. Import-Sheet mit Anleitung (iPhone), Prüfung, Fortschritt. Biom-Ebene auf der Karte. Phase 1 an der Fixture-Welt geprüft. | `companion/biom-welt.js`, `biom-import.worker.js`, `biom-ids.js`, `regeln.js` (`biomImportPruefen`), Board `daten.js` (`biome…`), `companion/tests/daten/fixture-seed.mcworld` |
-| **Anzeige-Link** | Jede Anzeige hat einen eigenen Schlüssel. Andere Geräte (TV, Tablet) werden mit dem Link zur Anzeige. QR-Code und Verwaltung stehen im Board-Sheet der Companion. | Board `server.js` (`anzeigeZugang`), `daten.js` (`anzeige…`), `client/src/lib/zugang.ts` |
+| **Anzeige-Link** | Jede Anzeige hat einen eigenen Schlüssel. Andere Geräte (TV, Tablet) werden mit dem Link zur Anzeige. QR-Code und Verwaltung stehen im Board-Sheet der Companion. | Board `server.js` (`anzeigeZugang`), `daten.js` (`anzeige…`), `features/karten/lib/zugang.ts` |
 | **A0** Übernahme | MainHub läuft als `companion/widgets/` (Vite, React, TS, Tailwind, zustand). | `companion/widgets/` |
 | **A1** Raster | 32 Spalten, quadratische Zellen, die Reihen folgen der Höhe. | `lib/raster.ts` |
 | **A2** Größen-Vertrag | Größenstufen statt freier Größen. Passt-Prüfung mit Belegungsmatrix. Vollbild als eigene Route. | `model/widget-vertrag.ts`, `lib/collision-utils.ts`, `pages/VollbildPage.tsx` |
@@ -91,7 +46,8 @@ Frühere Entscheidungen (01.10.2026): Strang C als ganzer Biom-Import, N1 (abgeh
 | **E15** Nur Bedrock | Portal-Prüfung mit festem Suchradius ±128 (`PORTAL_SUCHRADIUS`), kein Umschalter, kein `edition` mehr im Kontext der Karten. Der Welt-Import weist Java-Welten mit klarer Meldung ab. | `companion/board-karten.js`, Portal-Verwaltung in `companion-prototyp.html` |
 | **CI** | Drei Jobs bei jedem PR und Push auf `main`, Screenshots als Download „bilder“ | `.github/workflows/tests.yml` |
 | **B3–B5** Offline | nicht gebaut. N5 ist hinfällig (HTTPS über Netlify/Cloudflare); B3 neu zugeschnitten, siehe Nachtrag im Offline-Bauplan. Gebaut ist davon schon der Service Worker mit versioniertem Cache (Umbau Phase 5). | `companion/sw.js` |
-| **E16** Sitzung | nicht gebaut. Bauplan abgenommen (`bauplaene/Bauplan-Sitzung.md`, 13.10.2026), S1 kann losgehen. | – |
+| **Umbau** Netlify + Pi | Phasen 1–6: Server abgesichert (Anzeige nur mit Link, `HOST`, `CF-Connecting-IP`, CORS, 6-stellige PIN), API-Adresse konfigurierbar, Texterkennung am Handy, SQLite, Netlify-Build mit PWA, Pi mit Tunnel. Plan im Archiv. | `netlify/`, `koordinaten-board/pi/`, `docs/plaene/UMBAUPLAN.md` |
+| **E16** Sitzung | S1–S4 gebaut (13.10.2026): Sitzung je Anzeige am Server, „Aufs Board“ mit Quelle, Widgets der Anzeige (Orte, Beitreten, Spieler, Zuletzt), Kopf der Anzeige, Dashboard ist die einzige Anzeige. ⏸ H10 offen. | Board `sitzung.js`, `companion/widget-groessen.mjs`, `features/anzeige/`, `netlify/_redirects` |
 | **A7** Größenstufen | nicht gebaut: Planungsrunde mit Max (E6) | – |
 
 Pfade unter `model/`, `lib/`, `components/` und `features/` liegen in `companion/widgets/src/` (`model/`, `lib/` und `components/` unter `features/workspace/`). „Board“ meint `koordinaten-board/server/src/`.
@@ -100,18 +56,10 @@ Pfade unter `model/`, `lib/`, `components/` und `features/` liegen in `companion
 
 ## 3. Branches und Mergen
 
-- **Repo-Umzug (05.10.2026):** Gearbeitet wird seitdem in `cloud7too9/Companion-Board`. `main` dort ist der Stand von `flexibel-visionboard` (`main` 9d5be46, Merge von PR #26) als **ein Start-Commit ohne Verlauf**. Die 16 gemergten Branches und alle PR-Nummern bis #26 gibt es nur noch im alten Repo; löschen muss Max dort nichts mehr. Die PR-Nummern in dieser Datei meinen das alte Repo.
-- **Mitgenommen:** `bereich/karte-mcworld` als eigener Stand ohne Eltern (ältere Fassung der Biom-Phasen 2–4: Prüfseite `welt-pruefen.html`, `welt-import.test.mjs`). #7 und #19 haben den Inhalt ersetzt; der Branch ist zum Nachschlagen, ein Merge scheitert absichtlich an „unrelated histories“.
-- **Umbau:** je Phase ein Branch `umbau/<phase>` mit PR gegen `main` (`UMBAUPLAN.md`). Gemergt sind #1 (Phase 1, Branch `claude/vibrant-mccarthy-qzhzq4` in der Rolle von `umbau/server-absichern`), #2 `umbau/api-adresse`, #3 `umbau/ocr-im-browser`, #4 `umbau/sqlite`, #5 `umbau/netlify`, #6 `umbau/pi-dienste`, #7 `umbau/anleitung-trixie`. Die Branches sind nach dem Merge gelöscht.
 - **Mergen:** nur nach Rückfrage bei Max, immer mit **„Create a merge commit“**.
+- **Branch der Cloud-Sitzung:** Claude arbeitet auf dem Branch, den die Sitzung vorgibt, und setzt ihn nach jedem Merge auf den neuen `main` zurück.
 - **Empfehlung:** In den Repo-Einstellungen „Automatically delete head branches“ einschalten. Dann verschwindet ein Branch nach dem Merge, und ein PR kann nicht mehr in einen schon gemergten Branch gehen (so ging im alten Repo #8 verloren).
-
-### Verlauf bis 04.10.2026
-
-- #7 (Strang C), #9 (MainHub), #10 (A0), #11 (A1) wurden einzeln gemergt.
-- #8 (Anzeige-Link) wurde in `bereich/karte-welt-upload` gemergt, als der schon in `main` war. Der Anzeige-Link kam erst mit #20 nach `main` (über `9f7dee9`).
-- #12–#17 waren gestapelt (jeder PR auf seinen Vorgänger). GitHub ließ die Basis von #17 nicht auf `main` umstellen („part of a stack“). Darum brachte **#20** denselben Branch `board/identitaet` in einem Merge nach `main`; #12 hat GitHub selbst als gemergt markiert, #13–#17 sind geschlossen.
-- Commits der Kette (ohne Merges): C `84ed32f` · `5a1d02e` · `e9c1efd` · `2570c56`; Anzeige-Link `51db22f`; A0 `b6d4082`; A1 `7ab7275` · `bedcfda` · `ca7eba6`; A2 `c777042` · `5de5ccc` · `e8d03ee` · `76f9fc2`; A3 `223f46c`; A4 `e00aeea` … `876aad6`; A5 `23f3a36` … `c54583a`; A6 `0905882` · `90ba916` · `d1873ae` · `766544a`; B1/B2 `75d4f89` · `1cae081` · `c09ec0a` · `8ee1ad6`.
+- Repo-Umzug, Umbau-Branches und der Verlauf der gestapelten PRs bis 04.10.2026: `docs/verlauf/Runden-und-PRs.md`.
 
 ---
 
@@ -159,23 +107,20 @@ npm start                                              # lokal; Betrieb auf dem 
 
 ---
 
-## 6. Tests (alle grün, 05.10.2026)
+## 6. Tests (alle grün, 13.10.2026)
 
 | Teil | Befehl | Ergebnis |
 |---|---|---|
-| Board-Server | `cd koordinaten-board && npm test` | 59 Tests (seit Umbau Phase 1: CORS, Client-IP hinter dem Tunnel, Board-PIN; seit Phase 3 ohne OCR; seit Phase 4 mit SQLite-Umzug) |
-| Widgets | `cd companion/widgets && npm run typecheck && npm test` | Typecheck ok, 110 Unit-Tests |
-| Companion und Dashboard (Playwright) | `cd companion/tests && npm test` | 17 Dateien (seit Umbau Phase 2 `getrennt`, seit Phase 5 `netlify`), dazu 20 Dekoder-Tests |
+| Board-Server | `cd koordinaten-board && npm test` | 60 Tests |
+| Widgets | `cd companion/widgets && npm run typecheck && npm test` | Typecheck ok, 125 Unit-Tests |
+| Companion und Dashboard (Playwright) | `cd companion/tests && npm test` | 17 Dateien mit zusammen 659 Prüfungen, dazu 20 Dekoder-Tests |
 
 **CI auf GitHub:** `.github/workflows/tests.yml` führt alle drei Teile bei jedem Pull Request und jedem Push auf `main` aus (Jobs „Board-Server“, „Widgets“, „Companion und Dashboard (Playwright)“, zusammen etwa 5 Minuten). Die Screenshots aus `companion/tests/bilder/`, darunter die Haltepunkte, hängen als Download „bilder“ am Lauf (14 Tage). Ein neuer Push auf denselben PR bricht den alten Lauf ab.
 
-Die Playwright-Dateien: `biom-dekoder` (20, `node --test`), `banner` (23), `portale` (29), `sammelobjekte` (64), `kennbloecke` (14), `board` (58), `live` (72), `anzeigeschema` (31), `ruestung` (52), `karte-mcworld` (52), `anzeige-link` (16), `widgets` (36), `widgets-board` (20), `widgets-anordnen` (25).
-
 Voraussetzungen für die Playwright-Tests:
 - Alles muss gebaut sein:
-  - `npm --prefix ../../koordinaten-board run installieren && npm --prefix ../../koordinaten-board run build`
-  - `npm --prefix ../widgets install && npm --prefix ../widgets run build`
-- In der Cloud-Umgebung braucht es `CHROMIUM=/opt/pw-browsers/chromium`. Auf GitHub installiert die CI Chromium selbst (`npx playwright install --with-deps chromium`).
+  - `npm --prefix ../../koordinaten-board run installieren && npm --prefix ../../koordinaten-board run build` (Server-Pakete und das Dashboard)
+- In der Cloud-Umgebung braucht es `CHROMIUM=/opt/pw-browsers/chromium` (für Schleifen mit `export`). Auf GitHub installiert die CI Chromium selbst (`npx playwright install --with-deps chromium`).
 - Die Tests starten eigene Board-Prozesse auf Ports 3185–3198. Ein hängender Prozess blockiert den nächsten Lauf; mit `ps -eo pid,args | grep "node src/server.js"` finden. Server-Tests und Playwright nicht parallel starten.
 - Screenshots für die Haltepunkte landen in `companion/tests/bilder/`.
 
@@ -208,7 +153,7 @@ Voraussetzungen für die Playwright-Tests:
 
 ## 8. Was auf Max wartet (Details in `WARTELISTE.md`)
 
-- **Bauplan „Sitzung“ abnicken** (E16), sobald er geschrieben ist.
+- **H10:** Probe nach dem Umschalten auf das Dashboard.
 - **A7/E6:** Planungsrunde zu den Größenstufen je Widget und `seitenleistenBreite`.
 - **Inhalte beschreiben:**
   - Koordinatensammlung, Eigene Liste
@@ -221,17 +166,7 @@ Voraussetzungen für die Playwright-Tests:
 
 ## 9. Nächste Schritte
 
-0. ~~**Umbau auf Netlify + Raspberry Pi**~~ **abgeschlossen (13.10.2026)**, siehe `UMBAUPLAN.md`: Phasen 1–6 in Betrieb unter `mainhubv1.com`, Aufräumen erledigt (E18). Entschieden: `/app/` bekommt den Prototyp, der Prototyp ist der Hauptstand; das Anzeigegerät bleibt offen (technisch egal). Noch zu entscheiden: die Startseite der Domain (E20, Anzeige oder Dashboard).
-1. **Bauplan „Sitzung“ (E16)** ist gebaut: `bauplaene/Bauplan-Sitzung.md` (13.10.2026, S1–S4). Offen ist nur noch ⏸ **H10** (Probe nach dem Umschalten, Max). Fest stand vorher:
-   - Die Sitzung lebt, solange das Board läuft. Ein Neustart beginnt leer; das gespeicherte Layout der Anzeige (A6) bleibt.
-   - Inhalte lassen sich während der Laufzeit live ändern.
-   - „Aufs Board“ fügt den Inhalt als **Widget an der ersten freien Stelle** ein (Größe aus dem Größen-Vertrag, Passt-Prüfung aus A2). Am Handy lässt er sich in „Anzeige anordnen“ verschieben oder entfernen.
-
-   Im Bauplan zu klären:
-   - Wo die Sitzung liegt: im Speicher des Servers, neben `layout.js`. Bekommt sie einen eigenen Layer über dem gespeicherten Layout?
-   - Was passiert, wenn kein Platz frei ist.
-   - Ob `/anzeige` wegfällt. Dann brauchen der QR-Code zum Beitreten und die Orte mit Kennblöcken eigene Widgets, der Anzeige-Link zeigt auf `/dashboard`, und die Startskripte bauen das Dashboard mit.
-   - Wie die Anzeigeschemas (`BOARD_KARTEN`, Quelle wie `portal:<id>`) auf Widget-Typen mit Quelle abgebildet werden. `WIDGETS` und `quellenVon` in Board `widgets.js` sind der Anknüpfungspunkt.
+1. ⏸ **H10** (Max): Probe nach dem Umschalten, Schritte in `koordinaten-board/pi/ANLEITUNG.md`. Kommt dabei etwas zurück, gehört es in den Bauplan „Sitzung“. Danach zieht der Bauplan nach `docs/bauplaene/`.
 2. **Offline B3–B5** auf `bereich/offline`, neu zugeschnitten am 13.10.2026 (N5 hinfällig, HTTPS und Service Worker sind da; Einzelheiten im Nachtrag von `bauplaene/Bauplan-Offline-Sync-und-Identitaet.md`):
    - **B3:** Live-Modus ohne Netz statt DEMO-Rückfall (`betriebErkennen`), Datenspiegel der Bereiche in IndexedDB, Server `GET /api/aenderungen?seit=<nr>` plus `nr` in `geaendert`, Nachladen nach Wiederverbinden, Playwright offline **mit Daten**.
    - ⏸ Haltepunkt am echten iPhone (Home-Bildschirm-App, Flugmodus, mit Daten).

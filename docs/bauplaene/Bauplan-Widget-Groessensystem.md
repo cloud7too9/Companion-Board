@@ -1,5 +1,7 @@
 # Bauplan: Widget-Größensystem
 
+> **Erledigt · Archiv** (gebaut in Phase A2, abgenommen mit H3 am 04.10.2026; die echten Größenstufen je Widget (A7, E6) sind offen und stehen in der Warteliste). Was noch offen ist, steht in [`planung/`](../../planung/); Übersicht über das Archiv: [`docs/README.md`](../../docs/README.md).
+
 Stand: 01.10.2026 · Grundlage: Widget-Groessensystem · Setzt voraus: Bauplan-Raster-32-Spalten
 
 Dieser Bauplan beschreibt die technischen Entscheidungen. Die Anpassung an das konkrete Projekt gehört nicht dazu.

@@ -1,5 +1,5 @@
 /**
- * Bereichs-Themes (planung/bauplaene/Bauplan-Bereichs-Themes.md): Am Gehäuse
+ * Bereichs-Themes (docs/bauplaene/Bauplan-Bereichs-Themes.md): Am Gehäuse
  * erkennt man, aus welchem Bereich ein Widget stammt. Ein Theme ist ein Satz
  * CSS-Variablen (shared/styles/themes.css, `[data-theme="…"]`), der die
  * Farb-Tokens überschreibt – Inhalte nutzen nur diese Tokens, nie feste Farben,

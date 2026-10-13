@@ -1,7 +1,7 @@
 # Roadmap
 
 > **Abgelöst** seit der Übernahme in die Companion (01.10.2026). Was als
-> Nächstes kommt, steht in [`planung/PLAN.md`](../../../planung/PLAN.md).
+> Nächstes kommt, steht in [`planung/PLAN.md`](../../planung/PLAN.md).
 > Diese Roadmap aus MainHub bleibt als Hintergrund stehen. Das Docker-Image
 > gibt es nicht mehr: Ausgeliefert wird vom Board-Server.
 

@@ -1,6 +1,6 @@
 # Pi, Cloudflare, Netlify: Anleitung für die Phasen 5 und 6
 
-Stand: 13.10.2026 · gehört zu [`../../planung/UMBAUPLAN.md`](../../planung/UMBAUPLAN.md)
+Stand: 13.10.2026 · gehört zum Umbauplan (erledigt, im Archiv: [`../../docs/plaene/UMBAUPLAN.md`](../../docs/plaene/UMBAUPLAN.md))
 
 **Stand 13.10.2026: alles eingerichtet und über Mobilfunk geprobt.** Diese Anleitung bleibt, damit der Pi jederzeit neu aufsetzbar ist. Ab hier braucht es Konten, die Domain und den Pi, also Max. Die Domain ist `mainhubv1.com` (seit 13.10.2026; API unter `api.mainhubv1.com`).
 

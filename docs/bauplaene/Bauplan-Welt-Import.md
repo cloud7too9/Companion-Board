@@ -1,5 +1,7 @@
 # Bauplan: Welt-Import per ZIP mit Anleitung
 
+> **Erledigt · Archiv** (gebaut als Strang C des Plans, 01.10.2026, abgenommen als H1 am 04.10.2026). Was noch offen ist, steht in [`planung/`](../../planung/); Übersicht über das Archiv: [`docs/README.md`](../../docs/README.md).
+
 Stand: 01.10.2026 · Grundlage: Welt-Export-iPhone
 
 Dieser Bauplan beschreibt die technischen Entscheidungen. Die Anpassung an das konkrete Projekt gehört nicht dazu, ebenso wenig das Auslesen der Biome aus den Weltdaten.
