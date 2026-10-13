@@ -246,7 +246,7 @@ try {
       headers: { "content-type": "application/json", authorization: `Bearer ${tim.token}` }, body: JSON.stringify(body) }).then((r) => r.json());
     const timWelt = (await timApi("POST", "/orte/welten", { seed: "6889192652397090698" })).welt;
     for (const [kategorie, variante, x, y, z, dim] of [["Eigene Orte", "Hauptbasis", 212, 71, -388, "overworld"], ["Village", null, 1040, 64, 310, "overworld"],
-      ["Nether Fortress", null, 180, 70, -95, "nether"], ["End City", null, 1300, 60, -820, "end"]]) {
+      ["Nether Fortress", null, 180, 70, -95, "nether"], ["End City", null, 1300, 60, -820, "end"], ["Stronghold", null, -1884, 40, -524, "overworld"]]) {   // ohne Variante: neue Varianten entstehen nur aus Screenshots
       await timApi("POST", "/orte/instanzen", { dimensionId: `d_${timWelt.id}_${dim}`, kategorie, variante, x, y, z, quelle: "manuell" });
     }
     await schlafen(300);
@@ -263,16 +263,25 @@ try {
     await anzeige.waitForFunction(() => [...document.querySelectorAll("img.kennblock")].every((i) => i.complete));
     const anzeigeIcons = await iconsLesen(anzeige, ".a-zeile");
     console.log("     Anzeige-Icons:", anzeigeIcons);
-    pruefe(anzeigeIcons === "End City=end_city.png, Hauptbasis=Linie, Nether Fortress=fortress.png, Village=Linie", "Anzeige: Kennblöcke bei Netherfestung und Endsiedlung, sonst Linien-Icon");
+    pruefe(anzeigeIcons === "End City=end_city.png, Hauptbasis=Linie, Nether Fortress=fortress.png, Stronghold=stronghold.png, Village=Linie", "Anzeige: Kennblöcke bei Netherfestung, Endsiedlung und Festung, sonst Linien-Icon");
     await anzeige.screenshot({ path: `${DIR}/v7b-anzeige-kennbloecke.png` });
 
 
-    await p.click('[data-aktion="schliessen"]'); await p.waitForTimeout(250);
-    await p.click(".ort-reihe"); await p.waitForTimeout(350);
-    const ortTitel = await text(p, ".sheet-kopf h2");
-    const ortX = await p.$eval(".result-coords b", (e) => e.textContent);
-    pruefe(await text(p, ".board-zeigen") === "Aufs Board", `Detail „${ortTitel}“: Knopf „Aufs Board“`);
-    await p.click(".board-zeigen");
+    // Seit Bauplan „Sitzung“ (S2) baut das Board die Karte aus seinen Daten: Lena macht live vom Board aus weiter
+    // (die DEMO-Seite oben kennt Tims Orte nicht). Gleicher Account, gleiche eigene PIN.
+    const lena = await p.context().newPage();
+    await lena.goto(`${BOARD}/?pin=${PIN}`);
+    // Das Board kennt Lena schon: Account antippen (die Kontenliste kommt verzögert und zeichnet das Formular neu), dann die eigene PIN
+    await lena.waitForSelector('[data-aktion="board-konto"][data-name="Lena"]');
+    await lena.click('[data-aktion="board-konto"][data-name="Lena"]');
+    await lena.fill("#boardKontoPin", "1357");
+    await lena.click('[data-aktion="board-beitreten"]');
+    pruefe(await warteAuf(lena, () => typeof bd !== "undefined" && bd.status === "verbunden" && st.instanzen?.length >= 5), "Lena live vom Board: Tims Orte geladen");
+    await lena.evaluate(() => detailOeffnen(st.instanzen.find((i) => typVon(i).kategorie === "Village").id)); await lena.waitForTimeout(350);
+    const ortTitel = await text(lena, ".sheet-kopf h2");
+    const ortX = await lena.$eval(".result-coords b", (e) => e.textContent);
+    pruefe(await text(lena, ".board-zeigen") === "Aufs Board", `Detail „${ortTitel}“: Knopf „Aufs Board“`);
+    await lena.click(".board-zeigen");
     pruefe(await warteAuf(anzeige, () => document.querySelector(".g-karte h2")), "Anzeige zeigt die Karte");
     await anzeige.waitForTimeout(600);  // Einblenden abwarten
     pruefe(await text(anzeige, ".g-karte h2") === ortTitel, `Anzeige: Titel „${ortTitel}“`);
@@ -281,7 +290,15 @@ try {
     pruefe(achsen[0].includes("X" + ortX), "Anzeige: X-Koordinate wie in der Companion");
     pruefe(achsen.length === 2 && /^Im Nether|^In der Oberwelt/.test(achsen[1]), "Anzeige: umgerechnete Koordinaten");
     pruefe((await text(anzeige, ".g-von")).startsWith("Lena"), "Anzeige: von Lena");
-    pruefe(await warteAuf(p, () => document.querySelector(".board-zeigen")?.classList.contains("aktiv")), "Detail: Knopf zeigt „Liegt auf dem Board“");
+    pruefe(await warteAuf(lena, () => document.querySelector(".board-zeigen")?.classList.contains("aktiv")), "Detail: Knopf zeigt „Liegt auf dem Board“");
+    // Bauplan „Sitzung“ (S2): Der Inhalt liegt als Widget im Layer „Sitzung“ des Dashboards, mit Absender
+    const dash = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+    await dash.goto(`${BOARD}/dashboard${await anzeigeLinkQuery(path.join(TMP, "daten"))}`);
+    pruefe(await warteAuf(dash, () => document.querySelector('[data-typ="karte.einzelkoordinate"] [data-testid="von"]')?.textContent.trim() === "Lena", null, 15000),
+      "Dashboard: Sitzungs-Widget des Ortes, „von Lena“");
+    pruefe(await warteAuf(dash, () => document.querySelector('[data-testid="layer-name"]')?.textContent.trim() === "Sitzung"), "Dashboard: Layer „Sitzung“ ist aktiv");
+    pruefe(await warteAuf(dash, () => Boolean(document.querySelector('[data-typ="karte.einzelkoordinate"] [data-testid="karte"]'))), "Dashboard: Karte des Ortes geladen");
+    await dash.screenshot({ path: `${DIR}/v8b-dashboard-sitzung.png` });
     const lage = await anzeige.evaluate(() => {
       const r = (s) => document.querySelector(s).getBoundingClientRect();
       const karte = r(".g-karte"), seite = r(".a-seite"), gez = r(".a-gezeigt");
@@ -290,7 +307,7 @@ try {
     pruefe(lage.seiteRechts, "Anzeige: Seitenleiste mit QR-Code bleibt rechts frei");
     pruefe(lage.karteGanz, "Anzeige: Karte vollständig sichtbar");
     await anzeige.screenshot({ path: `${DIR}/v8-anzeige-ort.png` });
-    await p.screenshot({ path: `${DIR}/v9-detail-aufs-board.png` });
+    await lena.screenshot({ path: `${DIR}/v9-detail-aufs-board.png` });
 
     // Neu geladene Anzeige bekommt die Karte sofort
     await anzeige.reload();
@@ -309,30 +326,37 @@ try {
     pruefe((await anzeige.$$eval(".g-zeile", (l) => l.map((z) => z.textContent).join(" | "))) === "StatusEinseitig | Abstand34 Blöcke", "Anzeige: Zeilen");
     pruefe((await text(anzeige, ".g-text")).startsWith("Nether-Portal genau"), "Anzeige: Text");
     await anzeige.screenshot({ path: `${DIR}/v10-anzeige-zeilen.png` });
-    pruefe(await warteAuf(p, () => !document.querySelector(".board-zeigen")?.classList.contains("aktiv")), "Detail: Knopf wieder „Aufs Board“");
+    pruefe(await lena.$eval(".board-zeigen", (e) => e.classList.contains("aktiv")), "Detail: Knopf bleibt „Liegt auf dem Board“ (Tims Karte ersetzt nur die große Anzeige, nicht die Sitzung)");
 
-    // Wegnehmen über das Board-Sheet
-    await p.click('[data-aktion="schliessen"]'); await p.waitForTimeout(250);
-    await boardAntippen(p); await p.waitForTimeout(300);
-    const auf = await text(p, ".board-gezeigt");
-    pruefe(auf.includes("<b>Eisenfarm</b>") && auf.includes("von Tim"), "Board-Sheet: zeigt Tims Karte");
-    await p.screenshot({ path: `${DIR}/v11-sheet-gezeigt.png` });
-    await p.click('[data-aktion="board-wegnehmen"]');
-    pruefe(await warteAuf(anzeige, () => !document.querySelector(".a-gezeigt")), "Wegnehmen → Anzeige wieder frei");
-    pruefe(await warteAuf(p, () => document.getElementById("orteSheetInhalt")?.textContent.includes("Gerade liegt nichts")), "Board-Sheet: wieder leer");
+    // Wegnehmen über das Board-Sheet: die Sitzung listet Lenas Widget
+    await lena.click('[data-aktion="schliessen"]'); await lena.waitForTimeout(250);
+    await boardAntippen(lena); await lena.waitForTimeout(300);
+    const auf = await text(lena, ".board-gezeigt");
+    pruefe(auf.includes(ortTitel) && auf.includes("von Lena"), `Board-Sheet: zeigt Lenas Sitzungs-Widget „${ortTitel}“`);
+    await lena.screenshot({ path: `${DIR}/v11-sheet-gezeigt.png` });
+    await lena.click('[data-aktion="board-wegnehmen"]');
+    pruefe(await warteAuf(dash, () => !document.querySelector('[data-testid="von"]')), "Wegnehmen → Sitzungs-Widget verschwindet vom Dashboard");
+    pruefe(await warteAuf(lena, () => document.getElementById("orteSheetInhalt")?.textContent.includes("Gerade liegt nichts")), "Board-Sheet: wieder leer");
+    timWs.send(JSON.stringify({ art: "verbergen", anfrage: 3, id: null }));   // Tims große Karte räumen (alter Weg)
+    pruefe(await warteAuf(anzeige, () => !document.querySelector(".a-gezeigt")), "Tim nimmt seine Karte weg → Anzeige wieder frei");
 
     // Struktur aufs Board → die Anzeige zeigt den Kennblock neben dem Titel
-    await p.evaluate(() => detailOeffnen(st.instanzen.find((i) => typVon(i).kategorie === "Stronghold").id)); await p.waitForTimeout(350);
-    await p.click(".board-zeigen");
+    await lena.evaluate(() => detailOeffnen(st.instanzen.find((i) => typVon(i).kategorie === "Stronghold").id)); await lena.waitForTimeout(350);
+    await lena.click(".board-zeigen");
     pruefe(await warteAuf(anzeige, () => document.querySelector(".g-kennblock img.kennblock")?.naturalWidth > 0), "Anzeige: Stronghold mit Kennblock neben dem Titel");
     await anzeige.waitForTimeout(600);
     pruefe(await anzeige.$eval(".g-kennblock img", (i) => i.getAttribute("src")) === "/icons/struktur_kennbloecke/stronghold.png", "Anzeige: Kennblock stronghold.png");
     pruefe(await anzeige.evaluate(() => { const k = document.querySelector(".g-karte").getBoundingClientRect(); return k.bottom <= innerHeight; }), "Anzeige: Karte mit Kennblock vollständig sichtbar");
     await anzeige.screenshot({ path: `${DIR}/v12-anzeige-kennblock.png` });
-    await p.evaluate(() => boardWegnehmen());
+    pruefe(await warteAuf(dash, () => document.querySelector('[data-typ="karte.einzelkoordinate"] img.kennblock')?.naturalWidth > 0), "Dashboard: Stronghold-Widget mit Kennblock");
+    await dash.screenshot({ path: `${DIR}/v12b-dashboard-kennblock.png` });
+    await lena.evaluate(() => boardAlleWegnehmen());
     pruefe(await warteAuf(anzeige, () => !document.querySelector(".a-gezeigt")), "Stronghold wieder vom Board genommen");
+    pruefe(await warteAuf(dash, () => !document.querySelector('[data-testid="von"]')), "Dashboard: Sitzung wieder leer");
     timWs.close();
     await anzeige.close();
+    await dash.close();
+    await lena.close();
 
     // Die übrigen Bereiche laufen weiter
     await p.click('[data-aktion="schliessen"]');
