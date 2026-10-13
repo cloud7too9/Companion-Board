@@ -4913,7 +4913,8 @@ function weltImportNachricht(m){
   wi.worker?.terminate(); wi.worker = null;
   if(m.typ === "geprueft") Object.assign(wi, { schritt:"bestaetigen", welt:m.welt });
   if(m.typ === "fertig"){
-    Object.assign(wi, { schritt:"pruefliste", ergebnis:{ meta:m.meta, kacheln:m.kacheln, auswertung:null } });
+    // funde (Strukturen, Portale, Spieler, Banner) zeigt die Prüfliste ab Phase W2 (Bauplan „Welt-Funde“)
+    Object.assign(wi, { schritt:"pruefliste", ergebnis:{ meta:m.meta, kacheln:m.kacheln, funde:m.funde ?? null, auswertung:null } });
     wi.dim = DIM_ORDER.find((d) => m.meta.chunks[d]) || "overworld";
   }
   weltImportRendern();

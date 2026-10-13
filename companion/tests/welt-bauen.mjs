@@ -73,14 +73,62 @@ export function data3dBauen({ hoehe = () => 128, biom, dim = "overworld", sektio
   return p.fertig();
 }
 
+// ---------- NBT schreiben (Little Endian) ----------
+
+/** Werte mit Typ: nbt.byte(1), nbt.liste(nbt.STRING, ["a"]) … Ohne Hülle gilt: Text → String,
+    ganze Zahl → Int, sonst Zahl → Float, BigInt → Long, Array → Liste (Typ vom ersten Wert), Objekt → Compound */
+export const nbt = {
+  BYTE: 1, SHORT: 2, INT: 3, LONG: 4, FLOAT: 5, DOUBLE: 6, BYTES: 7, STRING: 8, LISTE: 9, COMPOUND: 10, INTS: 11, LONGS: 12,
+  byte: (v) => ({ t: 1, v }), short: (v) => ({ t: 2, v }), int: (v) => ({ t: 3, v }), long: (v) => ({ t: 4, v: BigInt(v) }),
+  float: (v) => ({ t: 5, v }), double: (v) => ({ t: 6, v }), bytes: (v) => ({ t: 7, v }), ints: (v) => ({ t: 11, v }), longs: (v) => ({ t: 12, v }),
+  liste: (elem, v) => ({ t: 9, elem, v }),
+};
+const nbtTyp = (w) => (w && typeof w === "object" && "t" in w && "v" in w ? w.t
+  : typeof w === "string" ? 8 : typeof w === "bigint" ? 4 : typeof w === "number" ? (Number.isInteger(w) ? 3 : 5)
+  : Array.isArray(w) ? 9 : 10);
+const nbtRoh = (w) => (w && typeof w === "object" && "t" in w && "v" in w ? w.v : w);
+function nbtWert(p, typ, w) {
+  const v = nbtRoh(w);
+  switch (typ) {
+    case 1: return p.u8(v);
+    case 2: return p.i16(v);
+    case 3: return p.i32(v);
+    case 4: return p.i64(v);
+    case 5: { const b = new Uint8Array(4); new DataView(b.buffer).setFloat32(0, v, true); return p.bytes(b); }
+    case 6: { const b = new Uint8Array(8); new DataView(b.buffer).setFloat64(0, v, true); return p.bytes(b); }
+    case 7: return p.i32(v.length).bytes(v);
+    case 8: { const t = new TextEncoder().encode(v); return p.u16(t.length).bytes(t); }
+    case 9: {
+      const elem = w?.elem ?? (v.length ? nbtTyp(v[0]) : 0);
+      p.u8(elem).i32(v.length);
+      for (const x of v) nbtWert(p, elem, x);
+      return p;
+    }
+    case 10: {
+      for (const [name, x] of Object.entries(v)) { const t = nbtTyp(x); nbtWert(p.u8(t), 8, name); nbtWert(p, t, x); }
+      return p.u8(0);
+    }
+    case 11: p.i32(v.length); for (const x of v) p.i32(x); return p;
+    case 12: p.i32(v.length); for (const x of v) p.i64(x); return p;
+    default: throw new Error(`NBT-Typ ${typ}`);
+  }
+}
+/** Wurzel-Compound(s) → Bytes; mehrere hintereinander wie bei Block-Entities */
+export function nbtBauen(...wurzeln) {
+  const p = new Puffer();
+  for (const w of wurzeln) nbtWert(nbtWert(p.u8(10), 8, ""), 10, w);
+  return p.fertig();
+}
+
 // ---------- level.dat ----------
 
-/** level.dat mit RandomSeed, LevelName, lastOpenedWithVersion – und Füllstoff aller NBT-Typen zum Überspringen */
-export function levelDatBauen({ seed, name = "Testwelt", version = [1, 26, 50, 20, 0] }) {
+/** level.dat mit RandomSeed, LevelName, lastOpenedWithVersion – und Füllstoff aller NBT-Typen zum Überspringen.
+    zusatz: weitere Felder (nbt-Werte), z. B. GameType, Time, LastPlayed – ersetzen gleichnamige Füllfelder */
+export function levelDatBauen({ seed, name = "Testwelt", version = [1, 26, 50, 20, 0], zusatz = {} }) {
   const n = new Puffer();
   const kopf = (typ, name) => n.u8(typ).u16(new TextEncoder().encode(name).length).text(name);
   n.u8(10).u16(0);                                                      // Wurzel-Compound, leerer Name
-  kopf(1, "Difficulty").u8(2);
+  if (!("Difficulty" in zusatz)) kopf(1, "Difficulty").u8(2);
   kopf(2, "Kurz").i16(-3);
   kopf(5, "Zufall").u32(0x3f800000);
   kopf(6, "Doppelt").u64(0n);
@@ -94,10 +142,11 @@ export function levelDatBauen({ seed, name = "Testwelt", version = [1, 26, 50, 2
   kopf(8, "LevelName").u16(new TextEncoder().encode(name).length).text(name);
   kopf(9, "lastOpenedWithVersion").u8(3).i32(version.length);
   for (const v of version) n.i32(v);
-  kopf(3, "SpawnX").i32(0);
+  if (!("SpawnX" in zusatz)) kopf(3, "SpawnX").i32(0);
+  for (const [name, w] of Object.entries(zusatz)) { const t = nbtTyp(w); kopf(t, name); nbtWert(n, t, w); }
   n.u8(0);
-  const nbt = n.fertig();
-  return new Puffer().i32(10).i32(nbt.length).bytes(nbt).fertig();
+  const daten = n.fertig();
+  return new Puffer().i32(10).i32(daten.length).bytes(daten).fertig();
 }
 
 // ---------- LevelDB ----------
@@ -224,10 +273,13 @@ function oberweltData3d(id, { mischung = null } = {}) {
  * optionen: ordner (Präfix im ZIP, z. B. „Meine Welt/“ wie von Hand gezippt am iPhone),
  *           altesManifest (zweites, veraltetes MANIFEST nach dem gültigen im ZIP),
  *           levelname (Inhalt von levelname.txt), ohne (Pfade mit diesem Anfang weglassen, z. B. "db/"),
- *           beiwerk (was ein echter Weltordner noch enthält: Pakete, world_icon.jpeg, level.dat_old, LOCK, LOG)
+ *           beiwerk (was ein echter Weltordner noch enthält: Pakete, world_icon.jpeg, level.dat_old, LOCK, LOG),
+ *           eintraege { neu, log } (weitere Einträge [[schluessel, wert | null]] in 000011.ldb bzw. zuletzt in die .log),
+ *           levelDat (weitere Felder für level.dat, siehe levelDatBauen)
  * → { zip, dateien: [[pfad, bytes]], erwartet: Map<"dim:cx:cz", id> }
  */
-export function testweltBauen({ ordner = "", altesManifest = false, seed = SEED, levelname = "Testwelt", ohne = [], beiwerk = false } = {}) {
+export function testweltBauen({ ordner = "", altesManifest = false, seed = SEED, levelname = "Testwelt", ohne = [], beiwerk = false,
+  eintraege = {}, levelDat = {} } = {}) {
   const erwartet = new Map();
   const alt = [];
   for (let cx = -40; cx < 40; cx++) for (let cz = -8; cz < 8; cz++) {
@@ -254,6 +306,7 @@ export function testweltBauen({ ordner = "", altesManifest = false, seed = SEED,
     erwartet.set(`end:${cx}:-1`, ID.end);
   }
 
+  neu.push(...(eintraege.neu ?? []));
   const log = logBauen([
     { seq: 500, eintraege: [[chunkSchluessel(2, 2), oberweltData3d(ID.fluss)], [chunkSchluessel(3, 3), null]] },
     { seq: 501, eintraege: [
@@ -261,6 +314,7 @@ export function testweltBauen({ ordner = "", altesManifest = false, seed = SEED,
       [new TextEncoder().encode("abcdefgh+"), new Uint8Array(600)],              // 9 Byte, endet auf „+“
       [new Puffer().i32(1).i32(2).i32(5).u8(0x2b).fertig(), new Uint8Array(600)], // 13 Byte, Dimension 5
     ] },
+    ...(eintraege.log?.length ? [{ seq: 502, eintraege: eintraege.log }] : []),
   ]);
   erwartet.set("overworld:2:2", ID.fluss);
   erwartet.delete("overworld:3:3");
@@ -270,7 +324,7 @@ export function testweltBauen({ ordner = "", altesManifest = false, seed = SEED,
   const ldb8 = ldbBauen([[chunkSchluessel(0, 0), oberweltData3d(ID.wueste)]], { seq: 5 });
   const manifest = manifestBauen({ neu: [{ level: 1, nr: 13 }, { level: 0, nr: 11 }], geloescht: [{ level: 0, nr: 8 }], logNr: 14 });
   const dateien = [
-    ["level.dat", levelDatBauen({ seed })],
+    ["level.dat", levelDatBauen({ seed, zusatz: levelDat })],
     ["levelname.txt", new TextEncoder().encode(levelname)],
     ["db/CURRENT", new TextEncoder().encode("MANIFEST-000015\n")],
     ["db/MANIFEST-000015", manifest],
@@ -291,4 +345,94 @@ export function testweltBauen({ ordner = "", altesManifest = false, seed = SEED,
   }
   const bleiben = dateien.filter(([p]) => !ohne.some((anfang) => p.startsWith(anfang))).map(([p, b]) => [ordner + p, b]);
   return { zip: zipBauen(bleiben), dateien: bleiben, erwartet };
+}
+
+// ---------- Die Fundewelt ----------
+
+const text = (t) => new TextEncoder().encode(t);
+const be = (cx, cz, dim, ...bloecke) => [chunkSchluessel(cx, cz, dim, 49), nbtBauen(...bloecke)];
+const truhe = (x, y, z, beute, extra = {}) => ({ id: "Chest", x, y, z, LootTable: `loot_tables/chests/${beute}.json`, Items: nbt.liste(10, []), ...extra });
+const item = (name, extra = {}) => ({ Count: nbt.byte(1), Damage: nbt.short(0), Name: name, WasPickedUp: nbt.byte(0), ...extra });
+const leer = () => item("", { Count: nbt.byte(0) });
+const vorlage = (id) => item(id === "netherite" ? "minecraft:netherite_upgrade_smithing_template" : `minecraft:${id}_armor_trim_smithing_template`);
+const besatz = (Pattern, Material) => ({ tag: { Trim: { Material, Pattern } } });
+let wesenNr = 0;
+const wesen = (w) => [new Uint8Array([...text("actorprefix"), 0, 0, 0, 1, 0, 0, 0, ++wesenNr]), nbtBauen(w)];
+const pos = (x, y, z) => nbt.liste(nbt.FLOAT, [x, y, z]);
+
+/**
+ * Testwelt mit allen Arten von Funden (Bauplan „Welt-Funde“): Strukturen aus Truhen, Kies, Spawnern und
+ * Tresoren, Lore mit Truhe, Rüstungsständer (auch im alten Format, Chunk-Tag 50), Banner, Schmiedevorlagen
+ * in Behältern, ~local_player mit Rüstung, Inventar und Endertruhe, Portal-Liste, ein anderer Spieler,
+ * Welt-Info in level.dat. Die .log löscht ein Schiffswrack und öffnet eine Iglu-Truhe; ein kaputter
+ * Block-Eintrag kostet nur seinen Fund. Was herauskommen soll, steht in welt-funde.test.mjs.
+ */
+export function fundeweltBauen() {
+  wesenNr = 0;
+  const neu = [
+    // Wüstentempel: vier Truhen eng beieinander → ein Ort; dazu der Brunnen (Kies) in der Nähe als eigener Ort
+    be(10, 10, "overworld", truhe(165, 64, 170, "desert_pyramid"), truhe(167, 55, 168, "desert_pyramid"),
+      truhe(163, 55, 172, "desert_pyramid"), truhe(165, 55, 174, "desert_pyramid")),
+    be(11, 10, "overworld", { id: "BrushableBlock", x: 180, y: 60, z: 170, LootTable: "loot_tables/entities/desert_well_brushable_block.json" }),
+    // Dorf: Truhen 80 Blöcke auseinander → ein Dorf (Nähe 96)
+    be(20, 0, "overworld", truhe(320, 70, 10, "village/village_plains_house")),
+    be(25, 0, "overworld", truhe(400, 70, 10, "village/village_weaponsmith")),
+    // Zwei Schiffswracks, das zweite verschwindet später (gelöscht in der .log)
+    be(-20, 30, "overworld", truhe(-310, 60, 490, "shipwrecktreasure")),
+    be(-40, 30, "overworld", truhe(-630, 60, 490, "shipwrecksupply")),
+    // Unbekannte Tabellen werden gemeldet, Bonustruhe nicht
+    be(1, -30, "overworld", truhe(20, 70, -470, "mod_kiste"), truhe(25, 70, -470, "mod_kiste"), truhe(30, 70, -470, "spawn_bonus_chest")),
+    // Netherfestung: Truhe und Lohenspawner → ein Ort beim Spawner; Portalruine im Nether
+    be(5, 5, "nether", truhe(90, 70, 85, "nether_bridge"),
+      { id: "MobSpawner", x: 100, y: 72, z: 88, EntityIdentifier: "minecraft:blaze" }),
+    be(-5, 5, "nether", truhe(-70, 40, 85, "ruined_portal")),
+    // Endsiedlung, Prüfungskammer
+    be(60, 0, "end", truhe(970, 80, 5, "end_city_treasure")),
+    be(-10, -10, "overworld", { id: "Vault", x: -150, y: -20, z: -150 }, { id: "TrialSpawner", x: -140, y: -20, z: -160 }),
+    // Banner: weiß mit rotem Fuß und schwarzem Creeper; eins mit unbekanntem Muster; das Unheilvolle bleibt weg
+    be(2, 2, "overworld",
+      { id: "Banner", x: 40, y: 70, z: 41, Base: 15, Type: 0, Patterns: [{ Color: 1, Pattern: "bs" }, { Color: 0, Pattern: "cre" }] },
+      { id: "Banner", x: 44, y: 70, z: 41, Base: 11, Type: 0, Patterns: [{ Color: 4, Pattern: "xyz" }, { Color: 4, Pattern: "flw" }] },
+      { id: "Banner", x: 46, y: 70, z: 41, Base: 15, Type: 1, Patterns: [{ Color: 9, Pattern: "mr" }] }),
+    // Behälter mit Schmiedevorlagen: Fass direkt, Truhe mit Shulkerkiste darin
+    be(3, 3, "overworld",
+      { id: "Barrel", x: 50, y: 64, z: 50, Items: [vorlage("sentry")] },
+      { id: "Chest", x: 52, y: 64, z: 50, Items: [item("minecraft:shulker_box", { tag: { Items: [vorlage("netherite")] } })] }),
+    // Eine Truhe, die später geöffnet wird (Beute-Tabelle weg) – kein Fund mehr
+    be(4, 4, "overworld", truhe(70, 30, 70, "igloo_chest")),
+    // Lebewesen: Lore mit Truhe (Mineshaft), Rüstungsständer mit besetztem Diamantharnisch, ein Zombie
+    wesen({ identifier: "minecraft:chest_minecart", Pos: pos(300.5, 20, -100.5), LootTable: "loot_tables/chests/abandoned_mineshaft.json" }),
+    wesen({ identifier: "minecraft:armor_stand", Pos: pos(12.5, 64, 12.5),
+      Armor: [leer(), item("minecraft:diamond_chestplate", besatz("coast", "quartz")), leer(), leer()] }),
+    wesen({ identifier: "minecraft:zombie", Pos: pos(0, 64, 0), Armor: [item("minecraft:iron_helmet"), leer(), leer(), leer()] }),
+    // Alte Welten: Lebewesen im Chunk (Tag 50)
+    [chunkSchluessel(6, 6, "overworld", 50), nbtBauen({ identifier: "minecraft:armor_stand", Pos: pos(-99.5, 64, 100.5),
+      Armor: [item("minecraft:turtle_helmet"), leer(), leer(), item("minecraft:netherite_boots", besatz("minecraft:silence", "minecraft:amethyst"))] })],
+    // Andere Spieler (nur gezählt) und die Portale
+    [text("player_server_1234"), nbtBauen({ identifier: "minecraft:player" })],
+    [text("portals"), nbtBauen({ data: { PortalRecords: [
+      { DimId: 0, Span: nbt.byte(2), TpX: 100, TpY: 70, TpZ: 200, Xa: nbt.byte(1), Za: nbt.byte(0) },
+      { DimId: 1, Span: nbt.byte(2), TpX: 12, TpY: 40, TpZ: 25, Xa: nbt.byte(0), Za: nbt.byte(1) },
+      { DimId: 2, Span: nbt.byte(2), TpX: 1, TpY: 1, TpZ: 1, Xa: nbt.byte(1), Za: nbt.byte(0) },
+    ] } })],
+    // Ein kaputter Eintrag kostet nur seinen Fund
+    [chunkSchluessel(7, 7, "overworld", 49), Uint8Array.of(10, 0, 0, 8, 5)],
+  ];
+  const log = [
+    [chunkSchluessel(-40, 30, "overworld", 49), null],
+    be(4, 4, "overworld", { id: "Chest", x: 70, y: 30, z: 70, Items: nbt.liste(10, []) }),
+    [text("~local_player"), nbtBauen({
+      identifier: "minecraft:player", DimensionId: 1, Pos: pos(10.5, 71.62, -5.5), PlayerLevel: 30,
+      Armor: [item("minecraft:leather_helmet", { tag: { customColor: 0xffb02e26 | 0 } }), item("minecraft:elytra"),
+        item("minecraft:iron_leggings", besatz("dune", "redstone")), item("minecraft:golden_boots"), item("minecraft:mod_helmet")],
+      Inventory: [vorlage("wild"), leer()],
+      EnderChestInventory: [vorlage("spire"), vorlage("sentry")],
+      Mainhand: [leer()], Offhand: [leer()],
+    })],
+  ];
+  return testweltBauen({
+    eintraege: { neu, log },
+    levelDat: { GameType: 1, Difficulty: 3, Time: nbt.long(10 * 24000 + 500), LastPlayed: nbt.long(1790701971),
+      IsHardcore: nbt.byte(0), cheatsEnabled: nbt.byte(1), SpawnX: 5, SpawnY: 32767, SpawnZ: -7 },
+  });
 }

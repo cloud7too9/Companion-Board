@@ -192,6 +192,8 @@ try {
   // ---- Lesen im Worker → Prüfliste ----
   await p.click('[data-aktion="wi-lesen"]');
   pruefe(await warteAuf(p, () => wi.schritt === "pruefliste"), "Worker liest die Welt");
+  pruefe(await p.evaluate(() => wi.ergebnis.funde?.info?.schwierigkeit === "normal" && Array.isArray(wi.ergebnis.funde.orte)),
+    "Worker liefert die Funde mit (nbt.js, welt-funde.js)");
   s = await sheet(p);
   pruefe(s.includes("1 305 Chunks") && s.includes("Oberwelt1 279 Chunks") && s.includes("Nether24 Chunks") && s.includes("End2 Chunks"),
     "Prüfliste: Chunks je Dimension");
@@ -320,6 +322,7 @@ try {
   await warteAuf(max, () => wi.schritt === "bestaetigen");
   await max.click('[data-aktion="wi-lesen"]');
   pruefe(await warteAuf(max, () => wi.schritt === "pruefliste"), "Live: Worker vom Board liest die Welt");
+  pruefe(await max.evaluate(() => wi.ergebnis.funde?.info?.schwierigkeit === "normal"), "Live: Board liefert nbt.js und welt-funde.js aus");
   await max.click('[data-aktion="wi-uebernehmen"]');
   pruefe(await warteAuf(max, () => bm.import?.von === "Max"), "Live: Import gespeichert");
   pruefe(await warteAuf(lena, () => bm.import?.weltname === "Unsere Welt" && bm.kacheln.size === 13), "Live: Lena bekommt die Biome sofort");

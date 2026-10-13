@@ -140,7 +140,7 @@ test('Companion-Dateien: konfig.js, Regeln, Karten, Texterkennung, Welt-Import u
   const sprache = await fetch(`${BASIS}/vendor/tesseract/eng.traineddata.gz`);
   assert.equal(sprache.status, 200);
   assert.equal((await sprache.arrayBuffer()).byteLength > 2_000_000, true, 'Sprachdaten (gz) kommen ganz an');
-  for (const pfad of ['/konfig.js', '/regeln.js', '/board-karten.js', '/texterkennung.js', '/biom-import.worker.js', '/biom-welt.js', '/welt-ordner.js', '/biom-dekoder.js', '/biom-ids.js',
+  for (const pfad of ['/konfig.js', '/regeln.js', '/board-karten.js', '/texterkennung.js', '/biom-import.worker.js', '/biom-welt.js', '/welt-ordner.js', '/nbt.js', '/welt-funde.js', '/biom-dekoder.js', '/biom-ids.js',
     '/vendor/mcbe-leveldb.js', '/vendor/tesseract/tesseract.min.js', '/vendor/tesseract/worker.min.js', '/vendor/tesseract/tesseract-core-simd-lstm.wasm.js']) {
     const res = await fetch(BASIS + pfad);
     assert.equal(res.status, 200, pfad);
