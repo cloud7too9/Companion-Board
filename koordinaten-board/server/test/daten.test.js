@@ -173,16 +173,20 @@ test('Strang B: IDs vom Handy, erstellerId, Benutzer-Sammlungen', async () => {
     '2b4c5d6e-7f80-4a1b-9c2d-3e4f5a6b7c8d');
   assert.equal(d.sammelSetzen('w_1', 'rib', { gefunden: true }, 'Max').status.rib.erstellerId, 'unbekannt');
   assert.deepEqual([d.inhalt.benutzer, d.inhalt.profile, d.inhalt.geraete], [[], [], []]);
+  await d.schliessen();   // sonst schreibt das verzögerte Speichern von d mitten in den Umzug unten (UNIQUE welten.id)
+  rmSync(o, { recursive: true, force: true });
 
-  // Alte daten.json ohne erstellerId: beim Laden „unbekannt“
-  writeFileSync(path.join(o, 'daten.json'), JSON.stringify({ zaehler: 3, welten: [{ id: 'w_1', seed: '7' }], typen: [],
+  // Alte daten.json ohne erstellerId: beim Laden „unbekannt“ (eigener Ordner, daten.db noch leer)
+  const o2 = ordner();
+  writeFileSync(path.join(o2, 'daten.json'), JSON.stringify({ zaehler: 3, welten: [{ id: 'w_1', seed: '7' }], typen: [],
     banner: [{ id: 'b_1', name: 'Alt', basis: 'white', ebenen: [], von: 'Max', am: '2026-09-01' }], sammel: { w_1: { rib: { von: 'Lena', am: '2026-09-02' } } } }));
-  const alt = new Daten(o);
+  const alt = new Daten(o2);
   await alt.laden();
   assert.equal(alt.inhalt.banner[0].erstellerId, 'unbekannt');
   assert.equal(alt.inhalt.sammel.w_1.rib.erstellerId, 'unbekannt');
   assert.deepEqual(alt.inhalt.benutzer, []);
-  rmSync(o, { recursive: true, force: true });
+  await alt.schliessen();
+  rmSync(o2, { recursive: true, force: true });
 });
 
 test('Speichern und Laden', async () => {
