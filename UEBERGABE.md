@@ -1,10 +1,10 @@
 # Übergabe · Minecraft Companion & Koordinaten-Board
 
-Stand: 05.10.2026 · Einstieg für einen neuen Chat
+Stand: 13.10.2026 · Einstieg für einen neuen Chat
 
 > **Repo-Umzug (05.10.2026):** Dieses Repo `Companion-Board` hat mit dem Stand von `flexibel-visionboard` (`main` 9d5be46) als einem Start-Commit begonnen. Der alte Verlauf, die alten Branches und die alten PR-Nummern liegen weiter in [`flexibel-visionboard`](https://github.com/cloud7too9/flexibel-visionboard). Mitgenommen wurde nur `bereich/karte-mcworld` als eigener Stand ohne Eltern (nicht mergen, nur nachschlagen).
 >
-> **Umbau auf Netlify + Raspberry Pi:** Plan und Haken in [`planung/UMBAUPLAN.md`](planung/UMBAUPLAN.md), Stand der Phasen in [`planung/UEBERGABE.md`](planung/UEBERGABE.md). Phasen 1–5 sind gebaut; was Max für Netlify, Cloudflare und den Pi tun muss, steht in [`koordinaten-board/pi/ANLEITUNG.md`](koordinaten-board/pi/ANLEITUNG.md).
+> **Umbau auf Netlify + Raspberry Pi:** Plan und Haken in [`planung/UMBAUPLAN.md`](planung/UMBAUPLAN.md), Stand der Phasen in [`planung/UEBERGABE.md`](planung/UEBERGABE.md). Phasen 1–5 sind gebaut und abgeschlossen (Netlify-Probe am 13.10.2026); was Max für Cloudflare und den Pi tun muss, steht in [`koordinaten-board/pi/ANLEITUNG.md`](koordinaten-board/pi/ANLEITUNG.md).
 
 > **Stand der Umsetzung von `planung/PLAN.md`** (Widget-Dashboard, Welt-Import, Accounts): [`planung/UEBERGABE.md`](planung/UEBERGABE.md) – was gebaut ist, Branches, Starten, Tests, nächste Schritte. Was auf Max wartet: [`planung/WARTELISTE.md`](planung/WARTELISTE.md).
 
@@ -30,7 +30,7 @@ Geht es ums Raum-Board, statt der Companion-Übergabe `koordinaten-board/UEBERGA
 
 Geht es mit dem Umbau weiter (Netlify, Pi, Tunnel), zum Beispiel:
 
-> Lies `UEBERGABE.md`, danach `planung/UMBAUPLAN.md` und `planung/UEBERGABE.md`. Phasen 1–5 sind gebaut; ich habe Netlify/Pi nach `koordinaten-board/pi/ANLEITUNG.md` eingerichtet, hier das Ergebnis der Probe: …
+> Lies `UEBERGABE.md`, danach `planung/UMBAUPLAN.md` und `planung/UEBERGABE.md`. Phasen 1–5 sind abgeschlossen; ich habe den Pi nach `koordinaten-board/pi/ANLEITUNG.md` eingerichtet, hier das Ergebnis der Probe über Mobilfunk: …
 
 Geht es mit dem Plan weiter (Widget-Dashboard, Offline, Accounts), zum Beispiel:
 

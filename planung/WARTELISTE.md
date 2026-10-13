@@ -1,6 +1,6 @@
 # Warteliste: was auf Max wartet
 
-> Stand 06.10.2026 · gehört zu [`PLAN.md`](PLAN.md)
+> Stand 13.10.2026 · gehört zu [`PLAN.md`](PLAN.md)
 >
 > Max hat gesagt: „Was weitere Eingaben braucht, kommt auf die Warteliste. Alles andere wird erledigt.“ Hier steht deshalb alles, was ohne Max nicht weitergeht: Haltepunkte, Nachfragen, offene Entscheidungen und Inhalte, die noch nicht beschrieben sind. Weitergearbeitet wird an allem anderen.
 
@@ -22,7 +22,7 @@ Bei jedem Haltepunkt stehen Branch und Screenshots. Die Screenshots erzeugen die
 | ~~H6~~ | **OK (04.10.2026).** **A6 · Anzeige am Handy anordnen** (Haltepunkt laut Plan): im Querformat ein Layout für die Anzeige im Zimmer anordnen | `bereich/widgets-anzeigen` | `w9-companion-anordnen-knopf.png`, `w9-anordnen-handy.png`, `w9-anordnen-auswahl.png`, `w10-anzeige-nach-anordnen.png`, `w11-anzeige-vollbild.png`. Live: Board starten, `npm run dashboard:installieren && npm run dashboard:build`, am Handy beitreten → Board → Anzeigen → „Anzeige anordnen“ |
 
 | H7 | **Farben der neuen Biome** (06.10.2026): Cherry Grove (rosa), Pale Garden (fahles Graugrün) und Sulfur Caves (schwefelgelb) haben Kartenfarben von Claude (`tools/biom-ids-bauen.mjs`, `NACHTRAG`). **Max (06.10.2026):** Die Biom-Farben werden auch der **Hintergrund der Sammelobjekt-Karten** (siehe E19), dort fallen sie also doppelt auf. | `main` (#9) | Sobald eine Welt eines davon enthält: Welt-Import, dann Prüfliste und Karte anschauen. Andere Farbe gewünscht → eine Zeile im `NACHTRAG`, `npm run biom-ids`. |
-| H8 | **Probe bei Netlify** (Umbauplan Phase 5): Die Site läuft schon (PRs bekommen Deploy-Previews), der Haken „erst mit der `.netlify.app`-Adresse testen“ fehlt noch. | `main` | Companion unter `/app/` als PWA installieren, beitreten, danach den Haken in `UMBAUPLAN.md` setzen. Seit #10 erscheint bei einem neuen Build der Knopf „Neue Version · Aktualisieren“. |
+| ~~H8~~ | **Erledigt (13.10.2026).** **Probe bei Netlify** (Umbauplan Phase 5): Max hat die Companion unter `/app/` als PWA installiert und ist beigetreten. Der Haken in `UMBAUPLAN.md` ist gesetzt, Phase 5 ist abgeschlossen. | `main` | – (weiter mit Phase 6: Pi, Tunnel, Domain) |
 
 Später, wenn es so weit ist: B3 (am echten iPhone im Flugmodus).
 

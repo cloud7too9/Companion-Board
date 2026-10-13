@@ -2,7 +2,7 @@
 
 Stand: 05.10.2026 · Max
 
-> **Umsetzung:** Seit dem 05.10.2026 läuft der Umbau im Repo `cloud7too9/Companion-Board` (Start ohne Verlauf, der alte Verlauf liegt in `flexibel-visionboard`). Die Haken in den Phasen werden hier gesetzt; den Stand je Phase führt [`UEBERGABE.md`](UEBERGABE.md), Kapitel 1 und 9. Phasen 1–5 sind gebaut und gemergt (PRs #1–#7); Phase 6 wartet auf Max, die Schritte stehen in [`koordinaten-board/pi/ANLEITUNG.md`](../koordinaten-board/pi/ANLEITUNG.md).
+> **Umsetzung:** Seit dem 05.10.2026 läuft der Umbau im Repo `cloud7too9/Companion-Board` (Start ohne Verlauf, der alte Verlauf liegt in `flexibel-visionboard`). Die Haken in den Phasen werden hier gesetzt; den Stand je Phase führt [`UEBERGABE.md`](UEBERGABE.md), Kapitel 1 und 9. Phasen 1–5 sind gebaut, gemergt (PRs #1–#7) und seit der Netlify-Probe am 13.10.2026 abgeschlossen; Phase 6 wartet auf Max, die Schritte stehen in [`koordinaten-board/pi/ANLEITUNG.md`](../koordinaten-board/pi/ANLEITUNG.md).
 
 ## Zielbild
 
@@ -123,7 +123,7 @@ Git: Schema, Umzugsskript und neue `daten.js` je ein Commit. Vor dem Merge das U
 - [x] `_redirects` für die Routen von Anzeige und Dashboard (`/dashboard/*` → `index.html`) *(05.10.2026: `netlify/_redirects`, auch `/anzeige*` → `/index.html`)*
 - [x] Companion installierbar machen: Manifest und Service Worker mit Scope `/app/`, App-Shell im Cache *(05.10.2026: `companion/manifest.webmanifest`, `companion/sw.js`, Icons in `companion/icons/app/`; nur aktiv, wenn `konfig.js` `pwa: true` setzt, lokal vom Board also nicht)*
 - [x] QR-Code zeigt auf `https://deinedomain.de/app/?pin=…` (`OEFFENTLICHE_URL`) *(05.10.2026: neue Umgebungsvariable `COMPANION_PFAD=/app/` am Server, lokal bleibt `/`)*
-- [ ] Erst mit der `.netlify.app`-Adresse testen, noch ohne Domain *(braucht Max: Netlify-Konto, Site aus dem GitHub-Repo, Umgebungsvariable `API_URL`. Lokal ist der ganze Stand geprüft: `companion/tests/netlify.test.mjs` baut wie Netlify und prüft Beitreten als PWA, QR-Code auf `/app/`, Anzeige und Dashboard mit Anzeige-Link, Kennblöcke, Offline aus dem Service Worker.)*
+- [x] Erst mit der `.netlify.app`-Adresse testen, noch ohne Domain *(13.10.2026: Probe von Max bestanden, Site aus dem GitHub-Repo, Companion unter `/app/` als PWA installiert und beigetreten. **Phase 5 ist damit abgeschlossen.** Lokal prüft denselben Stand `companion/tests/netlify.test.mjs` baut wie Netlify und prüft Beitreten als PWA, QR-Code auf `/app/`, Anzeige und Dashboard mit Anzeige-Link, Kennblöcke, Offline aus dem Service Worker.)*
 
 Git: Push löst bei Netlify einen Vorschau-Build für den PR aus, dort testen, dann mergen.
 
