@@ -16,7 +16,7 @@ let server;
 async function starten() {
   server = spawn(process.execPath, ['src/server.js'], {
     cwd: path.join(path.dirname(fileURLToPath(import.meta.url)), '..'),
-    env: { ...process.env, PORT: String(PORT), DATEN_ORDNER: ORDNER, RAUM_PIN: '471100', ERLAUBTE_URSPRUENGE: 'https://board.beispiel.de, http://localhost:5173' },
+    env: { ...process.env, PORT: String(PORT), DATEN_ORDNER: ORDNER, TEST_UHR: '1', ERLAUBTE_URSPRUENGE: 'https://board.beispiel.de, http://localhost:5173' },
     stdio: 'ignore',
   });
   for (let i = 0; i < 50; i += 1) {
@@ -38,8 +38,19 @@ const anfrage = async (methode, pfad, token, body) => {
   });
   return { status: res.status, daten: await res.json() };
 };
-// Account anlegen oder – wenn es den Namen gibt – mit derselben PIN anmelden (B2)
-const beitreten = async (name) => (await anfrage('POST', '/api/beitreten', null, { pin: '471100', name, kontoPin: '2468' })).daten.token;
+// Konto anlegen (das erste gilt sofort und gibt alle weiteren frei) oder – wenn es den Namen gibt – mit dem
+// Passwort auf einem neuen Gerät anmelden (Bauplan „Anmeldung“)
+const PASSWORT = 'creeper123';
+let chef = null;
+async function konto(name, pin = '2468') {
+  const r = await anfrage('POST', '/api/registrieren', null, { echterName: `${name} Beispiel`, anzeigename: name, passwort: PASSWORT, pin });
+  if (r.status === 409) return (await anfrage('POST', '/api/anmelden', null, { anzeigename: name, passwort: PASSWORT })).daten.token;
+  assert.equal(r.status, 201, JSON.stringify(r.daten));
+  if (!r.daten.freigegeben) assert.equal((await anfrage('POST', `/api/konten/${r.daten.id}/freigeben`, chef)).status, 200);
+  chef ??= r.daten.token;
+  return r.daten.token;
+}
+const beitreten = konto;
 
 test('ohne Anmeldung kein Zugriff', async () => {
   assert.deepEqual((await anfrage('GET', '/api/server')).daten, { name: 'koordinaten-board' });
@@ -48,23 +59,56 @@ test('ohne Anmeldung kein Zugriff', async () => {
   assert.equal(r.daten.message, 'Nicht angemeldet');
 });
 
-test('Accounts mit PIN: Konten nur mit Board-PIN, anlegen, anmelden, Ersteller an Einträgen', async () => {
-  let r = await anfrage('POST', '/api/beitreten/konten', null, { pin: '0000' });
-  assert.equal(r.status, 401);
-  r = await anfrage('POST', '/api/beitreten', null, { pin: '471100', name: 'Tim', kontoPin: '9753' });
-  assert.deepEqual([r.status, r.daten.neu, r.daten.name], [200, true, 'Tim']);
-  const tim = r.daten;
-  assert.ok((await anfrage('POST', '/api/beitreten/konten', null, { pin: '471100' })).daten.konten.some((k) => k.id === tim.id && k.name === 'Tim'));
+test('Konten (Anmeldung L2): registrieren, erstes frei, weitere warten, freigeben, anmelden, Ersteller an Einträgen', async () => {
+  const tim = (await anfrage('POST', '/api/registrieren', null, { echterName: 'Tim Tester', anzeigename: ' Tim ', passwort: PASSWORT, pin: '9753' })).daten;
+  assert.deepEqual([tim.name, tim.freigegeben], ['Tim', true], 'das erste Konto gilt sofort');
+  chef = tim.token;
+  let r = await anfrage('POST', '/api/registrieren', null, { echterName: 'Tom', anzeigename: 'tim', passwort: PASSWORT, pin: '1111' });
+  assert.deepEqual([r.status, r.daten.fehler], [409, 'Den Namen „tim“ gibt es schon']);
+  r = await anfrage('POST', '/api/registrieren', null, { echterName: 'Tom', anzeigename: 'Tom', passwort: 'kurz', pin: '1111' });
+  assert.deepEqual([r.status, r.daten.message], [400, 'Das Passwort braucht mindestens 8 Zeichen']);
   const ich = (await anfrage('GET', '/api/ich', tim.token)).daten;
-  assert.deepEqual([ich.id, ich.name], [tim.id, 'Tim']);
-  r = await anfrage('POST', '/api/beitreten', null, { pin: '471100', name: 'tim', kontoPin: '1111' });
-  assert.deepEqual([r.status, r.daten.fehler], [401, 'Falsche PIN für Tim']);
-  assert.equal((await anfrage('POST', '/api/beitreten', null, { pin: '471100', name: 'Tim', kontoPin: '9753' })).daten.neu, false);
-  assert.equal((await anfrage('POST', '/api/beitreten', null, { pin: '471100', name: 'Tim' })).status, 400, 'ohne eigene PIN');
+  assert.deepEqual([ich.benutzer.id, ich.benutzer.anzeigename, ich.benutzer.echterName, ich.freigegeben, ich.pinNoetig], [tim.id, 'Tim', 'Tim Tester', true, false]);
+
+  // Ein neues Konto wartet: nur /api/ich und /api/abmelden, sonst 403 – auch keine Live-Verbindung
+  const ute = (await anfrage('POST', '/api/registrieren', null, { echterName: 'Ute U.', anzeigename: 'Ute', passwort: PASSWORT, pin: '1357' })).daten;
+  assert.equal(ute.freigegeben, false);
+  assert.equal((await anfrage('GET', '/api/ich', ute.token)).daten.freigegeben, false);
+  r = await anfrage('GET', '/api/orte/welten', ute.token);
+  assert.deepEqual([r.status, r.daten.message], [403, 'Dein Konto wartet auf Freigabe']);
+  assert.equal((await anfrage('GET', '/api/konten', ute.token)).status, 403);
+  const wsZu = await new Promise((ok) => { const w = new WebSocket(`ws://127.0.0.1:${PORT}/ws?token=${encodeURIComponent(ute.token)}`); w.onclose = (e) => ok(e.code); });
+  assert.equal(wsZu, 4030);
+  const konten = (await anfrage('GET', '/api/konten', tim.token)).daten.konten;
+  assert.deepEqual(konten.map((k) => [k.anzeigename, k.echterName, Boolean(k.freigegebenAm)]), [['Tim', 'Tim Tester', true], ['Ute', 'Ute U.', false]], 'echter Name für alle Konten');
+  assert.equal('passwortHash' in konten[0] || 'pinHash' in konten[0], false);
+  r = await anfrage('POST', `/api/konten/${ute.id}/freigeben`, tim.token);
+  assert.deepEqual([r.status, r.daten.konto.freigegebenVon], [200, 'Tim']);
+  assert.equal((await anfrage('GET', '/api/orte/welten', ute.token)).status, 200, 'nach der Freigabe geht es');
+  assert.equal((await anfrage('DELETE', `/api/konten/${ute.id}`, tim.token)).status, 409, 'freigegebene Konten lassen sich nicht ablehnen');
+  // Ablehnen löscht ein wartendes Konto samt Gerät
+  const zoe = (await anfrage('POST', '/api/registrieren', null, { echterName: 'Zoe', anzeigename: 'Zoe', passwort: PASSWORT, pin: '1357' })).daten;
+  assert.deepEqual((await anfrage('DELETE', `/api/konten/${zoe.id}`, ute.token)).daten, { ok: true });
+  assert.equal((await anfrage('GET', '/api/ich', zoe.token)).status, 401);
+
+  // Anmelden: falsches Passwort und unbekannter Name mit derselben Meldung
+  for (const body of [{ anzeigename: 'Tim', passwort: 'falsch123' }, { anzeigename: 'Niemand', passwort: PASSWORT }]) {
+    r = await anfrage('POST', '/api/anmelden', null, body);
+    assert.deepEqual([r.status, r.daten.fehler], [401, 'Anzeigename oder Passwort stimmt nicht'], body.anzeigename);
+  }
+  const zweit = (await anfrage('POST', '/api/anmelden', null, { anzeigename: 'TIM', passwort: PASSWORT })).daten;
+  assert.deepEqual([zweit.id, zweit.name], [tim.id, 'Tim'], 'gleiches Konto, zweites Gerät');
+  assert.notEqual(zweit.token, tim.token);
   // Einträge tragen die Benutzer-ID, der Name bleibt zur Anzeige
-  const b = (await anfrage('POST', '/api/banner', tim.token, { name: 'Tims Banner', basis: 'white', ebenen: [] })).daten.banner;
+  const b = (await anfrage('POST', '/api/banner', zweit.token, { name: 'Tims Banner', basis: 'white', ebenen: [] })).daten.banner;
   assert.deepEqual([b.von, b.erstellerId], ['Tim', tim.id]);
-  assert.equal((await anfrage('GET', '/api/orte/welten', 'alt.token')).status, 401, 'Token ohne Account gilt nicht');
+  // Abmelden: dieses Gerät gilt nicht mehr, das andere schon
+  assert.deepEqual((await anfrage('POST', '/api/abmelden', zweit.token)).daten, { ok: true });
+  assert.equal((await anfrage('GET', '/api/orte/welten', zweit.token)).status, 401);
+  assert.equal((await anfrage('GET', '/api/orte/welten', tim.token)).status, 200);
+  assert.equal((await anfrage('GET', '/api/orte/welten', 'alt.token')).status, 401, 'fremdes Token gilt nicht');
+  // Die Board-PIN gibt es nicht mehr
+  assert.equal((await anfrage('POST', '/api/beitreten', null, { pin: '471100', name: 'X', kontoPin: '2468' })).status, 404);
 });
 
 test('Companion-Vertrag: Welten, Orte, Sammelobjekte, Portale, Banner, Rüstung', async () => {
@@ -236,12 +280,12 @@ test('Offline B3: geaendert mit Nummer, stand beim Verbinden, GET /api/aenderung
 });
 
 test('Companion-Dateien: konfig.js, Regeln, Karten, Texterkennung, Welt-Import und tesseract.js werden ausgeliefert', async () => {
-  const sprache = await fetch(`${BASIS}/vendor/tesseract/eng.traineddata.gz`);
+  const sprache = await fetch(`${BASIS}/app/vendor/tesseract/eng.traineddata.gz`);
   assert.equal(sprache.status, 200);
   assert.equal((await sprache.arrayBuffer()).byteLength > 2_000_000, true, 'Sprachdaten (gz) kommen ganz an');
   for (const pfad of ['/konfig.js', '/regeln.js', '/board-karten.js', '/texterkennung.js', '/biom-import.worker.js', '/biom-welt.js', '/welt-ordner.js', '/nbt.js', '/welt-funde.js', '/biom-dekoder.js', '/biom-ids.js',
     '/vendor/mcbe-leveldb.js', '/vendor/tesseract/tesseract.min.js', '/vendor/tesseract/worker.min.js', '/vendor/tesseract/tesseract-core-simd-lstm.wasm.js']) {
-    const res = await fetch(BASIS + pfad);
+    const res = await fetch(`${BASIS}/app${pfad}`);
     assert.equal(res.status, 200, pfad);
     assert.ok(res.headers.get('content-type').startsWith('application/javascript'), `${pfad}: ${res.headers.get('content-type')}`);
   }
@@ -436,7 +480,7 @@ test('CORS: nur erlaubte Ursprünge und der eigene, alle Methoden, auch für /ws
   r = await mit(BASIS);
   assert.deepEqual([r.status, r.headers.get('access-control-allow-origin')], [200, BASIS]);
   assert.equal((await mit(null)).status, 200);
-  assert.equal((await mit('https://fremd.de', '/regeln.js')).status, 200, 'statische Dateien sind kein API-Pfad');
+  assert.equal((await mit('https://fremd.de', '/app/regeln.js')).status, 200, 'statische Dateien sind kein API-Pfad');
   // WebSocket: Browser erzwingen bei /ws kein CORS, deshalb lehnt der Server fremde Ursprünge selbst ab
   const max = await beitreten('Max');
   const ws = (origin) => new Promise((ok) => {
@@ -450,44 +494,36 @@ test('CORS: nur erlaubte Ursprünge und der eigene, alle Methoden, auch für /ws
   assert.equal(await ws(BASIS), 'offen', 'eigener Ursprung');
 });
 
-test('Board-PIN hat mindestens 6 Ziffern: kurze RAUM_PIN lehnt der Start ab, alte 4-stellige pin.txt wird ersetzt', async () => {
-  const cwd = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-  const ordner = mkdtempSync(path.join(tmpdir(), 'kb-pin-'));
-  const start = (env) => new Promise((ok) => {
-    const p = spawn(process.execPath, ['src/server.js'], { cwd, env: { ...process.env, PORT: '3298', DATEN_ORDNER: ordner, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
-    let aus = '';
-    p.stdout.on('data', (d) => { aus += d; });
-    p.stderr.on('data', (d) => { aus += d; });
-    p.stdout.on('data', (d) => { if (String(d).includes('läuft')) p.kill('SIGTERM'); });
-    p.once('exit', (code) => ok({ code, aus }));
-  });
-  let r = await start({ RAUM_PIN: '4711' });
-  assert.equal(r.code, 1);
-  assert.match(r.aus, /mindestens 6 Ziffern/);
-  writeFileSync(path.join(ordner, 'pin.txt'), '1234');
-  r = await start({});
-  assert.equal(r.code, 0);
-  assert.match(r.aus, /neue PIN mit 6 Ziffern/);
-  assert.match(readFileSync(path.join(ordner, 'pin.txt'), 'utf8'), /^\d{6}$/, 'pin.txt hat jetzt 6 Ziffern');
-  rmSync(ordner, { recursive: true, force: true });
+test('Seiten wie auf Netlify: Anmeldeseite unter /, Companion unter /app/, alte QR-Codes mit ?pin= führen dorthin', async () => {
+  const anmeldung = await fetch(`${BASIS}/`);
+  assert.deepEqual([anmeldung.status, anmeldung.headers.get('cache-control')], [200, 'no-cache']);
+  assert.match(await anmeldung.text(), /<title>Companion · Anmeldung<\/title>/);
+  const app = await fetch(`${BASIS}/app/`);
+  assert.deepEqual([app.status, app.headers.get('cache-control')], [200, 'no-cache']);
+  assert.equal((await fetch(`${BASIS}/app/regeln.js`)).headers.get('cache-control'), 'no-cache', 'Regeln ohne Cache (neuer Stand sofort)');
+  assert.match(await app.text(), /<script src="regeln.js"><\/script>/);
+  const um = await fetch(`${BASIS}/app?pin=471100`, { redirect: 'manual' });
+  assert.deepEqual([um.status, um.headers.get('location')], [302, '/app/?pin=471100']);
+  assert.equal((await fetch(`${BASIS}/regeln.js`)).status, 404, 'Dateien der Companion nur noch unter /app/');
+  for (const pfad of ['/icons/manifest.json', '/app/icons/manifest.json']) assert.equal((await fetch(BASIS + pfad)).status, 200, `${pfad}: Kennblöcke für Dashboard und Companion`);
 });
 
-test('PIN-Sperre hinter dem Tunnel: CF-Connecting-IP von loopback zählt als Adresse, je Adresse eigene Sperre', async () => {
-  const falsch = (ip) => fetch(`${BASIS}/api/beitreten/konten`, { method: 'POST',
-    headers: { 'content-type': 'application/json', ...(ip && { 'cf-connecting-ip': ip }) }, body: JSON.stringify({ pin: '0000' }) });
-  for (let i = 0; i < 5; i += 1) assert.equal((await falsch('203.0.113.5')).status, 401);
-  assert.equal((await falsch('203.0.113.5')).status, 429, 'nach 5 Fehlversuchen gesperrt');
-  assert.equal((await falsch('203.0.113.6')).status, 401, 'andere Adresse hinter dem Tunnel: eigene Zählung');
-  assert.equal((await fetch(`${BASIS}/api/beitreten/konten`, { method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ pin: '471100' }) })).status, 200, 'ohne Header (direkt, 127.0.0.1) nicht mitgesperrt');
+test('Passwort-Sperre je Anzeigename: 5 Fehlversuche, dann warten; andere Namen nicht betroffen', async () => {
+  await konto('Sperrig');
+  const falsch = (anzeigename) => anfrage('POST', '/api/anmelden', null, { anzeigename, passwort: 'falsch-falsch' });
+  for (let i = 0; i < 5; i += 1) assert.equal((await falsch('Sperrig')).status, 401);
+  const r = await falsch('sperrig');
+  assert.deepEqual([r.status, /^Zu viele Fehlversuche – bitte \d+ s warten$/.test(r.daten.fehler)], [429, true], 'auch klein geschrieben gesperrt');
+  assert.equal((await anfrage('POST', '/api/anmelden', null, { anzeigename: 'Sperrig', passwort: PASSWORT })).status, 429, 'auch mit richtigem Passwort');
+  assert.equal((await falsch('Anders')).status, 401, 'anderer Name: eigene Zählung');
 });
 
 test('Rüstungs-Baukasten wird ausgeliefert (Texturen, Module, Manifest)', async () => {
-  const manifest = await (await fetch(`${BASIS}/ruestungs-baukasten/manifest.json`)).json();
+  const manifest = await (await fetch(`${BASIS}/app/ruestungs-baukasten/manifest.json`)).json();
   assert.equal(manifest.teile.length, 4);
   for (const [pfad, typ] of [['fertig/items/iron_helmet__amethyst.png', 'image/png'], ['vorlagen/eye_armor_trim_smithing_template.png', 'image/png'],
     ['baukasten.js', 'application/javascript'], ['figur3d.js', 'application/javascript']]) {
-    const res = await fetch(`${BASIS}/ruestungs-baukasten/${pfad}`);
+    const res = await fetch(`${BASIS}/app/ruestungs-baukasten/${pfad}`);
     assert.equal(res.status, 200, pfad);
     assert.ok(res.headers.get('content-type').startsWith(typ), `${pfad}: ${res.headers.get('content-type')}`);
   }
@@ -575,4 +611,42 @@ test('Änderungen gehen live an alle, Daten überstehen einen Neustart; die Sitz
   const layoutNachher = (await anfrage('GET', `/api/anzeigen/${board.id}/layout`, max)).daten.layout;
   assert.ok(!layoutNachher?.layer?.some((l) => l.id === 'sitzung'), 'nach dem Neustart ist die Sitzung leer');
   assert.equal((await anfrage('GET', '/api/board/einstellungen', max)).daten.aktiv, welt.id);
+});
+
+// Zuletzt: Die Test-Uhr des Servers läuft danach vor, alle anderen Geräte wären dann „offline“
+test('PIN-Pflicht (Anmeldung L2): nach über 30 Minuten ohne Kontakt 423, PIN bestätigt, PIN zurücksetzen fragt andere Geräte', async () => {
+  const uhr = (minuten) => anfrage('POST', '/api/test/uhr', null, { minuten });
+  const a = await konto('Paula', '2580');
+  const b = (await anfrage('POST', '/api/anmelden', null, { anzeigename: 'Paula', passwort: PASSWORT })).daten.token;
+  await uhr(29);
+  assert.equal((await anfrage('GET', '/api/orte/welten', a)).status, 200, '29 Minuten: geht durch (und zählt als Kontakt)');
+  await uhr(31);
+  let r = await anfrage('GET', '/api/orte/welten', a);
+  assert.deepEqual([r.status, r.daten.message, r.daten.grund], [423, 'PIN nötig', 'offline:31']);
+  assert.equal((await anfrage('GET', '/api/orte/welten', a)).status, 423, 'bleibt 423, bis die PIN kommt (Prüfung vor dem Kontakt)');
+  r = await anfrage('GET', '/api/ich', a);
+  assert.deepEqual([r.status, r.daten.pinNoetig, r.daten.grund], [200, true, 'offline:31'], '/api/ich sagt, warum');
+  assert.equal(await new Promise((ok) => { const w = new WebSocket(`ws://127.0.0.1:${PORT}/ws?token=${encodeURIComponent(a)}`); w.onclose = (e) => ok(e.code); }), 4023, 'keine Live-Verbindung ohne PIN');
+  for (let i = 0; i < 5; i += 1) assert.equal((await anfrage('POST', '/api/pin', a, { pin: '0000' })).status, 401);
+  assert.equal((await anfrage('POST', '/api/pin', a, { pin: '2580' })).status, 429, 'nach 5 falschen PINs gesperrt');
+  await uhr(2);
+  assert.deepEqual((await anfrage('POST', '/api/pin', a, { pin: '2580' })).daten, { ok: true });
+  assert.equal((await anfrage('GET', '/api/orte/welten', a)).status, 200);
+
+  // B war auch über 30 Minuten weg; nach einer neuen PIN auf A fragt B nach der neuen
+  r = await anfrage('POST', '/api/pin/zuruecksetzen', a, { passwort: 'falsch-falsch', neuePin: '1470' });
+  assert.deepEqual([r.status, r.daten.fehler], [401, 'Das Passwort stimmt nicht']);
+  assert.equal((await anfrage('POST', '/api/pin/zuruecksetzen', a, { passwort: PASSWORT, neuePin: '12' })).status, 400);
+  assert.deepEqual((await anfrage('POST', '/api/pin/zuruecksetzen', a, { passwort: PASSWORT, neuePin: '1470' })).daten, { ok: true });
+  assert.equal((await anfrage('GET', '/api/orte/welten', a)).status, 200, 'dieses Gerät gilt sofort');
+  r = await anfrage('GET', '/api/ich', b);
+  assert.deepEqual([r.daten.pinNoetig, r.daten.grund], [true, 'pinwechsel']);
+  assert.equal((await anfrage('POST', '/api/pin', b, { pin: '2580' })).status, 401, 'alte PIN gilt nicht mehr');
+  assert.equal((await anfrage('POST', '/api/pin', b, { pin: '1470' })).status, 200);
+  assert.equal((await anfrage('GET', '/api/orte/welten', b)).status, 200);
+
+  // Herzschlag: Solange die Live-Verbindung steht, läuft kein Timer (Pong alle 25 s zählt als Kontakt)
+  const ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws?token=${encodeURIComponent(a)}`);
+  await new Promise((ok) => { ws.onopen = ok; });
+  ws.close();
 });

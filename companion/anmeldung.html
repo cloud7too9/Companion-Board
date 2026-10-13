@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0d0f13">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Companion · Anmeldung</title>
+<style>
+/* ============================================================================
+   Minecraft Companion · ANMELDESEITE (Einstieg unter /)
+   ----------------------------------------------------------------------------
+   Bauplan „Anmeldung und Dashboard-Zugang“, L3. Aufbau aus dem Prototyp
+   entwuerfe/anmeldung-prototyp.html, ohne Mock und Simulation.
+   Regeln wie am Server (identitaet.js):
+     · Passwort: erste Anmeldung auf einem Gerät + PIN zurücksetzen
+     · PIN: nach über 30 Minuten ohne Kontakt und nach einem PIN-Wechsel
+     · neue Konten warten, bis ein anderes Konto sie freigibt (das erste gilt sofort)
+   Bewusst eine Datei, keine Build-Tools, wie die Companion.
+   ========================================================================== */
+
+/* Tokens: 1:1 THEMES.overworld aus companion-prototyp.html (die Companion ist nur dunkel) */
+:root {
+  --bg:#0d0f13; --surface:#161a21; --surface-2:#1d222b; --surface-3:#252b36;
+  --border:#2b313d; --border-soft:#20252f;
+  --text:#eef1f6; --text-dim:#828b9b; --text-faint:#565e6c;
+  --accent:#2ed47e; --accent-ink:#04160b; --accent-soft:rgba(46,212,126,.16);
+  --ok-bg:rgba(58,209,122,.14); --ok:#5fe09a;
+  --warn-bg:rgba(232,180,68,.14); --warn:#f0c468;
+  --bad-bg:rgba(232,68,60,.14); --bad:#ff8278;
+  --rahmen:#16181d; --rahmen-2:#2a2d34; --aussen:#000;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", "Roboto Mono", Menlo, monospace;
+  color-scheme: dark;
+}
+
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+[hidden] { display:none !important; }
+html, body { height:100%; }
+body {
+  margin:0; font-family:var(--font); background:var(--aussen); color:var(--text);
+  display:flex; align-items:center; justify-content:center; overscroll-behavior:none;
+}
+.mono { font-family:var(--mono); font-variant-numeric:tabular-nums; letter-spacing:.02em; }
+
+/* ---- Seite: am Handy Vollbild, am Desktop eine Spalte in der Mitte ---------- */
+.device {
+  position:relative; width:100%; max-width:430px; height:100%;
+  background:var(--bg); overflow:hidden; display:flex; flex-direction:column;
+}
+
+/* ---- Kopf ----------------------------------------------------------------- */
+.kopf { flex:0 0 auto; padding:64px 16px 22px; display:flex; flex-direction:column; align-items:center; gap:6px; }
+.marke { display:flex; align-items:center; gap:10px; }
+.marke svg { color:var(--accent); flex:0 0 auto; }
+.kopf h1 { margin:0; font-size:36px; font-weight:800; letter-spacing:-.3px; line-height:1.05; }
+.kopf-unter { margin:0; font-size:16px; font-weight:600; color:var(--text-dim); }
+
+/* Dashboard-Login: Code-Feld und Layout-Auswahl */
+.eingabe.code { font-size:24px; letter-spacing:.5em; text-align:center; padding-left:calc(12px + .5em); }
+.layout-liste { border:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; min-width:0; }
+.layout-liste legend { padding:0; margin:0 0 6px; }
+.layout-karte {
+  display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:12px; cursor:pointer;
+  padding:13px 14px; border-radius:14px; background:var(--surface); border:1px solid var(--border-soft);
+}
+.layout-karte:has(input:checked) { border-color:var(--accent); background:var(--accent-soft); }
+.layout-karte input { accent-color:var(--accent); width:18px; height:18px; margin:0; }
+.layout-text { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.layout-text b { font-size:15px; }
+.layout-text span { font-size:12.5px; color:var(--text-dim); line-height:1.35; }
+.layout-meta { font-size:11.5px; color:var(--text-faint); white-space:nowrap; }
+
+/* Willkommenskarte (Platzhalter, bis Max den Inhalt liefert) */
+.platzhalter {
+  display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center;
+  padding:28px 18px; border-radius:18px; border:1.5px dashed var(--border); background:var(--surface);
+}
+.platzhalter h2 { margin:2px 0 0; }
+.platzhalter.willkommen { border-color:var(--accent); background:var(--accent-soft); }
+.kicker { font-size:12px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--text-dim); }
+.laden { color:var(--text-dim); font-size:13.5px; text-align:center; margin-top:24px; }
+
+/* Navigation: Segment-Umschalter zwischen Überschrift und „Anmeldung“ */
+.navigation {
+  display:grid; grid-template-columns:1fr 1fr; gap:4px; width:100%; max-width:360px; margin:14px 0 8px;
+  padding:4px; border-radius:14px; background:var(--surface); border:1px solid var(--border-soft);
+}
+.navigation button {
+  font:inherit; font-size:14px; font-weight:600; padding:10px 8px; border-radius:10px; cursor:pointer;
+  color:var(--text-dim); background:transparent; border:none;
+}
+.navigation button[aria-selected="true"] { background:var(--surface-3); color:var(--text); box-shadow:inset 0 0 0 1px var(--border); }
+.navigation button[aria-selected="true"]::before {
+  content:""; display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--accent);
+  margin-right:8px; vertical-align:1px;
+}
+.navigation button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+
+.klein-knopf {
+  align-self:center; font:inherit; font-size:13px; font-weight:600; padding:7px 14px;
+  border-radius:999px; cursor:pointer; color:var(--text); background:transparent; border:1px solid var(--border);
+}
+.klein-knopf:active { background:var(--surface-2); }
+.klein-knopf:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+
+/* ---- Bühne: eine Ansicht zur Zeit ------------------------------------------ */
+.buehne { flex:1 1 auto; min-height:0; overflow-y:auto; padding:8px 20px 24px; }
+.ansicht { display:flex; flex-direction:column; gap:14px; max-width:360px; margin:0 auto; }
+.ansicht h2 { margin:8px 0 0; font-size:22px; font-weight:800; text-wrap:balance; }
+.ansicht .sub { margin:-8px 0 0; font-size:13.5px; line-height:1.45; color:var(--text-dim); }
+
+/* ---- Formular -------------------------------------------------------------- */
+.feld { display:flex; flex-direction:column; gap:6px; }
+.feld label { font-size:12px; font-weight:600; color:var(--text-dim); letter-spacing:.04em; text-transform:uppercase; }
+.feld .hilfe { font-size:12px; color:var(--text-faint); line-height:1.4; }
+.eingabe-wrap { position:relative; }
+.eingabe {
+  width:100%; font:inherit; font-size:16px; padding:12px; border-radius:12px;
+  background:var(--surface); color:var(--text); border:1px solid var(--border); outline:none;
+}
+.eingabe:focus { border-color:var(--accent); }
+.eingabe::placeholder { color:var(--text-faint); }
+.eingabe.mono { font-family:var(--mono); letter-spacing:.2em; }
+.eingabe-wrap .eingabe { padding-right:64px; }
+.zeigen {
+  position:absolute; right:6px; top:50%; transform:translateY(-50%);
+  font:inherit; font-size:12.5px; font-weight:600; color:var(--text-dim);
+  background:transparent; border:none; padding:8px 10px; border-radius:8px; cursor:pointer;
+}
+.zeigen:focus-visible, .knopf:focus-visible, .link:focus-visible, .chip:focus-visible, .taste:focus-visible {
+  outline:2px solid var(--accent); outline-offset:2px;
+}
+
+.knopf {
+  font:inherit; font-size:15.5px; font-weight:700; padding:14px; border-radius:14px; border:none;
+  background:var(--accent); color:var(--accent-ink); cursor:pointer; width:100%;
+}
+.knopf:disabled { opacity:.45; cursor:default; }
+.knopf.zweit { background:var(--surface-2); color:var(--text); border:1px solid var(--border-soft); }
+.link {
+  font:inherit; font-size:13.5px; font-weight:600; color:var(--accent); background:none; border:none;
+  padding:6px; cursor:pointer; align-self:center; border-radius:8px;
+}
+.link.leise { color:var(--text-dim); }
+.links { display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+
+.banner { padding:10px 13px; border-radius:12px; font-size:12.5px; line-height:1.45; }
+.banner.ok   { background:var(--ok-bg);   color:var(--ok); }
+.banner.warn { background:var(--warn-bg); color:var(--warn); }
+.banner.bad  { background:var(--bad-bg);  color:var(--bad); }
+.banner.info { background:var(--surface-2); color:var(--text-dim); border:1px solid var(--border-soft); }
+
+.konto-liste { display:flex; flex-wrap:wrap; gap:6px; }
+.chip {
+  display:inline-flex; align-items:center; gap:8px; font:inherit; font-size:13.5px; font-weight:600;
+  padding:7px 12px 7px 7px; border-radius:999px; cursor:pointer;
+  background:var(--surface-2); color:var(--text); border:1px solid var(--border-soft);
+}
+.chip[aria-pressed="true"] { border-color:var(--accent); background:var(--accent-soft); }
+.initiale {
+  width:24px; height:24px; border-radius:50%; display:grid; place-items:center;
+  font-size:12px; font-weight:800; color:var(--accent-ink); background:var(--accent);
+}
+
+/* ---- PIN-Sperre ------------------------------------------------------------ */
+.pin-kopf { display:flex; flex-direction:column; align-items:center; gap:8px; text-align:center; margin-top:6px; }
+.pin-kopf .initiale { width:64px; height:64px; font-size:28px; }
+.pin-kopf h2 { margin:4px 0 0; }
+.grund { font-size:13px; color:var(--text-dim); line-height:1.45; max-width:30ch; }
+.punkte { display:flex; justify-content:center; gap:12px; min-height:16px; margin:6px 0 2px; }
+.punkte span { width:13px; height:13px; border-radius:50%; border:2px solid var(--border); }
+.punkte span.voll { background:var(--accent); border-color:var(--accent); }
+.punkte.wackeln { animation:wackeln .35s; }
+@keyframes wackeln { 20%,60% { transform:translateX(-8px); } 40%,80% { transform:translateX(8px); } }
+.tastatur { display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; max-width:300px; width:100%; margin:0 auto; }
+.taste {
+  font:inherit; font-size:24px; font-weight:500; height:62px; border-radius:18px; cursor:pointer;
+  background:var(--surface); color:var(--text); border:1px solid var(--border-soft);
+  font-variant-numeric:tabular-nums;
+}
+.taste:active { background:var(--surface-3); }
+.taste.neben { font-size:15px; font-weight:700; color:var(--text-dim); }
+.taste.ok { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); font-size:15px; font-weight:800; }
+.taste:disabled { opacity:.35; cursor:default; }
+
+@media (prefers-reduced-motion: reduce) {
+  .punkte.wackeln { animation:none; }
+}
+</style>
+<script src="app/konfig.js"></script>
+<script src="app/regeln.js"></script>
+</head>
+<body>
+
+<div class="device">
+  <header class="kopf">
+    <div class="marke">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5 13 13l-4.5 2.5L11 11z" fill="currentColor"/></svg>
+      <h1>Companion</h1>
+    </div>
+    <nav class="navigation" id="navigation" role="tablist" aria-label="Bereich">
+      <button type="button" role="tab" data-nav="app" aria-selected="true">Companion-App</button>
+      <button type="button" role="tab" data-nav="dashboard" aria-selected="false" tabindex="-1">Dashboard-Login</button>
+    </nav>
+    <p class="kopf-unter" id="kopfUnter">Anmeldung</p>
+  </header>
+
+  <main class="buehne" id="buehne"><p class="laden">Einen Moment …</p></main>
+</div>
+
+<script>
+"use strict";
+/* ============================================================================
+   0 · BOARD  ·  Adresse aus app/konfig.js (Netlify: api.mainhubv1.com), sonst dieser Server
+   ----------------------------------------------------------------------------
+   Gespeichert auf dem Gerät (gleicher Ursprung wie die Companion unter /app/):
+     board.verbindung     { adresse, token, name }  – das Token ist der Geräteschlüssel
+     board.pinLokal       { benutzerId, salz, hash, runden } – PIN-Sperre ohne Netz (AN12)
+     board.kontakt        letzter Kontakt zum Board (ms), zählt die 30 Minuten ohne Netz
+     anmeldung.willkommen Benutzer-ID, solange die Willkommenskarte noch aussteht
+   ========================================================================== */
+const BOARD_ADRESSE = String(window.COMPANION_KONFIG?.apiAdresse || "").replace(/\/+$/, "") || location.origin;
+const API = `${BOARD_ADRESSE}/api`;
+const COMPANION = "app/";              // die Companion, relativ zu dieser Seite
+const WARTEN_PRUEFEN_MS = 10000;      // wartendes Konto: so oft fragen, ob es freigegeben ist
+
+// Alte Anzeige-Links auf die Startseite (?anzeige=…&schluessel=…) gehören zum Dashboard
+{
+  const q = new URLSearchParams(location.search);
+  if(q.get("anzeige") && q.get("schluessel")) location.replace(`dashboard/${location.search}`);
+}
+// Als App auf dem Home-Bildschirm: Manifest der Companion (Start unter /app/, Bereich ab /)
+if(window.COMPANION_KONFIG?.pwa){
+  for(const [rel, href] of [["manifest", "app/manifest.webmanifest"], ["apple-touch-icon", "app/icons/app/icon-180.png"]]){
+    const link = document.createElement("link"); link.rel = rel; link.href = href; document.head.appendChild(link);
+  }
+}
+
+function lsLesen(k){ try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }
+function lsSchreiben(k, v){ try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+/** Verbindung zu diesem Board (eine zu einem anderen Board gilt hier nicht) */
+function verbindung(){
+  const v = lsLesen("board.verbindung");
+  return v?.adresse === BOARD_ADRESSE && v.token ? v : null;
+}
+/** Abgemeldet oder Gerät unbekannt: nichts vom Konto bleibt auf dem Gerät (auch nicht der Spiegel der Companion, Offline B3) */
+function vergessen(){
+  for(const k of ["board.verbindung", "board.pinLokal", "board.kontakt", "board.stand", "anmeldung.willkommen"]) lsSchreiben(k, null);
+  try { indexedDB.deleteDatabase("companion-spiegel"); } catch {}
+}
+const kontaktMerken = () => lsSchreiben("board.kontakt", Date.now());
+/** PIN auf diesem Gerät richtig eingegeben: Hash für die PIN-Sperre ohne Netz ablegen (nur mit WebCrypto) */
+async function pinMerken(benutzerId, pin){
+  const h = await pinLokalHashen(pin).catch(() => null);
+  lsSchreiben("board.pinLokal", h ? { benutzerId, ...h } : null);
+}
+
+const nichtErreichbar = (r) => r.status === 0 || (r.status >= 502 && r.status <= 504) || r.status === 530;
+/** Anfrage ans Board → { ok, status, data, text } (text: Meldung für den Nutzer) */
+async function anfrage(methode, pfad, body){
+  const v = verbindung();
+  let res;
+  try {
+    res = await fetch(API + pfad, { method:methode, cache:"no-store",
+      headers:{ ...(body === undefined ? {} : { "Content-Type":"application/json" }), ...(v ? { Authorization:`Bearer ${v.token}` } : {}) },
+      body:body === undefined ? undefined : JSON.stringify(body) });
+  } catch { return { ok:false, status:0, data:null, text:"Das Board ist nicht erreichbar. Läuft es noch?" }; }
+  let data = null;
+  try { data = await res.json(); } catch {}
+  const r = { ok:res.ok, status:res.status, data };
+  r.text = nichtErreichbar(r) ? "Das Board ist nicht erreichbar. Läuft es noch?"
+    : res.status === 404 && /^\/(anmelden|registrieren)$/.test(pfad) ? "Das Board kennt die Anmeldung mit Passwort noch nicht – der Pi braucht ein Update."
+    : data?.fehler || data?.message || `Fehler ${res.status}`;
+  return r;
+}
+
+/* ============================================================================
+   1 · ANSICHTEN
+   ========================================================================== */
+const $buehne = document.getElementById("buehne");
+let ich = null;          // Antwort von /api/ich: { benutzer, freigegeben, pinNoetig, grund }
+let wartenTimer = null;
+
+function unterzeile(text){
+  const $u = document.getElementById("kopfUnter");
+  $u.textContent = text; $u.hidden = !text;
+}
+/** Navigation Companion-App | Dashboard-Login. null = ausblenden (PIN, Freigabe …) */
+const $nav = document.getElementById("navigation");
+function navSetzen(aktiv){
+  $nav.hidden = !aktiv;
+  $nav.querySelectorAll("[data-nav]").forEach((t) => {
+    const an = t.dataset.nav === aktiv;
+    t.setAttribute("aria-selected", String(an)); t.tabIndex = an ? 0 : -1;
+  });
+}
+/** Neue Ansicht: offene Wartezeiten beenden */
+function ansicht(html){
+  clearInterval(wartenTimer); wartenTimer = null;
+  $buehne.innerHTML = html;
+}
+$nav.addEventListener("click", (e) => {
+  const ziel = e.target.closest("[data-nav]")?.dataset.nav;
+  if(ziel === "app") start();
+  else if(ziel === "dashboard") zeigeDashboard();
+});
+$nav.addEventListener("keydown", (e) => {
+  if(e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+  const tabs = [...$nav.querySelectorAll("[data-nav]")];
+  const neu = tabs[(tabs.indexOf(document.activeElement) + 1) % tabs.length];
+  neu.focus(); neu.click();
+});
+
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+const initiale = (name) => esc(String(name).trim().charAt(0).toLocaleUpperCase("de") || "?");
+const bannerHtml = (art, text) => text ? `<div class="banner ${art}" role="${art === "bad" ? "alert" : "status"}">${esc(text)}</div>` : "";
+const meldungArt = (r) => r.status === 429 || nichtErreichbar(r) ? "warn" : "bad";
+const dauer = (min) => min < 60 ? `${min} ${min === 1 ? "Minute" : "Minuten"}`
+  : min < 60 * 48 ? `${Math.round(min / 60)} Stunden` : `${Math.round(min / 1440)} Tage`;
+
+function passwortFeld(id, label, auto, hilfe){
+  return `<div class="feld">
+    <label for="${id}">${label}</label>
+    <div class="eingabe-wrap">
+      <input class="eingabe" id="${id}" type="password" autocomplete="${auto}" required>
+      <button class="zeigen" type="button" data-zeigen="${id}" aria-label="${label} anzeigen">Zeigen</button>
+    </div>
+    ${hilfe ? `<span class="hilfe">${hilfe}</span>` : ""}
+  </div>`;
+}
+const pinFeld = (id, label, hilfe) => `<div class="feld">
+    <label for="${id}">${label}</label>
+    <input class="eingabe mono" id="${id}" type="password" inputmode="numeric" pattern="\\d*" maxlength="8" autocomplete="off" placeholder="4 bis 8 Ziffern" required>
+    ${hilfe ? `<span class="hilfe">${hilfe}</span>` : ""}
+  </div>`;
+/** Knopf während der Anfrage sperren */
+async function mitKnopf($knopf, arbeit){
+  $knopf.disabled = true;
+  try { return await arbeit(); } finally { if($knopf.isConnected) $knopf.disabled = false; }
+}
+
+/** Neues Gerät: einmal mit Anzeigename und Passwort */
+function zeigeAnmelden(meldung){
+  navSetzen("app");
+  unterzeile("Anmeldung");
+  ansicht(`<form class="ansicht" id="formAnmelden" novalidate>
+    ${bannerHtml(meldung?.art, meldung?.text)}
+    <div class="feld">
+      <label for="anmName">Anzeigename</label>
+      <input class="eingabe" id="anmName" type="text" autocomplete="username" maxlength="${ANZEIGENAME_MAX}" required>
+    </div>
+    ${passwortFeld("anmPasswort", "Passwort", "current-password")}
+    <div id="anmMeldung" aria-live="polite"></div>
+    <button class="klein-knopf" type="button" data-weiter="anlegen">Registrieren</button>
+    <button class="knopf" type="submit">Anmelden</button>
+  </form>`);
+  const $form = document.getElementById("formAnmelden");
+  $form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const $m = document.getElementById("anmMeldung");
+    const name = document.getElementById("anmName").value.trim(), passwort = document.getElementById("anmPasswort").value;
+    if(!name || !passwort){ $m.innerHTML = bannerHtml("bad", "Bitte Anzeigename und Passwort eingeben"); return; }
+    mitKnopf($form.querySelector('[type="submit"]'), async () => {
+      const r = await anfrage("POST", "/anmelden", { anzeigename:name, passwort });
+      if(!r.ok){ $m.innerHTML = bannerHtml(meldungArt(r), r.text); return; }
+      angemeldet(r.data);
+      await start();
+    });
+  });
+}
+/** Token vom Board → auf dem Gerät merken */
+function angemeldet(d){
+  lsSchreiben("board.verbindung", { adresse:BOARD_ADRESSE, token:d.token, name:d.name });
+  kontaktMerken();
+}
+
+/** Neues Konto: echter Name, Anzeigename, Passwort, PIN */
+function zeigeAnlegen(){
+  navSetzen("app");
+  unterzeile("Registrierung");
+  ansicht(`<form class="ansicht" id="formAnlegen" novalidate>
+    <p class="sub">Das Konto gilt für alle Welten auf diesem Board. Ein anderes Konto gibt es frei.</p>
+    <div class="feld">
+      <label for="neuEcht">Echter Name</label>
+      <input class="eingabe" id="neuEcht" type="text" autocomplete="name" maxlength="${ECHTER_NAME_MAX}" required>
+      <span class="hilfe">Sehen alle Konten auf diesem Board.</span>
+    </div>
+    <div class="feld">
+      <label for="neuName">Anzeigename</label>
+      <input class="eingabe" id="neuName" type="text" autocomplete="username" maxlength="${ANZEIGENAME_MAX}" required>
+      <span class="hilfe">So sehen dich die anderen auf der Karte und bei deinen Einträgen.</span>
+    </div>
+    ${passwortFeld("neuPasswort", "Passwort", "new-password", `Mindestens ${PASSWORT_MIN} Zeichen. Brauchst du für neue Geräte und wenn du die PIN vergisst.`)}
+    ${pinFeld("neuPin", "PIN", `Für den Alltag: nach über ${OFFLINE_MINUTEN.konto} Minuten ohne Verbindung fragt die App danach.`)}
+    ${pinFeld("neuPin2", "PIN wiederholen")}
+    <div id="neuMeldung" aria-live="polite"></div>
+    <button class="knopf" type="submit">Registrieren</button>
+    <button class="link leise" type="button" data-weiter="anmelden">Zurück zur Anmeldung</button>
+  </form>`);
+  const $form = document.getElementById("formAnlegen");
+  $form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const $m = document.getElementById("neuMeldung");
+    const wert = (id) => document.getElementById(id).value;
+    const konto = { echterName:wert("neuEcht"), anzeigename:wert("neuName"), passwort:wert("neuPasswort"), pin:wert("neuPin") };
+    const f = kontoPruefen(konto) || (wert("neuPin") !== wert("neuPin2") ? "Die beiden PINs sind verschieden" : null);
+    if(f){ $m.innerHTML = bannerHtml("bad", f); return; }
+    mitKnopf($form.querySelector('[type="submit"]'), async () => {
+      const r = await anfrage("POST", "/registrieren", konto);
+      if(!r.ok){ $m.innerHTML = bannerHtml(meldungArt(r), r.text); return; }
+      angemeldet(r.data);
+      lsSchreiben("anmeldung.willkommen", r.data.id);
+      await pinMerken(r.data.id, konto.pin);
+      await start();
+    });
+  });
+}
+
+/** Neues Konto, noch nicht freigegeben (L19): warten, bis ein anderes Konto es freigibt */
+function zeigeWartet(){
+  navSetzen(null);
+  unterzeile("Registrierung");
+  ansicht(`<div class="ansicht">
+    <div class="pin-kopf">
+      <span class="initiale" aria-hidden="true">${initiale(ich.benutzer.anzeigename)}</span>
+      <h2>Wartet auf Freigabe</h2>
+      <p class="grund">Dein Konto „${esc(ich.benutzer.anzeigename)}“ ist angelegt. Jemand, der schon dabei ist, gibt es in der Companion unter Board → Konten frei.</p>
+    </div>
+    <div id="wartenMeldung" aria-live="polite"></div>
+    <button class="knopf" type="button" data-weiter="pruefen">Erneut prüfen</button>
+    <button class="link leise" type="button" data-weiter="abmelden">Abmelden</button>
+  </div>`);
+  wartenTimer = setInterval(async () => {
+    const r = await anfrage("GET", "/ich");
+    if(r.ok && r.data?.freigegeben) start();
+    else if(r.status === 401) start();
+  }, WARTEN_PRUEFEN_MS);
+}
+
+/** Nach dem Registrieren und der Freigabe: Willkommenskarte (Inhalt fügt Max später hinzu, AN11) */
+function zeigeWillkommen(){
+  navSetzen(null);
+  unterzeile("");
+  ansicht(`<div class="ansicht">
+    <div class="platzhalter willkommen">
+      <span class="kicker">Willkommenskarte</span>
+      <h2>Willkommen, ${esc(ich.benutzer.anzeigename)}</h2>
+      <p class="grund">Hier kommt bald mehr: Den Inhalt der Willkommenskarte fügt Max noch hinzu.</p>
+    </div>
+    <button class="knopf" type="button" data-weiter="companion">Weiter zur Companion</button>
+  </div>`);
+}
+
+/** PIN-Sperre: Gerät bekannt, aber über 30 Minuten ohne Kontakt oder PIN woanders gewechselt */
+function zeigePin(){
+  const grund = ich.grund === "pinwechsel"
+    ? "Deine PIN wurde geändert. Bitte gib die neue PIN ein."
+    : `Dieses Gerät war ${dauer(Number(String(ich.grund).split(":")[1]) || OFFLINE_MINUTEN.konto)} ohne Verbindung. Bitte bestätige mit deiner PIN.`;
+  navSetzen(null);
+  unterzeile("Anmeldung");
+  ansicht(`<div class="ansicht">
+    <div class="pin-kopf">
+      <span class="initiale" aria-hidden="true">${initiale(ich.benutzer.anzeigename)}</span>
+      <h2>Hallo, ${esc(ich.benutzer.anzeigename)}</h2>
+      <p class="grund">${esc(grund)}</p>
+    </div>
+    ${pinPadHtml()}
+    <div id="pinMeldung" aria-live="polite"></div>
+    <div class="links">
+      <button class="link" type="button" data-weiter="reset">PIN vergessen?</button>
+      <button class="link leise" type="button" data-weiter="abmelden">Anderes Konto</button>
+    </div>
+  </div>`);
+  pinPadVerbinden(async (pin, wackeln) => {
+    const $m = document.getElementById("pinMeldung");
+    const r = await anfrage("POST", "/pin", { pin });
+    if(!r.ok){ wackeln(); $m.innerHTML = bannerHtml(meldungArt(r), r.text); return; }
+    await pinMerken(ich.benutzer.id, pin);
+    kontaktMerken();
+    start();
+  });
+}
+
+/** PIN zurücksetzen: Passwort + neue PIN */
+function zeigeReset(){
+  navSetzen(null);
+  unterzeile("PIN zurücksetzen");
+  ansicht(`<form class="ansicht" id="formReset" novalidate>
+    <p class="sub">Mit deinem Passwort legst du eine neue PIN fest. Deine anderen Geräte fragen danach nach der neuen PIN.</p>
+    ${passwortFeld("resPasswort", "Passwort", "current-password")}
+    ${pinFeld("resPin", "Neue PIN")}
+    ${pinFeld("resPin2", "Neue PIN wiederholen")}
+    <div id="resMeldung" aria-live="polite"></div>
+    <button class="knopf" type="submit">PIN speichern</button>
+    <button class="link leise" type="button" data-weiter="start">Abbrechen</button>
+  </form>`);
+  const $form = document.getElementById("formReset");
+  $form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const $m = document.getElementById("resMeldung");
+    const wert = (id) => document.getElementById(id).value;
+    if(!KONTO_PIN.test(wert("resPin"))){ $m.innerHTML = bannerHtml("bad", "Deine PIN hat 4 bis 8 Ziffern"); return; }
+    if(wert("resPin") !== wert("resPin2")){ $m.innerHTML = bannerHtml("bad", "Die beiden PINs sind verschieden"); return; }
+    mitKnopf($form.querySelector('[type="submit"]'), async () => {
+      const r = await anfrage("POST", "/pin/zuruecksetzen", { passwort:wert("resPasswort"), neuePin:wert("resPin") });
+      if(!r.ok){ $m.innerHTML = bannerHtml(meldungArt(r), r.text); return; }
+      await pinMerken(ich.benutzer.id, wert("resPin"));
+      kontaktMerken();
+      start({ art:"ok", text:"Neue PIN gespeichert." });
+    });
+  });
+}
+
+/** Board nicht erreichbar, Gerät aber angemeldet: die Companion läuft mit dem letzten Stand weiter (Offline B3) */
+function zeigeOffline(){
+  navSetzen("app");
+  unterzeile("Anmeldung");
+  ansicht(`<div class="ansicht">
+    ${bannerHtml("warn", "Das Board ist gerade nicht erreichbar.")}
+    <p class="sub">Die Companion zeigt ohne Verbindung den letzten Stand. Nach über ${OFFLINE_MINUTEN.konto} Minuten fragt sie nach deiner PIN.</p>
+    <button class="knopf" type="button" data-weiter="companion">Offline weiter zur Companion</button>
+    <button class="link leise" type="button" data-weiter="start">Erneut versuchen</button>
+  </div>`);
+}
+
+/** Reiter Dashboard-Login: Anzeige-Geräte melden sich hier bald mit einem Zugangs-Code an (L5) */
+function zeigeDashboard(){
+  navSetzen("dashboard");
+  unterzeile("");
+  ansicht(`<div class="ansicht" role="tabpanel" aria-label="Dashboard-Login">
+    ${bannerHtml("info", "Kommt bald: Anzeige-Geräte (TV, Tablet) melden sich hier mit einem Zugangs-Code an.")}
+    <p class="sub">Bis dahin öffnet ein Anzeige-Gerät seinen Anzeige-Link. Den gibt es in der Companion unter Board → Anzeigen.</p>
+  </div>`);
+}
+
+function zurCompanion(){
+  lsSchreiben("anmeldung.willkommen", null);
+  location.replace(COMPANION);
+}
+
+/** Einstieg: Gerät angemeldet? Konto frei? PIN nötig? Sonst direkt in die Companion (L13). */
+async function start(meldung){
+  const v = verbindung();
+  if(!v) return zeigeAnmelden(meldung);
+  const r = await anfrage("GET", "/ich");
+  if(nichtErreichbar(r)) return zeigeOffline();
+  if(r.status === 401){
+    vergessen();
+    return zeigeAnmelden({ art:"info", text:"Dieses Gerät ist nicht mehr angemeldet. Bitte melde dich mit deinem Passwort an." });
+  }
+  if(!r.ok) return zeigeAnmelden({ art:"bad", text:r.text });
+  if(!r.data?.benutzer) return zurCompanion();   // Board ohne die Anmeldung mit Passwort (vor dem Pi-Update)
+  ich = r.data;
+  if(!ich.freigegeben) return zeigeWartet();
+  if(ich.pinNoetig) return zeigePin();
+  kontaktMerken();
+  if(lsLesen("anmeldung.willkommen") === ich.benutzer.id) return zeigeWillkommen();
+  if(meldung?.art === "ok") return zurCompanionNach(meldung);
+  zurCompanion();
+}
+/** Kurz zeigen, was geklappt hat, dann weiter */
+function zurCompanionNach(meldung){
+  ansicht(`<div class="ansicht">${bannerHtml(meldung.art, meldung.text)}<p class="laden">Weiter zur Companion …</p></div>`);
+  setTimeout(zurCompanion, 900);
+}
+
+async function abmelden(){
+  if(verbindung()) await anfrage("POST", "/abmelden");
+  vergessen();
+  zeigeAnmelden({ art:"info", text:"Abgemeldet. Dieses Gerät braucht jetzt wieder ein Passwort." });
+}
+
+/* Knöpfe und „Zeigen“ per Delegation */
+$buehne.addEventListener("click", (e) => {
+  const zeigen = e.target.closest("[data-zeigen]");
+  if(zeigen){
+    const $i = document.getElementById(zeigen.dataset.zeigen), sichtbar = $i.type === "text";
+    $i.type = sichtbar ? "password" : "text";
+    zeigen.textContent = sichtbar ? "Zeigen" : "Verbergen";
+    return;
+  }
+  const ziel = e.target.closest("[data-weiter]")?.dataset.weiter;
+  if(!ziel) return;
+  if(ziel === "anlegen") zeigeAnlegen();
+  else if(ziel === "anmelden" || ziel === "start" || ziel === "pruefen") start();
+  else if(ziel === "reset") zeigeReset();
+  else if(ziel === "abmelden") abmelden();
+  else if(ziel === "companion") zurCompanion();
+});
+
+/* ============================================================================
+   2 · PIN-FELD  ·  4–8 Ziffern, darum mit OK-Taste statt automatischem Absenden
+   ========================================================================== */
+function pinPadHtml(){
+  const tasten = ["1","2","3","4","5","6","7","8","9"].map((z) => `<button class="taste" type="button" data-ziffer="${z}">${z}</button>`).join("");
+  return `<div class="punkte" id="pinPunkte" aria-label="PIN-Eingabe, 0 Ziffern"></div>
+    <div class="tastatur" role="group" aria-label="Ziffernblock">
+      ${tasten}
+      <button class="taste neben" type="button" data-pin="loeschen" aria-label="Letzte Ziffer löschen">⌫</button>
+      <button class="taste" type="button" data-ziffer="0">0</button>
+      <button class="taste ok" type="button" data-pin="ok" disabled>OK</button>
+    </div>`;
+}
+function pinPadVerbinden(absenden){
+  let pin = "", laeuft = false;
+  const $p = document.getElementById("pinPunkte"), $ok = $buehne.querySelector('[data-pin="ok"]');
+  const zeichnen = () => {
+    const stellen = Math.max(4, pin.length);
+    $p.innerHTML = Array.from({ length:stellen }, (_, i) => `<span class="${i < pin.length ? "voll" : ""}"></span>`).join("");
+    $p.setAttribute("aria-label", `PIN-Eingabe, ${pin.length} Ziffern`);
+    $ok.disabled = laeuft || !KONTO_PIN.test(pin);
+  };
+  const wackeln = () => { pin = ""; zeichnen(); $p.classList.remove("wackeln"); void $p.offsetWidth; $p.classList.add("wackeln"); };
+  const eingabe = (z) => { if(pin.length < 8){ pin += z; zeichnen(); } };
+  const loeschen = () => { pin = pin.slice(0, -1); zeichnen(); };
+  const ok = async () => {
+    if(laeuft || !KONTO_PIN.test(pin)) return;
+    laeuft = true; zeichnen();
+    try { await absenden(pin, wackeln); } finally { laeuft = false; if($p.isConnected) zeichnen(); }
+  };
+  $buehne.querySelector(".tastatur").addEventListener("click", (e) => {
+    const t = e.target.closest("button"); if(!t) return;
+    if(t.dataset.ziffer) eingabe(t.dataset.ziffer);
+    else if(t.dataset.pin === "loeschen") loeschen();
+    else if(t.dataset.pin === "ok") ok();
+  });
+  // Tastatur am Desktop
+  const taste = (e) => {
+    if(!document.getElementById("pinPunkte")) return document.removeEventListener("keydown", taste);
+    // preventDefault: sonst löst Enter zusätzlich den gerade fokussierten Knopf aus
+    if(/^\d$/.test(e.key)){ e.preventDefault(); eingabe(e.key); }
+    else if(e.key === "Backspace"){ e.preventDefault(); loeschen(); }
+    else if(e.key === "Enter"){ e.preventDefault(); ok(); }
+  };
+  document.addEventListener("keydown", taste);
+  zeichnen();
+}
+
+start();
+</script>
+</body>
+</html>

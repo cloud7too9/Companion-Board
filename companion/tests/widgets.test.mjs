@@ -78,8 +78,8 @@ try {
   pruefe((await karteText("w-sammelstatus")).includes("5 von 18") && (await karteText("w-portale")).includes("Hauptbasis"),
     "Widgets rendern Karten (Titel und Zeilen)");
   pruefe(await p.$$eval('[data-panel-id] [data-testid="karte"]', (l) => l.length) === 6, "alle 6 Start-Widgets mit Karte (vier vom Board, Orte und Beitreten aus dem Zustand)");
-  pruefe(await p.$$eval('[data-testid="ort-zeile"]', (l) => l.length) >= 3 && await p.isVisible('[data-testid="pin"]') && await p.$('[data-testid="qr"] svg') !== null,
-    "Ohne Board: Orte, QR-Code und PIN aus dem Beispiel-Zustand");
+  pruefe(await p.$$eval('[data-testid="ort-zeile"]', (l) => l.length) >= 3 && await p.isVisible('[data-testid="adresse"]') && await p.$('[data-testid="pin"]') === null
+    && await p.$('[data-testid="qr"] svg') !== null, "Ohne Board: Orte, QR-Code und Adresse der Anmeldeseite aus dem Beispiel-Zustand (keine Board-PIN)");
   await p.screenshot({ path: `${DIR}/w5-beispielkarten.png` });
   await p.getByRole("button", { name: "Bearbeiten" }).click();
   const stufe = (id) => p.$eval(`[data-panel-id="${id}"] [data-testid="stufe"]`, (e) => e.textContent);

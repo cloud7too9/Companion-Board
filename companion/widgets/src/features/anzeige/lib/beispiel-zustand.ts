@@ -27,7 +27,7 @@ export function beispielZustand(jetzt = Date.now()): BoardZustand {
 
 export const BEISPIEL_TEILNEHMER = ["Max", "Lena"];
 
-export const BEISPIEL_BEITRITT: Beitritt = { beitrittsUrl: "https://mainhubv1.com/app/?pin=000000", adresse: "https://mainhubv1.com", pin: "000000" };
+export const BEISPIEL_BEITRITT: Beitritt = { beitrittsUrl: "https://mainhubv1.com/", adresse: "https://mainhubv1.com" };
 
 /** Platzhalter statt eines echten QR-Codes (das Beispiel hat kein Board, dem man beitreten könnte) */
 export const BEISPIEL_QR =

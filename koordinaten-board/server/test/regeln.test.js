@@ -122,3 +122,25 @@ test('IDs neuer Einträge: UUID v4 vom Handy, auch ohne sicheren Kontext', () =>
     assert.equal(regeln.idGueltig(falsch), false, String(falsch));
   }
 });
+
+test('Anmeldung: Konto, Passwort, PIN, Zugangs-Codes, Gültigkeit', () => {
+  const konto = { echterName: 'Max Muster', anzeigename: '  Max  ', passwort: 'creeper123', pin: '2468' };
+  assert.equal(regeln.kontoPruefen(konto), null);
+  assert.equal(regeln.anzeigenameSauber(' Max   der  Große '), 'Max der Große');
+  assert.equal(regeln.kontoPruefen({ ...konto, echterName: ' ' }), 'Bitte deinen echten Namen eingeben');
+  assert.equal(regeln.kontoPruefen({ ...konto, anzeigename: 'x'.repeat(25) }), 'Anzeigename ist zu lang (max. 24 Zeichen)');
+  assert.equal(regeln.kontoPruefen({ ...konto, passwort: 'kurz' }), 'Das Passwort braucht mindestens 8 Zeichen');
+  assert.equal(regeln.kontoPruefen({ ...konto, pin: '12' }), 'Deine PIN hat 4 bis 8 Ziffern');
+  assert.equal(regeln.passwortPruefen(12345678), 'Das Passwort braucht mindestens 8 Zeichen', 'nur Text');
+  assert.ok(regeln.KONTO_PIN.test('12345678') && !regeln.KONTO_PIN.test('123456789'));
+  // 57 Zeichen ohne die verwechselbaren 0 O 1 l I, jedes nur einmal
+  assert.equal(regeln.CODE_ZEICHEN.length, 57);
+  assert.equal(new Set(regeln.CODE_ZEICHEN).size, 57);
+  assert.ok(![...'0O1lI'].some((z) => regeln.CODE_ZEICHEN.includes(z)));
+  assert.ok(regeln.ZUGANGS_CODE.test('aB3x9') && !regeln.ZUGANGS_CODE.test('aB3x') && !regeln.ZUGANGS_CODE.test('aB3x-'));
+  assert.deepEqual([...regeln.GUELTIGKEITEN], [20, 5, 60, 1440, null]);
+  assert.equal(regeln.gueltigkeitPruefen(null), null);
+  assert.equal(regeln.gueltigkeitPruefen(20), null);
+  for (const falsch of [0, -5, 1.5, '20', undefined]) assert.equal(regeln.gueltigkeitPruefen(falsch), 'Ungültige Gültigkeit', String(falsch));
+  assert.deepEqual({ ...regeln.OFFLINE_MINUTEN }, { konto: 30, anzeige: 15 });
+});

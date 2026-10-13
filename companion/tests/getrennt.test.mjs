@@ -1,25 +1,26 @@
-// Getrennte Ursprünge (Umbau Phase 2): Die Companion kommt von einem eigenen Server (wie später von Netlify),
-// das Board läuft woanders. konfig.js nennt die Adresse des Boards; Beitreten, API und Live-Verbindung
-// gehen dorthin, das Board lässt den Ursprung der Seite per CORS zu.
+// Getrennte Ursprünge (Umbau Phase 2): Die Companion kommt von einem eigenen Server (wie von Netlify),
+// das Board läuft woanders. konfig.js nennt die Adresse des Boards; API und Live-Verbindung gehen dorthin,
+// das Board lässt den Ursprung der Seite per CORS zu. Die Anmeldeseite über zwei Ursprünge prüft netlify.test.mjs
+// mit dem echten Netlify-Aufbau; hier bringt das Gerät seine Anmeldung schon mit (Token aus der API).
 import { chromium } from "playwright";
 import { fileURLToPath } from "node:url";
 import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { companionAusliefern, threeUmleiten, CHROMIUM_OPTIONEN } from "./hilfen.mjs";
+import { companionAusliefern, threeUmleiten, CHROMIUM_OPTIONEN, konto } from "./hilfen.mjs";
 
 const HIER = fileURLToPath(new URL(".", import.meta.url));
 const DIR = path.join(HIER, "bilder"); mkdirSync(DIR, { recursive: true });
 const TMP = mkdtempSync(path.join(tmpdir(), "getrennt-"));
-const PORT = 3190, SEITE_PORT = 3187, PIN = "471100", BOARD = `http://127.0.0.1:${PORT}`;
+const PORT = 3190, SEITE_PORT = 3187, BOARD = `http://127.0.0.1:${PORT}`;
 const pruefe = (ok, text) => { console.log((ok ? "OK   " : "FEHL ") + text); if (!ok) process.exitCode = 1; };
 const schlafen = (ms) => new Promise((r) => setTimeout(r, ms));
 const warteAuf = (p, fn, arg, ms = 8000) => p.waitForFunction(fn, arg, { timeout: ms }).then(() => true, () => false);
 
 const board = spawn(process.execPath, ["src/server.js"], {
   cwd: path.join(HIER, "../../koordinaten-board/server"),
-  env: { ...process.env, PORT: String(PORT), RAUM_PIN: PIN, DATEN_ORDNER: path.join(TMP, "daten"), ERLAUBTE_URSPRUENGE: `http://127.0.0.1:${SEITE_PORT}` },
+  env: { ...process.env, PORT: String(PORT), DATEN_ORDNER: path.join(TMP, "daten"), ERLAUBTE_URSPRUENGE: `http://127.0.0.1:${SEITE_PORT}` },
   stdio: "ignore",
 });
 const seite = await companionAusliefern(SEITE_PORT);
@@ -46,14 +47,16 @@ try {
   await demo.close();
 
   // ---- Mit konfig.js: Live-Betrieb gegen das Board auf dem anderen Ursprung ----
-  await p.goto(`${seite.adresse}/companion-prototyp.html?pin=${PIN}`);
-  await p.waitForSelector("#boardName");
-  pruefe(await p.evaluate((b) => !DEMO.enabled && BOARD_ADRESSE === b && API_BASIS === `${b}/api`, BOARD), "konfig.js: Live-Betrieb, API_BASIS zeigt aufs Board (ohne Schrägstrich am Ende)");
-  pruefe((await p.$eval(".sheet-kopf", (e) => e.textContent)).includes("127.0.0.1:3190"), "Beitreten-Sheet nennt die Adresse des Boards");
-  await p.fill("#boardName", "Max");
-  await p.fill("#boardKontoPin", "2468");
-  await p.click('[data-aktion="board-beitreten"]');
-  pruefe(await warteAuf(p, (b) => bd.verbindung?.name === "Max" && bd.verbindung.adresse === b, BOARD), "Beigetreten, Verbindung zeigt aufs Board");
+  // Angemeldet wie nach der Anmeldeseite: Token im localStorage, dazu der letzte Kontakt
+  const max = await konto(BOARD, "Max");
+  await kontext.addInitScript(([adresse, token]) => {
+    if (localStorage.getItem("board.verbindung")) return;
+    localStorage.setItem("board.verbindung", JSON.stringify({ adresse, token, name: "Max" }));
+    localStorage.setItem("board.kontakt", String(Date.now()));
+  }, [BOARD, max.token]);
+  await p.goto(`${seite.adresse}/companion-prototyp.html`);
+  pruefe(await warteAuf(p, (b) => !DEMO.enabled && BOARD_ADRESSE === b && API_BASIS === `${b}/api`, BOARD), "konfig.js: Live-Betrieb, API_BASIS zeigt aufs Board (ohne Schrägstrich am Ende)");
+  pruefe(await warteAuf(p, (b) => bd.ich?.anzeigename === "Max" && bd.verbindung.adresse === b, BOARD), "Angemeldet, Verbindung zeigt aufs Board");
   pruefe(await warteAuf(p, () => bd.status === "verbunden"), "WebSocket zum Board auf dem anderen Ursprung steht");
 
   // Daten über die API (PUT/POST über CORS), Live-Meldung kommt an

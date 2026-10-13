@@ -56,3 +56,40 @@ export const CHROMIUM_OPTIONEN = {
   args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"],
   env: { ...process.env, no_proxy: OHNE_PROXY, NO_PROXY: OHNE_PROXY },
 };
+
+// ---------- Konten (Bauplan „Anmeldung und Dashboard-Zugang“) ----------
+export const PASSWORT = "creeper123";
+/** Board-Adresse → Token des ersten Kontos; es gilt sofort und gibt jedes weitere frei */
+const ersteKonten = new Map();
+
+/** Konto per API anlegen (und freigeben lassen); gibt es den Namen schon, auf einem neuen Gerät anmelden
+ *  → { token, id, name, freigegeben } */
+export async function konto(board, name, pin = "2468", { freigeben = true } = {}) {
+  const post = (pfad, body, token) => fetch(`${board}/api${pfad}`, { method: "POST",
+    headers: { "content-type": "application/json", ...(token && { authorization: `Bearer ${token}` }) }, body: JSON.stringify(body ?? {}) });
+  let res = await post("/registrieren", { echterName: `${name} Beispiel`, anzeigename: name, passwort: PASSWORT, pin });
+  if (res.status === 409) res = await post("/anmelden", { anzeigename: name, passwort: PASSWORT });
+  const d = await res.json();
+  if (!res.ok) throw new Error(`Konto ${name}: ${d.fehler ?? res.status}`);
+  if (!d.freigegeben && freigeben) {
+    const r = await post(`/konten/${d.id}/freigeben`, null, ersteKonten.get(board));
+    if (!r.ok) throw new Error(`Konto ${name} freigeben: ${r.status}`);
+    d.freigegeben = true;
+  }
+  if (!ersteKonten.has(board)) ersteKonten.set(board, d.token);
+  return d;
+}
+
+/** Wie ein Handy: Anmeldeseite (/) öffnen, Anzeigename + Passwort, weiter in die Companion (/app/).
+ *  seiten: Ursprung der Seiten (lokal das Board, sonst die Netlify-Vorschau) → true, wenn live verbunden */
+export async function anmelden(seite, seiten, name, passwort = PASSWORT) {
+  await seite.goto(`${seiten}/`);
+  await seite.fill("#anmName", name);
+  await seite.fill("#anmPasswort", passwort);
+  await seite.click('#formAnmelden [type="submit"]');
+  try {
+    await seite.waitForURL(`${seiten}/app/`, { timeout: 10000 });
+    await seite.waitForFunction(() => typeof bd !== "undefined" && bd.status === "verbunden", null, { timeout: 10000 });
+    return true;
+  } catch { return false; }
+}

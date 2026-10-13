@@ -1,4 +1,4 @@
-// Anordnen am Handy (A6, Weg 1): Max tritt in der Companion bei, öffnet Board → Anzeigen →
+// Anordnen am Handy (A6, Weg 1): Max meldet sich in der Companion an, öffnet Board → Anzeigen →
 // „Anzeige anordnen“ und landet auf /dashboard/anordnen. Dort sieht er die Fläche der Anzeige
 // (32 × ihre Reihen) mit leeren Widgets und ordnet an: Widget mit Quelle hinzufügen, verschieben,
 // Stufe wechseln, Layer anlegen und wechseln, Vollbild starten und beenden, entfernen. Jede Änderung
@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, rmSync, existsSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { CHROMIUM_OPTIONEN, anzeigeLinkQuery } from "./hilfen.mjs";
+import { CHROMIUM_OPTIONEN, anzeigeLinkQuery, konto, anmelden } from "./hilfen.mjs";
 
 const HIER = fileURLToPath(new URL(".", import.meta.url));
 const DIR = path.join(HIER, "bilder");
@@ -19,10 +19,10 @@ const schlafen = (ms) => new Promise((r) => setTimeout(r, ms));
 if (!existsSync(path.join(HIER, "../widgets/dist/index.html"))) { console.log("FEHL nicht gebaut: npm --prefix ../widgets run build"); process.exit(1); }
 
 const TMP = mkdtempSync(path.join(tmpdir(), "widgets-anordnen-"));
-const PORT = 3185, PIN = "471100", BOARD = `http://127.0.0.1:${PORT}`;
+const PORT = 3185, BOARD = `http://127.0.0.1:${PORT}`;
 const board = spawn(process.execPath, ["src/server.js"], {
   cwd: path.join(HIER, "../../koordinaten-board/server"),
-  env: { ...process.env, PORT: String(PORT), RAUM_PIN: PIN, DATEN_ORDNER: path.join(TMP, "daten") },
+  env: { ...process.env, PORT: String(PORT), DATEN_ORDNER: path.join(TMP, "daten") },
   stdio: "ignore",
 });
 
@@ -36,7 +36,7 @@ const browser = await chromium.launch(CHROMIUM_OPTIONEN);
 const fehler = [];
 try {
   for (let i = 0; i < 60 && !(await fetch(`${BOARD}/api/server`).then((r) => r.ok, () => false)); i++) await schlafen(200);
-  ({ token } = await api("POST", "/api/beitreten", { pin: PIN, name: "Lena", kontoPin: "1357" }));
+  ({ token } = await konto(BOARD, "Lena", "1357"));
   await api("POST", "/api/orte/welten", { seed: "6889192652397090698" });
   const banner = (await api("POST", "/api/banner", { name: "Kreuz", basis: "white", ebenen: [{ muster: "cross", farbe: "red" }] })).banner;
 
@@ -54,10 +54,8 @@ try {
   const kontext = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true });
   const max = await kontext.newPage();
   max.on("pageerror", (e) => fehler.push(`Handy: ${e.message}`));
-  await max.goto(`${BOARD}/?pin=${PIN}`);
-  await max.waitForSelector("#boardName"); await max.fill("#boardName", "Max"); await max.fill("#boardKontoPin", "2468");
-  await max.click('[data-aktion="board-beitreten"]');
-  await max.waitForFunction(() => !DEMO.enabled && bd.verbindung?.name);
+  await konto(BOARD, "Max");
+  pruefe(await anmelden(max, BOARD, "Max"), "Max meldet sich an");
   await max.evaluate(() => alleSchliessen());
   await max.click("#burgerBtn"); await schlafen(300);
   await max.click("#boardBtn");
@@ -155,13 +153,13 @@ try {
 
   // ---- Fertig → zurück in die Companion ----
   await max.click('a:has-text("Fertig")');
-  pruefe(await max.waitForFunction(() => location.pathname === "/" && typeof bd !== "undefined" && bd.verbindung?.name === "Max", null, { timeout: 8000 }).then(() => true, () => false),
+  pruefe(await max.waitForFunction(() => location.pathname === "/app/" && typeof bd !== "undefined" && bd.verbindung?.name === "Max", null, { timeout: 8000 }).then(() => true, () => false),
     "„Fertig“ führt zurück in die Companion, weiter angemeldet");
 
   // ---- Ohne Anmeldung ----
   const fremd = await browser.newPage();
   await fremd.goto(`${BOARD}/dashboard/anordnen?anzeige=${anzeigeId}`);
-  pruefe((await fremd.textContent('[data-testid="anordnen-hinweis"] h1')) === "Erst beitreten", "Ohne Beitritt: „Erst beitreten“ mit Weg zur Companion");
+  pruefe((await fremd.textContent('[data-testid="anordnen-hinweis"] h1')) === "Erst anmelden", "Ohne Anmeldung: „Erst anmelden“ mit Weg zur Companion");
   await fremd.close();
 } catch (f) {
   pruefe(false, `Abbruch: ${f.stack || f}`);

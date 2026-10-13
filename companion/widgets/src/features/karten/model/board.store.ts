@@ -44,7 +44,7 @@ interface BoardState {
   teilnehmer: string[];
   /** Steht die Verbindung zum Board (/ws offen)? */
   verbunden: boolean;
-  /** Anzeige: Adresse und PIN zum Beitreten; null, bis geladen */
+  /** Anzeige: Adresse der Anmeldeseite zum Beitreten; null, bis geladen */
   beitritt: Beitritt | null;
   /** Anzeige: QR-Code zum Beitreten als SVG */
   qrSvg: string;
@@ -128,7 +128,7 @@ export const useBoardStore = create<BoardState>((set, get) => ({
       set({ anzeige: antwort?.anzeige ?? null, layout: antwort?.layout ?? null, vollbild: antwort?.vollbild ?? null });
     };
 
-    // Anzeige: Beitreten (Adresse, PIN) und QR-Code; ändern sich nur mit dem Neustart des Boards
+    // Anzeige: Beitreten (Adresse der Anmeldeseite) und QR-Code; ändern sich nur mit dem Neustart des Boards
     const beitrittLaden = async () => {
       if (token) return;
       const parameter = zugangParameter(zugang);
@@ -139,7 +139,7 @@ export const useBoardStore = create<BoardState>((set, get) => ({
       ]);
       if (aus) return;
       set({
-        beitritt: beitritt && { beitrittsUrl: beitritt.beitrittsUrl, adresse: beitritt.adresse, pin: beitritt.pin },
+        beitritt: beitritt && { beitrittsUrl: beitritt.beitrittsUrl, adresse: beitritt.adresse },
         qrSvg: qr?.svg ?? "",
         zugangHinweis: ohneLink ? fehlerHinweis(403, zugang) : null,
       });
@@ -161,7 +161,8 @@ export const useBoardStore = create<BoardState>((set, get) => ({
           if (n?.art === "zustand" && n.zustand) return set({ zustand: n.zustand as BoardZustand });
           if (n?.art === "teilnehmer" && Array.isArray(n.namen)) return set({ teilnehmer: n.namen as string[] });
           if (n?.art !== "geaendert") return;
-          // Layout und Anzeigen betreffen keine Karte
+          // Konten (Bauplan „Anmeldung“) zeigt die Anzeige nicht; Layout und Anzeigen betreffen keine Karte
+          if (n.bereich === "konten") return;
           if (n.bereich === "layout" || n.bereich === "anzeigen") void layoutLaden();
           else geaendert();
         } catch { /* keine JSON-Nachricht */ }

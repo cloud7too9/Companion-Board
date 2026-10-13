@@ -6,13 +6,13 @@ import { mkdirSync, mkdtempSync, rmSync, existsSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { threeUmleiten, CHROMIUM_OPTIONEN, anzeigeLinkQuery } from "./hilfen.mjs";
+import { threeUmleiten, CHROMIUM_OPTIONEN, anzeigeLinkQuery, konto, anmelden } from "./hilfen.mjs";
 
 const HIER = fileURLToPath(new URL(".", import.meta.url));
 const DIR = path.join(HIER, "bilder");
 mkdirSync(DIR, { recursive: true });
 const TMP = mkdtempSync(path.join(tmpdir(), "live-test-"));
-const PORT = 3195, PIN = "471100";
+const PORT = 3195;
 const BOARD = `http://127.0.0.1:${PORT}`;
 if (!existsSync(path.join(HIER, "../widgets/dist/index.html"))) {
   console.log("FEHL Dashboard nicht gebaut: npm --prefix ../widgets install && npm --prefix ../widgets run build");
@@ -25,7 +25,7 @@ let board = null;
 async function boardStarten() {
   board = spawn(process.execPath, ["src/server.js"], {
     cwd: path.join(HIER, "../../koordinaten-board/server"),
-    env: { ...process.env, PORT: String(PORT), RAUM_PIN: PIN, DATEN_ORDNER: path.join(TMP, "daten") },
+    env: { ...process.env, PORT: String(PORT), DATEN_ORDNER: path.join(TMP, "daten") },
     stdio: "ignore",
   });
   for (let i = 0; i < 60; i++) {
@@ -62,45 +62,28 @@ async function handy() {
 }
 const text = (p, sel) => p.$eval(sel, (e) => e.textContent.replace(/\s+/g, " ").trim());
 const warteAuf = (p, fn, arg, ms = 6000) => p.waitForFunction(fn, arg, { timeout: ms }).then(() => true, () => false);
-/** Eigene PIN je Account (B2) */
+/** Eigene PIN je Konto; Konten legt die API an, angemeldet wird über die Anmeldeseite (Bauplan „Anmeldung“) */
 const KONTO_PIN = { Max: "2468", Lena: "1357" };
-/** Wie ein Handy nach dem QR-Scan: /?pin=… öffnen, Name und eigene PIN eingeben, beitreten */
-async function beitreten(p, name) {
-  await p.goto(`${BOARD}/?pin=${PIN}`);
-  await p.waitForSelector("#boardName");
-  await p.fill("#boardName", name);
-  await p.fill("#boardKontoPin", KONTO_PIN[name]);
-  await p.click('[data-aktion="board-beitreten"]');
-  return warteAuf(p, () => !DEMO.enabled && st.sheet === null && bd.verbindung?.name);
-}
 
 try {
   await boardStarten();
   const max = await handy();
 
-  // === Beitreten ================================================================
-  await max.goto(`${BOARD}/?pin=${PIN}`);
-  await max.waitForSelector("#boardName");
+  // === Anmelden =================================================================
+  await konto(BOARD, "Max", KONTO_PIN.Max);
+  pruefe(await anmelden(max, BOARD, "Max"), "Max meldet sich an: Anmeldeseite → Companion unter /app/");
   pruefe(await max.evaluate(() => DEMO.enabled) === false, "Vom Board ausgeliefert → Live-Betrieb");
-  pruefe(await text(max, ".sheet-kopf h2") === "Beitreten", "Startet mit „Beitreten“");
-  pruefe(await max.$eval("#boardPin", (e) => e.value) === PIN, "PIN aus dem QR-Code vorbefüllt");
-  pruefe(await max.$("#boardScanner") === null, "Kein Kamera-Scanner nötig");
   pruefe((await fetch(`${BOARD}/api/typen`)).status === 404, "Die alte Handy-Steuerung des Boards ist abgelöst");
-  await max.screenshot({ path: `${DIR}/l1-beitreten.png` });
-  await max.fill("#boardName", "Max");
-  pruefe((await text(max, "#boardKontoHinweis")) === "Neuer Account „Max“ – wähl dir eine PIN", "Neuer Name → neuer Account");
-  await max.fill("#boardKontoPin", KONTO_PIN.Max);
-  await max.click('[data-aktion="board-beitreten"]');
-  pruefe(await warteAuf(max, () => document.querySelector(".sheet-kopf h2")?.textContent === "Welt"), "Beigetreten → leeres Board: Welt anlegen");
-  pruefe(await max.evaluate(() => bd.ich?.anzeigename === "Max" && /^[0-9a-f-]{36}$/.test(bd.ich.id)), "IDENTITAET.werBistDu(): Account Max mit stabiler ID");
-  pruefe(!max.url().includes("pin="), "PIN steht nicht mehr in der Adresszeile");
+  pruefe(await warteAuf(max, () => document.querySelector(".sheet-kopf h2")?.textContent === "Welt"), "Angemeldet → leeres Board: Welt anlegen");
+  pruefe(await max.evaluate(() => bd.ich?.anzeigename === "Max" && bd.ich.echterName === "Max Beispiel" && /^[0-9a-f-]{36}$/.test(bd.ich.id)),
+    "IDENTITAET.werBistDu(): Konto Max mit stabiler ID und echtem Namen");
   pruefe((await text(max, "#weltBanner")).includes("Noch keine Welt"), "Hinweis: noch keine Welt");
   await max.screenshot({ path: `${DIR}/l2-erste-welt.png` });
   await max.fill("#weltSeed", "6889192652397090698");
   await max.click('[data-aktion="welt-anlegen"]');
   pruefe(await warteAuf(max, () => st.weltId && st.welten.length === 1), "Welt angelegt");
   pruefe((await text(max, "#boardBtn")).includes("Verbunden"), "Sidebar: mit dem Board verbunden");
-  pruefe((await text(max, "#sbProfil")).includes("Max") && (await text(max, "#sbProfil")).includes("Account auf dem Board"), `Sidebar: Spielerprofil oben (${await text(max, "#sbProfil")})`);
+  pruefe((await text(max, "#sbProfil")).includes("Max") && (await text(max, "#sbProfil")).includes("Konto auf dem Board"), `Sidebar: Spielerprofil oben (${await text(max, "#sbProfil")})`);
 
   // Ort von Hand eintragen
   await max.click("#orteEintragenBtn"); await max.click('[data-aktion="eintragen-hand"]'); await max.waitForSelector("#formNeu");
@@ -124,7 +107,8 @@ try {
 
   // === Zweites Handy sieht alles, Änderungen kommen live ==========================
   const lena = await handy();
-  pruefe(await beitreten(lena, "Lena"), "Lena tritt bei");
+  await konto(BOARD, "Lena", KONTO_PIN.Lena);
+  pruefe(await anmelden(lena, BOARD, "Lena"), "Lena meldet sich an");
   pruefe(await warteAuf(lena, () => st.instanzen.length === 2 && st.welten.length === 1), "Lena sieht Welt und Orte von Max");
   await max.evaluate(() => api("/orte/instanzen", { method: "POST", body: JSON.stringify({
     dimensionId: `d_${st.weltId}_overworld`, kategorie: "Village", variante: null, x: 1040, y: 64, z: 310, quelle: "manuell" }) }));
@@ -277,35 +261,26 @@ try {
     "Anzeige nach dem Neustart: verbindet neu, weiter Welt 2 mit Titel");
 
   // === Abmelden, abgelaufene Anmeldung ==========================================
+  const lenaId = await lena.evaluate(() => bd.ich.id);
   await lena.evaluate(() => { bd.verbindung.token = "kaputt.token"; lsSchreiben("board.verbindung", bd.verbindung); });
   await lena.reload();
-  pruefe(await warteAuf(lena, () => document.querySelector(".sheet-kopf h2")?.textContent === "Beitreten"), "Ungültiges Token → wieder „Beitreten“");
-  await lena.fill("#boardPin", PIN);   // nach dem Beitreten steht die Board-PIN nicht mehr in der Adresse
-  pruefe(await warteAuf(lena, () => [...document.querySelectorAll("#boardKonten .konto")].map((k) => k.textContent).join() === "Max,Lena"),
-    "Beitreten zeigt die Accounts zum Auswählen");
-  await lena.screenshot({ path: `${DIR}/l4b-konten.png` });
-  await lena.click('#boardKonten .konto:has-text("Lena")');
-  pruefe(await lena.$eval("#boardName", (e) => e.value) === "Lena" && (await text(lena, "#boardKontoHinweis")) === "Anmelden als Lena – mit deiner PIN", "Account antippen → „Anmelden als Lena“");
-  await lena.fill("#boardKontoPin", "9999");
-  await lena.click('[data-aktion="board-beitreten"]');
-  pruefe(await warteAuf(lena, () => document.getElementById("boardBanner")?.textContent.includes("Falsche PIN für Lena")), "Falsche eigene PIN wird gemeldet");
-  await lena.fill("#boardPin", "000000"); await lena.fill("#boardKontoPin", KONTO_PIN.Lena);   // falsche Board-PIN mit 6 Ziffern
-  await lena.click('[data-aktion="board-beitreten"]');
-  pruefe(await warteAuf(lena, () => document.getElementById("boardBanner")?.textContent.includes("Falsche PIN") && !document.getElementById("boardBanner")?.textContent.includes("für")), "Falsche Board-PIN wird gemeldet");
-  await schlafen(800);   // die Seite fragt die Accounts zur getippten Board-PIN mit 500 ms Verzögerung ab (→ 401 konten, unten erwartet)
-  await lena.fill("#boardPin", PIN);
-  await lena.click('[data-aktion="board-beitreten"]');
-  pruefe(await warteAuf(lena, () => st.sheet === null && bd.verbindung?.name === "Lena" && bd.ich?.anzeigename === "Lena"), "Mit der richtigen PIN wieder angemeldet – derselbe Account");
+  pruefe(await warteAuf(lena, () => location.pathname === "/" && document.getElementById("anmName")), "Ungültiges Token → Anmeldeseite");
+  pruefe(await lena.evaluate(() => localStorage.getItem("board.verbindung") === null && localStorage.getItem("board.pinLokal") === null),
+    "… und nichts vom alten Gerät bleibt");
+  pruefe(await anmelden(lena, BOARD, "Lena"), "Mit dem Passwort wieder angemeldet");
+  pruefe(await lena.evaluate((id) => bd.ich?.id === id, lenaId), "… derselbe Account");
   await max.evaluate(() => boardOeffnen());
-  pruefe((await text(max, "#orteSheetInhalt")).includes("Abmelden"), "Board-Sheet: „Abmelden“ statt „Trennen“");
+  pruefe(await warteAuf(max, () => document.querySelectorAll('#orteSheetInhalt [data-konto]').length === 2), "Board-Sheet: Konten Max und Lena");
+  pruefe((await text(max, "#orteSheetInhalt")).includes("Lena Beispiel"), "… mit echtem Namen");
   await max.screenshot({ path: `${DIR}/l5-board-sheet.png` });
-  await max.click('[data-aktion="board-trennen"]');
-  pruefe(await warteAuf(max, () => document.querySelector(".sheet-kopf h2")?.textContent === "Beitreten" && !bd.verbindung), "Abmelden → „Beitreten“");
+  await max.click('[data-aktion="board-abmelden"]');
+  pruefe(await warteAuf(max, () => location.pathname === "/" && document.getElementById("anmName") && !localStorage.getItem("board.verbindung")), "Abmelden → Anmeldeseite, Gerät vergessen");
+  const r = await fetch(`${BOARD}/api/anmelden`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ anzeigename: "Max", passwort: "creeper123" }) });
+  pruefe(r.ok, "Max' Konto bleibt (nur das Gerät ist abgemeldet)");
 
   pruefe(fehler.length === 0, `keine Fehler in der Konsole${fehler.length ? ": " + fehler.join(" | ") : ""}`);
-  // erwartet: 7 Muster abgelehnt, Schildkröten-Stiefel abgelehnt, ungültiges Token (Prüfung mit werBistDu),
-  // falsche eigene PIN, falsche Board-PIN, danach (verzögert) Accounts mit der falschen Board-PIN abgefragt
-  const erwartet = ["422 /api/banner", "422 /api/ruestung", "401 /api/ich", "401 /api/beitreten", "401 /api/beitreten", "401 /api/beitreten/konten"];
+  // erwartet: 7 Muster abgelehnt, Schildkröten-Stiefel abgelehnt, ungültiges Token (Prüfung mit werBistDu)
+  const erwartet = ["422 /api/banner", "422 /api/ruestung", "401 /api/ich"];
   pruefe(JSON.stringify(antworten) === JSON.stringify(erwartet), `nur erwartete HTTP-Fehler: ${antworten.join(", ")}`);
 } catch (e) {
   pruefe(false, "Abbruch: " + e.message);

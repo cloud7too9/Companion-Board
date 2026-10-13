@@ -13,9 +13,8 @@ import { verbindungLesen } from "../features/anordnen/anmeldung";
 import { useAnordnen } from "../features/anordnen/useAnordnen";
 import { Button } from "../shared/ui/Button";
 
-/** Zurück zur Companion: lokal liefert das Board sie unter / aus, auf Netlify liegt sie unter /app/
- *  (VITE_COMPANION_PFAD aus netlify/bauen.sh, Umbau Phase 5) */
-const ZUR_COMPANION = import.meta.env.VITE_COMPANION_PFAD || "/";
+/** Zurück zur Companion: lokal wie auf Netlify unter /app/ (Bauplan „Anmeldung“: unter / liegt die Anmeldeseite) */
+const ZUR_COMPANION = import.meta.env.VITE_COMPANION_PFAD || "/app/";
 
 function Hinweis({ titel, text }: { titel: string; text: string }) {
   return (
@@ -51,7 +50,7 @@ export function AnordnenPage({ anzeigeId }: { anzeigeId: string | null }) {
   // Als Steuerung mit dem Token der Companion: Quellen in der Galerie, „geaendert“ über /ws
   useEffect(() => (verbindung ? starten({ token: verbindung.token }) : undefined), [verbindung, starten]);
 
-  if (!verbindung) return <Hinweis titel="Erst beitreten" text="Zum Anordnen erst in der Companion am Board beitreten." />;
+  if (!verbindung) return <Hinweis titel="Erst anmelden" text="Zum Anordnen erst in der Companion mit deinem Konto anmelden." />;
   if (!anzeigeId) return <Hinweis titel="Keine Anzeige gewählt" text="Öffne „Anordnen“ in der Companion unter Board → Anzeigen." />;
   if (modus === "beispiel") return <Hinweis titel="Kein Board erreichbar" text="Anordnen geht nur, wenn das Dashboard vom Board kommt." />;
   if (status.art === "fehler") return <Hinweis titel="Anordnen geht gerade nicht" text={status.text} />;

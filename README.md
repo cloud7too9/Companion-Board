@@ -17,9 +17,9 @@ Zwei Projekte für eine gemeinsame Minecraft-Welt im Raum – seit dem 29.09.202
 
 ## Wie die Projekte zusammenhängen
 
-- Das **Board** liefert die Companion unter `/` aus und hält alle Daten (`koordinaten-board/server/daten/daten.db`, SQLite). Handys scannen den QR-Code der Anzeige und treten mit der Board-PIN und ihrem Account (Name + eigene PIN) bei; Änderungen kommen bei allen live an.
+- Das **Board** hält alle Daten (`koordinaten-board/server/daten/daten.db`, SQLite) und liefert lokal die Seiten aus wie Netlify: die Anmeldeseite unter `/`, die Companion unter `/app/`. Handys scannen den QR-Code der Anzeige und melden sich mit ihrem Konto an (Anzeigename + Passwort, danach die PIN; neue Konten gibt ein anderes Konto frei); Änderungen kommen bei allen live an.
 - Handy und Server prüfen mit **derselben Datei** `companion/regeln.js` und bauen Karten mit derselben Datei `companion/board-karten.js`.
-- Die **Anzeige** ist das **Widget-Dashboard** (`/dashboard`, seit Bauplan „Sitzung“ die einzige Anzeige): je Anzeige ein Layout aus Widgets, dazu Orte der aktiven Welt, QR-Code zum Beitreten und Spieler. Jeder Inhalt der Companion lässt sich per „Aufs Board“ als Widget in die Sitzung legen; die Karten baut das Board mit den Anzeigeschemas aus `BOARD_KARTEN`.
+- Die **Anzeige** ist das **Widget-Dashboard** (`/dashboard`, seit Bauplan „Sitzung“ die einzige Anzeige): je Anzeige ein Layout aus Widgets, dazu Orte der aktiven Welt, QR-Code zur Anmeldeseite und Spieler. Jeder Inhalt der Companion lässt sich per „Aufs Board“ als Widget in die Sitzung legen; die Karten baut das Board mit den Anzeigeschemas aus `BOARD_KARTEN`.
 - Seed-Map-Screenshots und Banner-Anleitungen liest die Companion seit Umbau Phase 3 am Handy selbst aus (`companion/texterkennung.js`, tesseract.js im Browser).
 - Beide nutzen dieselbe Optik (Dimensions-Themes aus `modul-a-live-karte.html`) und dieselben Seed-Map-Screenshots als Grundlage.
 - `modul-a-live-karte.html`, die Hauptdatei der Companion-PWA, liegt **nicht** in diesem Repo. Max pflegt sie selbst; das Board kann sie später statt des Prototyps ausliefern (`COMPANION_DATEI`).

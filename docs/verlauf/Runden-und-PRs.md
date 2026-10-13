@@ -4,6 +4,16 @@ Archiv aus `planung/UEBERGABE.md` und `planung/WARTELISTE.md` (ausgelagert am 13
 
 PR-Nummern bis #26 meinen das alte Repo `flexibel-visionboard`, ab dem Repo-Umzug am 05.10.2026 das Repo `Companion-Board` (dort ab #1).
 
+## Runde 14.10.2026 (Bauplan „Anmeldung und Dashboard-Zugang“) · Repo `Companion-Board`
+
+Seit dem 14.10.2026 mergt Claude ohne Rückfrage, sobald die CI grün ist (Max: „mergen ab jetzt ohne Rückfragen“).
+
+| PR | Inhalt |
+|---|---|
+| #25 | Anmeldung L1–L3: Konten mit Passwort und PIN, Freigabe neuer Konten, PIN nach über 30 Minuten ohne Kontakt (Hook 403/423, Pongs als Herzschlag), Anmeldeseite unter `/`, Companion unter `/app/`, Offline-Sperre mit lokalem PIN-Hash, Board-PIN abgebaut; alle Tests auf Konten umgestellt, `anmeldung.test.mjs` (⏸ H15) |
+| #24 | W4: Strukturbereiche aus Chunk-Tag 119 (AABBVolumes) + Entscheidungen zur Anmeldung (andere Sitzung) |
+| #23 | Bauplan „Anmeldung und Dashboard-Zugang“, Referenzschema, H12-Ergebnis (andere Sitzung) |
+
 ## Runde 13.10.2026 (Umbau abgeschlossen, Bauplan „Sitzung“) · Repo `Companion-Board`
 
 | PR | Inhalt |

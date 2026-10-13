@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, rmSync, existsSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { companionAusliefern, threeUmleiten, CHROMIUM_OPTIONEN, anzeigeLinkQuery } from "./hilfen.mjs";
+import { companionAusliefern, threeUmleiten, CHROMIUM_OPTIONEN, anzeigeLinkQuery, konto, anmelden } from "./hilfen.mjs";
 
 const HIER = fileURLToPath(new URL(".", import.meta.url));
 const DIR = path.join(HIER, "bilder");
@@ -17,7 +17,7 @@ mkdirSync(DIR, { recursive: true });
 const BOARD_ORDNER = path.join(HIER, "../../koordinaten-board");
 const { kartePruefen } = await import(pathToFileURL(path.join(BOARD_ORDNER, "server/src/zeigen.js")).href);
 const TMP = mkdtempSync(path.join(tmpdir(), "schema-test-"));
-const PORT = 3194, PIN = "471100", BOARD = `http://127.0.0.1:${PORT}`;
+const PORT = 3194, BOARD = `http://127.0.0.1:${PORT}`;
 if (!existsSync(path.join(HIER, "../widgets/dist/index.html"))) {
   console.log("FEHL Dashboard nicht gebaut: npm --prefix ../widgets install && npm --prefix ../widgets run build");
   process.exit(1);
@@ -27,15 +27,14 @@ const schlafen = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const board = spawn(process.execPath, ["src/server.js"], {
   cwd: path.join(BOARD_ORDNER, "server"),
-  env: { ...process.env, PORT: String(PORT), RAUM_PIN: PIN, DATEN_ORDNER: path.join(TMP, "daten"), ERLAUBTE_URSPRUENGE: "http://127.0.0.1:3193" },
+  env: { ...process.env, PORT: String(PORT), DATEN_ORDNER: path.join(TMP, "daten"), ERLAUBTE_URSPRUENGE: "http://127.0.0.1:3193" },
   stdio: "ignore",
 });
 const companion = await companionAusliefern(3193);
 const browser = await chromium.launch(CHROMIUM_OPTIONEN);
 try {
   for (let i = 0; i < 60 && !(await fetch(`${BOARD}/api/server`).then((r) => r.ok, () => false)); i++) await schlafen(200);
-  const { token } = await (await fetch(`${BOARD}/api/beitreten`, { method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify({ pin: PIN, name: "Max", kontoPin: "2468" }) })).json();
+  const { token } = await konto(BOARD, "Max");
 
   // Companion im DEMO-Modus (über http), mit dem echten Board verbunden
   const p = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
@@ -92,10 +91,7 @@ try {
   const live = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
   live.on("pageerror", (e) => fehler.push(e.message));
   live.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) fehler.push(m.text()); });
-  await live.goto(`${BOARD}/?pin=${PIN}`);
-  await live.waitForSelector("#boardName");
-  await live.fill("#boardName", "Max"); await live.fill("#boardKontoPin", "2468");
-  await live.click('[data-aktion="board-beitreten"]');
+  await anmelden(live, BOARD, "Max");
   pruefe(await live.waitForFunction(() => typeof bd !== "undefined" && bd.status === "verbunden" && st.weltId, null, { timeout: 15000 }).then(() => true, () => false), "Companion live vom Board, als Max verbunden");
   await live.evaluate(() => Promise.all([bannerLaden(), ruestungLaden(), portaleLaden(), samLaden()]));
   await live.waitForFunction(() => bn.liste.length && rs.sets.length && pt.liste.length);

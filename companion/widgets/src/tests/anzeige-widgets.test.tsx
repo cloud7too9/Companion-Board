@@ -58,7 +58,8 @@ describe("Widgets der Anzeige", () => {
     useBoardStore.setState({ zustand: beispielZustand(), beitritt: BEISPIEL_BEITRITT, qrSvg: BEISPIEL_QR });
     const { container, unmount } = render(<LokalesWidget typ="board.beitreten" />);
     expect(container.querySelector('[data-testid="qr"] svg')).toBeTruthy();
-    expect(screen.getByTestId("pin").textContent).toBe("000000");
+    expect(screen.queryByTestId("pin")).toBeNull();   // keine Board-PIN mehr (Bauplan „Anmeldung“)
+    expect(screen.getByTestId("adresse").textContent).toBe("mainhubv1.com");
     expect(screen.getByTestId("beitreten").textContent).toContain("mainhubv1.com");
     unmount();
     const z = beispielZustand();

@@ -1,6 +1,6 @@
 # Bauplan: Anmeldung und Dashboard-Zugang
 
-> Für Claude Code · Repo `Companion-Board` · Stand 13.10.2026 · Entscheidungen von Max (Chat vom 13.10.2026), Nachfragen AN1–AN3, AN5–AN7 und AN10–AN13 beantwortet (L15–L19, Kapitel 9)
+> Für Claude Code · Repo `Companion-Board` · Stand 14.10.2026 · Entscheidungen von Max (Chat vom 13.10.2026), Nachfragen AN1–AN3, AN5–AN7 und AN10–AN13 beantwortet (L15–L19, Kapitel 9) · **L1–L3 gebaut** (14.10.2026, Kapitel 10), ⏸ H15
 > Grundlage: Klick-Prototyp [`companion/entwuerfe/anmeldung-prototyp.html`](../../companion/entwuerfe/anmeldung-prototyp.html) (Mock, im Browser öffnen) und das SQL-Referenzschema [`planung/schema/`](../schema/README.md) (Tabellen `benutzer`, `geraete`, `zugaenge`, `anzeige_geraete` mit ihren Sichten)
 >
 > Er nennt Dateien, Routen und Branches und baut auf dem Stand von `main` vom 13.10.2026 auf (Netlify + Pi, SQLite, Bauplan „Sitzung“, B3). Er setzt Strang B aus [`PLAN.md`](../PLAN.md) fort (B1/B2 gebaut, B3 gebaut).
@@ -11,9 +11,9 @@
 
 1. Lies `UEBERGABE.md`, `planung/UEBERGABE.md`, `koordinaten-board/UEBERGABE.md` und `koordinaten-board/pi/ANLEITUNG.md`. Öffne den Prototyp im Browser und klick ihn einmal durch (Knopf „Simulation“ oben rechts).
 2. Arbeite die Phasen in Kapitel 7 der Reihe nach ab. Jede Phase endet mit Tests, README-Notiz und Commit.
-3. **Haltepunkte (⏸):** stoppen, Max Screenshots zeigen, erst nach seinem OK weiter.
+3. **Haltepunkte (⏸):** Max die Screenshots zeigen und auf die Warteliste setzen. Seit 14.10.2026 mergt Claude ohne Rückfrage („mergen ab jetzt ohne Rückfragen“); weiter geht es mit dem, was nicht vom Haltepunkt abhängt.
 4. Was in Kapitel 9 als **offene Nachfrage** (AN4, AN14) steht, baust du nicht vorweg. Steht eine Annahme (⚠) dabei, baust du die Annahme und meldest es Max.
-5. Konventionen wie immer: Deutsch in Code, UI und Commits · nach jedem Commit `Commit erstellt: …` · ansagen, wann gepusht wird · **gemergt wird nur nach Rückfrage bei Max** · Datenmodell minimal.
+5. Konventionen wie immer: Deutsch in Code, UI und Commits · nach jedem Commit `Commit erstellt: …` · ansagen, wann gepusht wird · **gemergt wird ohne Rückfrage, sobald die CI grün ist** (Max, 14.10.2026) · Datenmodell minimal.
 
 ---
 
@@ -287,3 +287,30 @@ Branch: **`board/anmeldung`** für alles. Nach jeder Phase pushen.
 | ~~AN12~~ | **Bestätigt (Max, 13.10.2026): ja**, lokaler scrypt-Hash der Konto-PIN im `localStorage`. | – | – |
 | ~~AN13~~ | **Entschieden (Max, 14.10.2026): Neue Konten gelten erst, wenn ein bestehendes Konto sie freigibt** (L19). | – | – |
 | AN14 | ⚠ **Freigabe im Einzelnen:** Das erste Konto gilt sofort als freigegeben (nach der Migration gibt es keins, das freigeben könnte). Jedes freigegebene Konto darf freigeben und ablehnen; ablehnen löscht das wartende Konto. Freigegeben wird im **Board-Sheet unter „Konten“**. Ein wartendes Konto sieht nach der Anmeldung nur „Wartet auf Freigabe“. | so wie links | – |
+
+---
+
+## 10. Stand der Umsetzung (14.10.2026)
+
+**L1–L3 gebaut**, auf dem Branch der Cloud-Sitzung (`claude/festive-euler-a82up2`) statt `board/anmeldung`, ein PR. ⏸ **H15** (Max meldet sich nach dem Pi-Update am Handy an; Screenshots `a1`–`a8`, `n6-offline-pin.png`).
+
+| Phase | Gebaut |
+|---|---|
+| L1 | `daten.js`: Felder aus Kapitel 4, `zugaenge` und `anzeigeGeraete` in `SAMMLUNGEN`, `kontenUmstellen()` bei jedem Laden (Konten ohne Passwort samt Profilen und Geräten weg, Ersteller → „unbekannt“, auch in `erledigt` und Sammelobjekten). `regeln.js`: `KONTO_PIN`, `PASSWORT_MIN`, `kontoPruefen`, `passwortPruefen`, `anzeigenameSauber`, `CODE_ZEICHEN`, `ZUGANGS_CODE`, `GUELTIGKEITEN`, `gueltigkeitPruefen`, `OFFLINE_MINUTEN` |
+| L2 | `identitaet.js` neu, Routen aus 5.1, Hook in `server.js` (Reihenfolge 401 → 403 wartet → 423 PIN → Kontakt), `/ws` mit 4030/4023, Sperren (Passwort je Anzeigename, PIN je Gerät, Zurücksetzen je Konto). Server-Tests: `identitaet.test.js`, `api.test.js` (Konten, Passwort-Sperre, PIN-Pflicht mit Test-Uhr) |
+| L3 | `companion/anmeldung.html`, Server und Netlify liefern sie unter `/`, die Companion unter `/app/`; Companion leitet bei fehlendem Token, 401, 423 und wartendem Konto dorthin; Konten im Board-Sheet; Offline-Sperre. Playwright: `anmeldung.test.mjs` (neu), alle anderen Tests auf Konten umgestellt |
+
+**Abweichungen vom Bauplan** (bewusst, kurz begründet):
+
+- **Board-PIN schon mit L3 abgebaut** (QR-Code mit `?pin=`, `/api/beitreten`, Sheet „Beitreten“, QR-Scanner der Companion, `RAUM_PIN`/`pin.txt`), nicht erst in L6: Die Migration aus L1 entfernt alle Konten ohne Passwort; ein weiter offenes Beitreten hätte sofort wieder solche Konten angelegt. Der **Anzeige-Link** bleibt bis L5/L6.
+- **Lokaler PIN-Hash mit PBKDF2** (SHA-256, 200 000 Runden, WebCrypto, `regeln.js` `pinLokalHashen`) statt scrypt (AN12): Der Browser hat scrypt nicht eingebaut. Abgelegt wird er, sobald die PIN auf dem Gerät einmal richtig eingegeben wurde (Registrieren, PIN-Sperre, PIN zurücksetzen); nach einer Anmeldung nur mit Passwort gibt es ihn erst nach der ersten PIN. Ohne ihn entsperrt ohne Netz erst wieder das Board.
+- **PIN nachreichen:** Wer die App ohne Netz mit der PIN entsperrt, muss sie wieder online nicht ein zweites Mal eingeben: Die Companion reicht sie einmal an `POST /api/pin` nach (nur im Speicher, einmalig).
+- **Herzschlag** ist das Pong auf den Ping, den der Server ohnehin alle 25 s schickt (kein eigener Takt am Handy). Am Handy hält ein Minutentakt `board.kontakt` frisch, solange die Live-Verbindung steht.
+- **Manifest:** Bereich (`scope`) ab `/`, Start weiter `/app/`, damit die Anmeldeseite in der Home-Bildschirm-App bleibt und nicht in einer Browser-Ansicht aufgeht. Die Anmeldeseite hängt auf Netlify dasselbe Manifest ein.
+- **Reiter Dashboard-Login** zeigt bis L5 einen Hinweis (Anzeige-Geräte öffnen ihren Anzeige-Link).
+- **Board nicht erreichbar** auf der Anmeldeseite: Hinweis mit „Offline weiter zur Companion“ (die läuft dann aus dem Spiegel, B3).
+- **Altes Board** (vor dem Pi-Update): Die Anmeldeseite meldet „der Pi braucht ein Update“; schon angemeldete Handys laufen mit dem alten Token weiter, `IDENTITAET.werBistDu()` versteht beide Antworten von `/api/ich`.
+- **Test-Uhr:** `TEST_UHR=1` schaltet `POST /api/test/uhr { minuten }` frei (Kapitel 7, L3 „Zeit am Server per Test-Schalter vorstellen“).
+
+**Als Nächstes:** L4 (Dashboard-Zugänge am Server, `dashboard-zugang.js`). L5 wartet auf **AN4**. Danach L6 (Anzeige-Link mit Schlüssel abbauen, Doku).
+
