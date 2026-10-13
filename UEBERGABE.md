@@ -73,7 +73,7 @@ Was wohin gehört:
   - Companion: jeder Bereich bekommt einen eigenen Branch `bereich/<name>`.
   - Board: Änderungen auf einem Branch `board/<thema>`.
   - Umbau (Netlify + Pi, abgeschlossen): je Phase ein Branch `umbau/<phase>` mit PR, wie in `docs/plaene/UMBAUPLAN.md` beschrieben.
-  - **Gemergt wird nur nach Rückfrage bei Max**, auch wenn Claude den Merge ausführt (Wunsch von Max, 04.10.2026).
+  - **Mergen ohne Rückfrage** (Max, 14.10.2026: „mergen ab jetzt ohne Rückfragen“): Claude mergt selbst, sobald die CI grün ist, und sagt danach Bescheid. Bis dahin galt: nur nach Rückfrage (04.10.2026).
 - **Bereiche geht Max einzeln durch.** Erst steht der Rahmen, dann folgen die Details. Nichts ausbauen, was nicht besprochen ist.
 - **Datenmodell minimal halten.** Es wird nur erweitert, wenn ein Bereich es konkret braucht. FeatureTypes werden nicht erfunden.
 - **Bedrock ist die einzige Edition** (Entscheidung von Max, 04.10.2026). Die Seed-Map-Screenshots zeigen „Bedrock 26.50“. Java gibt es nirgendwo, auch nicht bei den Portalen.
@@ -102,17 +102,18 @@ Was wohin gehört:
 **Entscheidung von Max:** Companion und Board sind **ein System**. Der Board-Server macht alles; er läuft im Heimnetz, der Code bleibt Hetzner-fähig (`OEFFENTLICHE_URL`). Die Companion ersetzt die frühere Handy-Oberfläche des Boards. Alte Board-Orte wurden nicht übernommen (neu anfangen). Die Anzeige zeigt **eine aktive Welt**.
 
 ```
-Handy ──http──▶ Board-Server :3000
-                ├─ /                 Companion (companion/companion-prototyp.html, live)
-                ├─ /regeln.js, /icons/…, /ruestungs-baukasten/…  aus companion/
-                ├─ /biom-*.js, /vendor/…  Welt-Import (Worker im Browser des Handys)
-                ├─ /api/…            Companion-API (daten.js) + Beitreten
+Handy ──http──▶ Board-Server :3000 (lokal; online: Seiten von Netlify, API über den Tunnel zum Pi)
+                ├─ /                 Anmeldeseite (companion/anmeldung.html, Bauplan „Anmeldung“)
+                ├─ /app/             Companion (companion/companion-prototyp.html, live)
+                ├─ /app/regeln.js, /app/icons/…, /app/ruestungs-baukasten/…  aus companion/
+                ├─ /app/biom-*.js, /app/vendor/…  Welt-Import (Worker im Browser des Handys)
+                ├─ /api/…            Companion-API (daten.js) + Konten (identitaet.js)
                 ├─ /ws               Live: geaendert, zustand, teilnehmer
                 └─ /dashboard        die Anzeige: Widget-Dashboard (nur mit Anzeige-Link); /anzeige leitet hierher
 Daten: koordinaten-board/server/daten/daten.db (SQLite; daten.json bleibt als Sicherung vom Umzug)
 ```
 
-- **Beitreten**: Das Handy scannt den QR-Code der Anzeige mit der Kamera-App und landet auf `/?pin=…`. Die Companion erkennt den Live-Betrieb (`/api/server`), fragt nach dem Account (Name + eigene PIN, Strang B) und lädt danach die Daten des Boards. Eine eigene Kamera in der Seite braucht es dafür nicht.
+- **Anmeldung** (Bauplan „Anmeldung und Dashboard-Zugang“, seit 14.10.2026): Der QR-Code der Anzeige führt auf die Anmeldeseite unter `/`. Dort meldet man sich mit Anzeigename und Passwort an oder registriert sich (echter Name, Anzeigename, Passwort, PIN). Neue Konten gelten erst, wenn ein freigegebenes Konto sie in der Companion unter Board → Konten freigibt; das erste gilt sofort. Danach geht es direkt in die Companion unter `/app/`. Nach über 30 Minuten ohne Kontakt zum Board und nach einem PIN-Wechsel fragt sie nach der PIN; ohne Netz prüft die Companion die PIN selbst gegen einen lokalen Hash. Die Board-PIN gibt es nicht mehr.
 - **Gemeinsame Regeln**: `companion/regeln.js` enthält Stammdaten und Regel-Funktionen. Die Seite bindet sie ein, der Server lädt sie per `node:vm` – nichts wird doppelt gepflegt.
 - **Live**: Jede Änderung meldet der Server als `{ art:"geaendert", bereich, weltId }`; die Handys laden den Bereich neu, die Anzeige bekommt die Orte der aktiven Welt (`sicht.js`).
 - **Texterkennung**: läuft seit Umbau Phase 3 am Handy (`companion/texterkennung.js`, tesseract.js im Browser, `fuerCompanion()`); der Server lädt dieselbe Auswertung per `node:vm`. Ist kein Seed-Map-Popup drauf, sucht sie eine **Banner-Anleitung** („Black Base“, „Cyan Bordure“ …); die Companion speichert daraus einen Bauplan.

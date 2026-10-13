@@ -13,9 +13,9 @@ Stand: 13.10.2026 · gehört zum Umbauplan (erledigt, im Archiv: [`../../docs/pl
 | 3. Cloudflare-Konto, Domain hinzufügen, Nameserver umstellen | sobald 1 läuft | Max |
 | 4. Tunnel auf dem Pi (`api.mainhubv1.com`) | nach 3 (die Domain muss bei Cloudflare liegen) | Max (Befehle unten) |
 | 5. In Netlify `API_URL=https://api.mainhubv1.com` setzen, Domain zuordnen | nach 4 | Max |
-| 6. Probe über Mobilfunk: QR scannen, beitreten, Ort anlegen, Board aktualisiert sich | nach 5 | Max |
+| 6. Probe über Mobilfunk: QR scannen, anmelden, Ort anlegen, Board aktualisiert sich | nach 5 | Max |
 
-**Wann startet der Pi?** Schon bei Schritt 2 kann er im Heimnetz den Laptop als Server ablösen (dann noch `HOST=0.0.0.0` und ohne `OEFFENTLICHE_URL`, die Handys kommen wie heute per QR-Code über die LAN-Adresse). Für die Online-Fassung (Schritt 4 bis 6) wird die Datei `/etc/companion-board.env` auf `HOST=127.0.0.1`, `OEFFENTLICHE_URL`, `COMPANION_PFAD=/app/` und `ERLAUBTE_URSPRUENGE` umgestellt und der Dienst neu gestartet. Bis dahin läuft alles lokal weiter wie heute.
+**Wann startet der Pi?** Schon bei Schritt 2 kann er im Heimnetz den Laptop als Server ablösen (dann noch `HOST=0.0.0.0` und ohne `OEFFENTLICHE_URL`, die Handys kommen wie heute per QR-Code über die LAN-Adresse). Für die Online-Fassung (Schritt 4 bis 6) wird die Datei `/etc/companion-board.env` auf `HOST=127.0.0.1`, `OEFFENTLICHE_URL` und `ERLAUBTE_URSPRUENGE` umgestellt und der Dienst neu gestartet. Bis dahin läuft alles lokal weiter wie heute.
 
 ## 1. Netlify
 
@@ -45,16 +45,18 @@ cd /opt/companion-board/koordinaten-board/server && sudo -u board npm ci --omit=
 # Dienst
 sudo cp /opt/companion-board/koordinaten-board/pi/companion-board.service /etc/systemd/system/
 sudo cp /opt/companion-board/koordinaten-board/pi/companion-board.env /etc/companion-board.env
-sudo nano /etc/companion-board.env                 # Domain eintragen; fürs Heimnetz vorerst HOST=0.0.0.0, OEFFENTLICHE_URL und COMPANION_PFAD auskommentieren
+sudo nano /etc/companion-board.env                 # Domain eintragen; fürs Heimnetz vorerst HOST=0.0.0.0 und OEFFENTLICHE_URL auskommentieren
 sudo systemctl daemon-reload
 sudo systemctl enable --now companion-board
-sudo journalctl -u companion-board -f              # Konsole: PIN, Anzeige-Link, „daten.json nach daten.db übernommen“
+sudo journalctl -u companion-board -f              # Konsole: Adresse der Anmeldung, Anzeige-Link, „daten.json nach daten.db übernommen“
                                                    # Die Warnung „widgets/dist must exist“ ist harmlos: das Dashboard kommt von Netlify
 ```
 
-**Daten vom Laptop mitnehmen:** `koordinaten-board/server/daten/` vom Laptop (daten.json oder schon daten.db, dazu `pin.txt`, `geheim.txt`, `biome/`) nach `/var/lib/companion-board/` kopieren, bevor der Dienst das erste Mal startet; `sudo chown -R board:board /var/lib/companion-board`. Eine `daten.json` übernimmt der Server beim ersten Start selbst nach `daten.db`.
+**Daten vom Laptop mitnehmen:** `koordinaten-board/server/daten/` vom Laptop (daten.json oder schon daten.db, dazu `geheim.txt`, `biome/`) nach `/var/lib/companion-board/` kopieren, bevor der Dienst das erste Mal startet; `sudo chown -R board:board /var/lib/companion-board`. Eine `daten.json` übernimmt der Server beim ersten Start selbst nach `daten.db`.
 
 **Update:** `cd /opt/companion-board && sudo -u board git pull && cd koordinaten-board/server && sudo -u board npm ci --omit=dev && sudo systemctl restart companion-board`.
+
+**Update auf die Anmeldung mit Passwort** (Bauplan „Anmeldung und Dashboard-Zugang“, 14.10.2026): Beim ersten Start nach dem Update entfernt der Server alle bisherigen Konten (ohne Passwort) samt ihren Geräten; Orte, Banner und alles andere bleiben stehen, der Ersteller heißt dann „unbekannt“. **Gleich danach** `https://mainhubv1.com/` öffnen und registrieren: Das **erste** Konto gilt sofort, jedes weitere wartet, bis ein freigegebenes Konto es in der Companion unter Board → Konten freigibt. `RAUM_PIN` und `COMPANION_PFAD` in `/etc/companion-board.env` braucht es nicht mehr (der Server liest sie nicht), `pin.txt` im Datenordner darf weg.
 
 **Sicherung:** `pi/sicherung.sh` zieht nachts eine Kopie von `daten.db` (SQLite-Backup im laufenden Betrieb). Cron als `board`: `sudo -u board crontab -e` → `15 3 * * * /opt/companion-board/koordinaten-board/pi/sicherung.sh`. Die Kopien vom Pi wegholen (Laptop oder Hetzner), sonst liegt alles auf einer SD-Karte, z. B. vom Laptop: `rsync -a board@<pi>:/var/lib/companion-board/sicherung/ ~/companion-sicherung/` (Nutzer `board` hat keine Shell; dann mit dem eigenen Pi-Nutzer kopieren, der die Dateien lesen darf, oder `sudo` in einem Cron auf dem Pi, der nach außen schiebt).
 
@@ -77,7 +79,7 @@ sudo journalctl -u companion-board -f              # Konsole: PIN, Anzeige-Link,
 
 Cloudflare flacht den CNAME auf `@` automatisch ab (CNAME flattening). Falls Netlify stattdessen einen A-Record verlangt: `A @ 75.2.60.5`, ebenfalls Proxy aus. Die graue Wolke ist wichtig: Nur dann kann Netlify das Zertifikat für die Domain ausstellen.
 
-**Einstellungen, die man nicht braucht:** *SSL/TLS* betrifft nur den Proxy (also `api`), dort passt *Full*. Keine *Page Rules*, kein *Access*, keine Firewall-Regel nötig. **Empfohlen** (Stand 13.10.2026 noch offen, siehe Warteliste Kapitel 5) unter *Security → WAF → Rate limiting rules*: Anfragen an `api.mainhubv1.com/api/beitreten*` auf z. B. 10 pro Minute je IP begrenzen (Schutz vor PIN-Raten, zusätzlich zur Sperre im Server).
+**Einstellungen, die man nicht braucht:** *SSL/TLS* betrifft nur den Proxy (also `api`), dort passt *Full*. Keine *Page Rules*, kein *Access*, keine Firewall-Regel nötig. **Empfohlen** (Stand 13.10.2026 noch offen, siehe Warteliste Kapitel 5) unter *Security → WAF → Rate limiting rules*: Anfragen an `api.mainhubv1.com/api/anmelden`, `/api/registrieren` und `/api/pin*` auf z. B. 10 pro Minute je IP begrenzen (Schutz vor Passwort- und PIN-Raten, zusätzlich zur Sperre im Server).
 
 **Tunnel auf dem Pi**
 
@@ -103,7 +105,7 @@ sudo cloudflared service install                   # Dienst „cloudflared“, s
 sudo systemctl status cloudflared
 
 # Jetzt die API auf den Tunnel umstellen
-sudo nano /etc/companion-board.env                 # HOST=127.0.0.1, OEFFENTLICHE_URL, COMPANION_PFAD=/app/, ERLAUBTE_URSPRUENGE
+sudo nano /etc/companion-board.env                 # HOST=127.0.0.1, OEFFENTLICHE_URL, ERLAUBTE_URSPRUENGE
 sudo systemctl restart companion-board
 curl https://api.mainhubv1.com/api/server         # → {"name":"koordinaten-board"}
 ```
@@ -123,20 +125,29 @@ Der Tunnel baut die Verbindung vom Pi nach außen auf: Am Router (bei deiner Mut
 
 ## 4. Probe (Umbauplan, Phase 6)
 
-1. Am Fernseher oder Tablet den Anzeige-Link `https://mainhubv1.com/dashboard?anzeige=…&schluessel=…` öffnen (aus `journalctl -u companion-board` oder aus der Companion unter Board → Anzeigen). Die Anzeige ist seit Bauplan „Sitzung“ (S4) das Widget-Dashboard; `https://mainhubv1.com/` und alte Links auf `/anzeige` leiten dorthin um.
-2. Am Handy **im Mobilfunk** (WLAN aus) den QR-Code scannen → `https://mainhubv1.com/app/?pin=…` → beitreten → „Zum Home-Bildschirm“ (Safari: Teilen → Zum Home-Bildschirm; Chrome: Installieren).
+1. Am Fernseher oder Tablet den Anzeige-Link `https://mainhubv1.com/dashboard?anzeige=…&schluessel=…` öffnen (aus `journalctl -u companion-board` oder aus der Companion unter Board → Anzeigen). Die Anzeige ist seit Bauplan „Sitzung“ (S4) das Widget-Dashboard; alte Links auf `/anzeige` leiten dorthin um. Unter `https://mainhubv1.com/` liegt seit dem Bauplan „Anmeldung“ die Anmeldeseite.
+2. Am Handy **im Mobilfunk** (WLAN aus) den QR-Code scannen → Anmeldeseite `https://mainhubv1.com/` → anmelden oder registrieren → Companion unter `/app/` → „Zum Home-Bildschirm“ (Safari: Teilen → Zum Home-Bildschirm; Chrome: Installieren).
 3. Ort anlegen oder Screenshot auslesen (die Texterkennung lädt beim ersten Mal etwa 7 MB) → die Anzeige aktualisiert sich live.
-4. Flugmodus an, App vom Home-Bildschirm öffnen: Die Seite geht auf (App-Shell aus dem Cache); Daten gibt es erst wieder mit Netz (Offline-Warteschlange kommt mit B3–B5).
+4. Flugmodus an, App vom Home-Bildschirm öffnen: Die Seite geht auf (App-Shell aus dem Cache), die Daten kommen aus dem Spiegel (B3). Nach über 30 Minuten ohne Verbindung fragt sie nach der PIN. Offline anlegen kommt mit B4.
 
 ## Probe nach dem Umschalten auf das Dashboard (Bauplan „Sitzung“, S4, Haltepunkt H10)
 
 Nach dem Merge baut Netlify die Seite neu; am Pi einmal das **Update** (oben) ausführen, damit der Server den neuen Anzeige-Link schreibt und die alte Anzeige nicht mehr kennt.
 
-1. `https://mainhubv1.com/` am Fernseher oder Tablet: landet auf `/dashboard/`. Ein Gerät, das schon die alte Anzeige mit Link geöffnet hatte, kennt seinen Schlüssel noch; sonst den Anzeige-Link öffnen.
-2. Im Kopf stehen Titel, Seed, Uhr und ein grüner Punkt „Verbunden“; die Widgets zeigen Orte, QR-Code mit PIN und Spieler.
-3. Am Handy **im Mobilfunk** den QR-Code aus dem Widget „Beitreten“ scannen, beitreten, einen Ort anlegen: erscheint live im Widget „Orte der Welt“, das Handy unter „Spieler“.
+1. Am Fernseher oder Tablet den Anzeige-Link öffnen (`https://mainhubv1.com/dashboard/` merkt sich danach den Schlüssel). `https://mainhubv1.com/` ist seit dem Bauplan „Anmeldung“ die Anmeldeseite.
+2. Im Kopf stehen Titel, Seed, Uhr und ein grüner Punkt „Verbunden“; die Widgets zeigen Orte, den QR-Code zur Anmeldeseite und Spieler.
+3. Am Handy **im Mobilfunk** den QR-Code aus dem Widget „Beitreten“ scannen, anmelden, einen Ort anlegen: erscheint live im Widget „Orte der Welt“, das Handy unter „Spieler“.
 4. Einen Inhalt „Aufs Board“ legen: Die Anzeige wechselt auf den Layer „Sitzung“ und zeigt das Widget mit „von <Name>“. „Wegnehmen“ am Handy nimmt es wieder weg.
 5. `sudo systemctl restart companion-board`: Die Anzeige verbindet sich neu, die Sitzung ist leer, das Layout ist noch da.
+
+## Probe der Anmeldung (Bauplan „Anmeldung“, L3, Haltepunkt H15)
+
+Nach dem Merge baut Netlify die Anmeldeseite unter `/`; am Pi einmal das **Update** (oben) ausführen.
+
+1. Gleich danach `https://mainhubv1.com/` am Handy öffnen → „Registrieren“: echter Name, Anzeigename, Passwort (mindestens 8 Zeichen), PIN. Als erstes Konto gilt es sofort → Willkommenskarte → „Weiter zur Companion“. Danach am besten „Zum Home-Bildschirm“.
+2. Ein zweites Handy registriert sich → „Wartet auf Freigabe“. Am ersten Handy Board → Konten → „Freigeben“: Das zweite Handy geht von selbst weiter zur Willkommenskarte.
+3. Das Handy über eine halbe Stunde liegen lassen (oder die App ganz schließen) und wieder öffnen: „Hallo, … Bitte bestätige mit deiner PIN.“ Mit „PIN vergessen?“ lässt sie sich mit dem Passwort neu setzen; ein anderes Gerät desselben Kontos fragt danach nach der neuen PIN.
+4. Flugmodus, über 30 Minuten nach dem letzten Kontakt: Die App fragt auch ohne Netz nach der PIN. Wieder online geht es ohne zweite Abfrage weiter.
 
 ## Aufräumen nach der Probe (Phase 6, Umbauplan): erledigt
 

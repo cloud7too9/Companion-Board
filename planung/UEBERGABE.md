@@ -15,16 +15,18 @@
   - das Widget-Dashboard A0–A6, einschließlich **Anordnen am Handy**
   - aus Strang B die Phasen **B1** (Datenmodell) und **B2** (Accounts mit PIN)
   - der **Umbau auf Netlify + Raspberry Pi** (Phasen 1–6, in Betrieb unter `mainhubv1.com` seit 13.10.2026; Plan im Archiv: `docs/plaene/UMBAUPLAN.md`, Einrichtung: `koordinaten-board/pi/ANLEITUNG.md`)
-  - der **Bauplan „Sitzung“** (S1–S4, 13.10.2026): [`bauplaene/Bauplan-Sitzung.md`](bauplaene/Bauplan-Sitzung.md). **Das Widget-Dashboard ist die einzige Anzeige**, „Aufs Board“ legt ein Widget in die Sitzung der Anzeige, `/` und `/anzeige` leiten auf `/dashboard/` um.
+  - der **Bauplan „Sitzung“** (S1–S4, 13.10.2026): [`bauplaene/Bauplan-Sitzung.md`](bauplaene/Bauplan-Sitzung.md). **Das Widget-Dashboard ist die einzige Anzeige**, „Aufs Board“ legt ein Widget in die Sitzung der Anzeige, `/anzeige` leitet auf `/dashboard/` um.
+  - aus dem **Bauplan „Anmeldung und Dashboard-Zugang“** die Phasen **L1–L3** (14.10.2026): [`bauplaene/Bauplan-Anmeldung-und-Dashboard-Zugang.md`](bauplaene/Bauplan-Anmeldung-und-Dashboard-Zugang.md). **Unter `/` liegt die Anmeldeseite**, die Companion unter `/app/` (lokal wie auf Netlify). Konten mit Passwort und PIN, Freigabe neuer Konten, PIN nach über 30 Minuten ohne Kontakt; die Board-PIN ist weg.
   - **CI auf GitHub:** Bei jedem PR und jedem Push auf `main` laufen alle Tests (Kapitel 6)
   - **Nur Bedrock (E15):** Java gibt es nirgendwo mehr
 - **Als Nächstes** (Kapitel 9):
+  0. **Anmeldung:** ⏸ **H15** (Max meldet sich nach dem Pi-Update am Handy an, Screenshots `a1`–`a8`). Als Nächstes **L4** (Dashboard-Zugänge am Server); **L5** wartet auf **AN4** (gleiches Layout auf verschieden großen Geräten). Danach L6 (Anzeige-Link abbauen).
   1. ⏸ **H10**: Probe nach dem Umschalten auf das Dashboard (Max, `koordinaten-board/pi/ANLEITUNG.md`). Danach wandert auch der Bauplan „Sitzung“ ins Archiv.
   2. **Offline:** **B3 gebaut** (13.10.2026): live ohne Netz aus dem Spiegel in IndexedDB, Nachladen über `/api/aenderungen`; ⏸ H14 am iPhone im Flugmodus. Als Nächstes B4 und B5 (Nachtrag im Offline-Bauplan).
   3. A7 (Größenstufen je Widget): Planungsrunde mit Max
   4. Inhalte, die noch nicht beschrieben sind (Warteliste, Kapitel 4)
   5. **Bauplan „Welt-Funde“** (erweiterter Welt-Import, E21): [`bauplaene/Bauplan-Welt-Funde.md`](bauplaene/Bauplan-Welt-Funde.md). **W0 gebaut** (13.10.2026): Weltordner direkt wählen oder hineinziehen, nur die gebrauchten Dateien gehen an den Worker; ⏸ H11 am iPhone. **W1 gebaut** (13.10.2026): Der Import liest Strukturen, Portale, Spieler, Vorlagen, Rüstung, Banner und Welt-Info mit (`nbt.js`, `welt-funde.js`), die Companion zeigt sie noch nicht; ⏸ H12 an einer echten Welt. Fragen 1–5 hat Max am 13.10.2026 beantwortet (automatisch übernehmen mit Schalter je Art, nur der eigene Spieler, Vorlagen auch aus Truhen, Portale ohne Gegenstück als Ort, kein Bild der Welt). **W2 gebaut** (13.10.2026): Prüfliste mit Welt-Info und einer Zeile je Art samt Schalter, „Übernehmen“ legt alles Eingeschaltete über `POST /welten/:id/funde` an; ⏸ H13 am iPhone. **W3 gebaut** (13.10.2026): Strukturbereiche (Außenposten, Hexenhütte, Ozeanmonument, Netherfestung), Dörfer, Endtransitportale, Enderdrache. **H12 bestätigt** (Max' Welt 1.26.52): Tag 57 gibt es dort nicht mehr. **W4 gebaut** (13.10.2026): Strukturbereiche aus Chunk-Tag 119 (AABBVolumes) mit Bedrock-ID, dazu Lager, Prüfungskammern, Tempel, Pfadruinen, Iglus; Tag 57 bleibt für ältere Welten.
-- **Git:** Gearbeitet wird im Repo `cloud7too9/Companion-Board` (seit 05.10.2026). **Gemergt wird nur nach Rückfrage bei Max**, auch wenn Claude den Merge ausführt. Die Runden mit allen PRs: `docs/verlauf/Runden-und-PRs.md`.
+- **Git:** Gearbeitet wird im Repo `cloud7too9/Companion-Board` (seit 05.10.2026). **Gemergt wird ohne Rückfrage**, sobald die CI grün ist (Max, 14.10.2026; vorher nur nach Rückfrage). Die Runden mit allen PRs: `docs/verlauf/Runden-und-PRs.md`.
 - **Tests:** alle grün in `main`, lokal und in der CI (Kapitel 6).
 
 ---
@@ -43,7 +45,8 @@
 | **A5** Themes | Theme je Bereich: Karte nach Dimension, Handbuch als Buch, Baupläne blau mit Gitter, Portale schwarz-lila ohne Rot und Grün. Platzhalter für E8. | `model/widget-themes.ts`, `shared/styles/themes.css` |
 | **A6** Layout pro Anzeige | Layout und Reihen je Anzeige am Server. Am Board ist das Dashboard reine Anzeige (live). **Anordnen am Handy** unter `/dashboard/anordnen`: leere Widgets, Auswahl-Leiste, Galerie, Layer, Vollbild steuern. Das Board liefert `/dashboard` aus. | Board `layout.js`, `daten.js` (`anzeigeLayout…`), `pages/AnordnenPage.tsx`, `features/anordnen/` |
 | **B1** Datenmodell | IDs neuer Einträge kommen vom Handy (UUID, auch über http). Jeder Eintrag hat `erstellerId`. Es gibt die Sammlungen `benutzer`, `profile`, `geraete`. | `regeln.js` (`neueEintragId`, `idGueltig`), Board `daten.js` (`eintragId`) |
-| **B2** Accounts mit PIN | Board-PIN, dann Account wählen oder anlegen (Name + eigene PIN, 4–8 Ziffern). Die PIN wird nur als **scrypt-Hash** gespeichert. Sperre je Gerät und Account. Das Token ist der **Geräteschlüssel**. `werBistDu()` gekapselt an Board und Companion. | Board `identitaet.js`, Companion `IDENTITAET`, Sheet „Beitreten“ |
+| **B2** Accounts mit PIN | **Abgelöst durch L1–L3** (14.10.2026). Geblieben: Das Token ist der **Geräteschlüssel**, `werBistDu()` gekapselt an Board und Companion, PIN nur als **scrypt-Hash**. | Board `identitaet.js`, Companion `IDENTITAET` |
+| **L1–L3** Anmeldung | Konten mit echtem Namen, Anzeigename, Passwort und PIN; neue Konten warten auf Freigabe (das erste gilt sofort, ⚠ AN14). Anmeldeseite unter `/` (Registrieren, Willkommenskarte, PIN-Sperre, PIN zurücksetzen). Server: 403 für wartende Konten, 423 „PIN nötig“ nach über 30 Minuten ohne Kontakt oder PIN-Wechsel; Kontakt zählen auch die Pongs auf `/ws`. Companion: Konten im Board-Sheet, Offline-Sperre mit lokalem PIN-Hash. Board-PIN abgebaut. ⏸ H15. | Board `identitaet.js`, `server.js` (Hook), `daten.js` (`kontenUmstellen`), `companion/anmeldung.html`, `regeln.js` (Anmeldung, lokaler PIN-Hash) |
 | **E15** Nur Bedrock | Portal-Prüfung mit festem Suchradius ±128 (`PORTAL_SUCHRADIUS`), kein Umschalter, kein `edition` mehr im Kontext der Karten. Der Welt-Import weist Java-Welten mit klarer Meldung ab. | `companion/board-karten.js`, Portal-Verwaltung in `companion-prototyp.html` |
 | **CI** | Drei Jobs bei jedem PR und Push auf `main`, Screenshots als Download „bilder“ | `.github/workflows/tests.yml` |
 | **B3–B5** Offline | **B3 gebaut** (13.10.2026): `betriebErkennen` → live, getrennt oder demo; `api()` spiegelt GET-Antworten in IndexedDB und antwortet offline daraus; Server `GET /api/aenderungen`, `nr`/`lauf` in `geaendert`, `stand` beim Verbinden; ⏸ H14. B4 und B5 nicht gebaut. N5 ist hinfällig (HTTPS über Netlify/Cloudflare). | `companion/sw.js`, `companion-prototyp.html` (Abschnitt Offline), `server.js` |
@@ -57,9 +60,9 @@ Pfade unter `model/`, `lib/`, `components/` und `features/` liegen in `companion
 
 ## 3. Branches und Mergen
 
-- **Mergen:** nur nach Rückfrage bei Max, immer mit **„Create a merge commit“**.
+- **Mergen:** ohne Rückfrage, sobald die CI grün ist (Max, 14.10.2026), immer mit **„Create a merge commit“**.
 - **Branch der Cloud-Sitzung:** Claude arbeitet auf dem Branch, den die Sitzung vorgibt, und setzt ihn nach jedem Merge auf den neuen `main` zurück.
-- **Empfehlung:** In den Repo-Einstellungen „Automatically delete head branches“ einschalten. Dann verschwindet ein Branch nach dem Merge, und ein PR kann nicht mehr in einen schon gemergten Branch gehen (so ging im alten Repo #8 verloren).
+- **Gemergte Branches** verschwinden seit dem 13.10.2026 von selbst („Automatically delete head branches“ ist an). Der Branch der Cloud-Sitzung wird nach dem Merge neu angelegt.
 - Repo-Umzug, Umbau-Branches und der Verlauf der gestapelten PRs bis 04.10.2026: `docs/verlauf/Runden-und-PRs.md`.
 
 ---
@@ -67,10 +70,10 @@ Pfade unter `model/`, `lib/`, `components/` und `features/` liegen in `companion
 ## 4. So hängt jetzt alles zusammen
 
 ```
-Handy (Companion, /)                 Board-Server (Fastify, :3000)                Anzeige im Zimmer
-───────────────────                  ─────────────────────────────                ─────────────────
-Beitreten: Board-PIN + Account  ──▶  identitaet.js: anmelden → Token (Gerät)
-  (Name + eigene PIN)                werBistDu(req) für API, /ws, Widgets
+Handy (Anmeldeseite /, Companion /app/)  Board-Server (Fastify, :3000)            Anzeige im Zimmer
+───────────────────────────────────────  ─────────────────────────────            ─────────────────
+Anmelden: Konto + Passwort, dann PIN ──▶ identitaet.js: anmelden → Token (Gerät)
+  (Registrieren → Freigabe)              Hook: 403 wartet, 423 PIN nötig; werBistDu(req) für API, /ws, Widgets
 Daten anlegen (ID vom Handy)    ──▶  daten.js (daten.db, SQLite): erstellerId = Account
 „Aufs Board“ (Quelle)           ──▶  /ws zeigen → Sitzung (sitzung.js),      ──▶  /dashboard: Layer „Sitzung“
                                      Karte aus board-karten.js
@@ -101,7 +104,7 @@ npm run installieren && npm run build                  # Server + Dashboard (die
 npm start                                              # lokal; Betrieb auf dem Pi, siehe koordinaten-board/pi/ANLEITUNG.md
 ```
 
-- **Handy:** QR-Code der Anzeige scannen → „Beitreten“. Dort die Board-PIN eingeben, einen Account antippen oder einen neuen Namen tippen, dazu die eigene PIN.
+- **Handy:** QR-Code der Anzeige scannen → Anmeldeseite (`/`). Anmelden mit Anzeigename und Passwort oder registrieren (echter Name, Anzeigename, Passwort, PIN); neue Konten gibt ein freigegebenes Konto unter Board → Konten frei, das erste gilt sofort. Danach geht es in die Companion unter `/app/`.
 - **Anzeige:** nur mit dem Anzeige-Link aus der Konsole (oder Board → Anzeigen), auch auf dem Board-Gerät selbst: `…/dashboard?anzeige=…&schluessel=…`. Alte Links auf `/anzeige` leiten mit Schlüssel dorthin um.
 - **Anordnen:** am Handy Board → Anzeigen → „Anzeige anordnen“, am besten im Querformat.
 - **Ohne Board:** `cd companion/widgets && npm run dev`. Dann gibt es Beispielkarten, man bearbeitet lokal, die Galerie geht im Bearbeiten-Modus. `companion/companion-prototyp.html` direkt geöffnet läuft im DEMO-Mock.
@@ -131,16 +134,17 @@ Voraussetzungen für die Playwright-Tests:
 
 - **Typecheck der Widgets:** Dafür `npm run typecheck` nehmen (`tsc -b`). `tsc -p .` prüft nichts, weil die oberste `tsconfig.json` nur Referenzen enthält. `npm run build` prüft ebenfalls.
 - **Die Playwright-Tests laufen gegen `dist`.** Nach Änderungen an den Widgets erst `npm run build`, sonst testet man den alten Stand.
-- **Tests auf dem langsameren Runner:** Nach dem Beitreten öffnet die Companion bei einem leeren Board „Noch keine Welt“ erst nach dem Laden der Welten. Ein Test, der Sheets schließt, muss vorher auf dieses Sheet warten (`.sheet-kopf h2` = „Welt“), sonst überdeckt es später den nächsten Klick. Nachstellen lässt sich so etwas mit einer Verzögerung per `page.route("**/api/orte/welten", …)`.
-- **Seit Umbau Phase 1:** Die Anzeige braucht auch auf dem Board-Gerät den Anzeige-Link (`daten/anzeige-link.txt`, Konsole). Tests, die ein Board starten, holen ihn mit `anzeigeLinkQuery()` aus `companion/tests/hilfen.mjs`. Liefert ein Test die Companion von einem anderen Ursprung aus als das Board, braucht das Board `ERLAUBTE_URSPRUENGE` mit diesem Ursprung (so in `board.test.mjs`, `anzeigeschema.test.mjs`). Die Test-PIN ist `471100`.
+- **Tests auf dem langsameren Runner:** Nach dem Anmelden öffnet die Companion bei einem leeren Board „Noch keine Welt“ erst nach dem Laden der Welten. Ein Test, der Sheets schließt, muss vorher auf dieses Sheet warten (`.sheet-kopf h2` = „Welt“), sonst überdeckt es später den nächsten Klick. Nachstellen lässt sich so etwas mit einer Verzögerung per `page.route("**/api/orte/welten", …)`.
+- **Seit Umbau Phase 1:** Die Anzeige braucht auch auf dem Board-Gerät den Anzeige-Link (`daten/anzeige-link.txt`, Konsole). Tests, die ein Board starten, holen ihn mit `anzeigeLinkQuery()` aus `companion/tests/hilfen.mjs`. Liefert ein Test die Companion von einem anderen Ursprung aus als das Board, braucht das Board `ERLAUBTE_URSPRUENGE` mit diesem Ursprung (so in `getrennt.test.mjs`, `anzeigeschema.test.mjs`). **Konten in Tests:** `konto(board, name)` aus `hilfen.mjs` registriert per API (das erste Konto gibt die weiteren frei), `anmelden(seite, ursprung, name)` meldet sich über die Anmeldeseite an (Passwort `creeper123`). Mit `TEST_UHR=1` stellt `POST /api/test/uhr { minuten }` die Uhr des Servers vor („30 Minuten offline“).
 - **Im Betrieb läuft die Companion über `https://mainhubv1.com/app/`** (sicherer Kontext, Service Worker aktiv). Nur lokal vom Board unter `http://localhost:3000` gilt noch:
   - `crypto.randomUUID` gibt es dort nicht. Deshalb erzeugt `neueEintragId()` die IDs aus `getRandomValues`.
   - Service Worker sind dort aus (`konfig.pwa` fehlt).
-- **Alte Anmeldungen:** Tokens von vor B2 werden abgelehnt. Die Companion prüft beim Start mit `IDENTITAET.werBistDu()` und öffnet dann das Beitreten. Die Accounts bleiben, auch wenn man `geheim.txt` löscht (nur die Anmeldungen verfallen).
+- **Alte Konten (L16):** Konten ohne Passwort (von vor dem Bauplan „Anmeldung“) entfernt `kontenUmstellen()` bei jedem Laden samt Profilen und Geräten; ihre Einträge bleiben mit Ersteller „unbekannt“. Die Companion prüft beim Start mit `IDENTITAET.werBistDu()` und geht bei 401, 423 oder wartendem Konto zur Anmeldeseite. Die Konten bleiben, auch wenn man `geheim.txt` löscht (nur die Anmeldungen der Geräte verfallen).
 - **Umzug nach SQLite (Umbau Phase 4):** Beim ersten Start mit leerer `daten.db` übernimmt `daten.js` die alte `daten.json` und `biome/*.json` einmal und liest sie danach nie wieder (Sicherung). Tests, die den Stand nach dem Speichern prüfen, laden ein zweites `Daten` statt Dateien zu lesen. Der Server braucht Node 22.13+ (`node:sqlite`), die npm-Skripte setzen `--disable-warning=ExperimentalWarning`.
 - **Migrationen beim Laden (nur noch beim Übernehmen von `daten.json`):**
   - Alte Biom-Punkte werden entfernt, mit Sicherung `daten.vor-welt-import.json`.
   - Fehlende `erstellerId` wird zu „unbekannt“.
+  - Bei jedem Laden: Konten ohne Passwort fallen weg (siehe „Alte Konten“).
 - **Am Board kein Bearbeiten:** Das Dashboard ist dort reine Anzeige. Geändert wird nur über `/dashboard/anordnen` (Token) oder ohne Board im Browser-Speicher.
 - **Portal-Regeln:** Es gibt nur Bedrock (E15). Handy und Board rechnen mit ±128 in beiden Dimensionen.
 - **Platzhalter-Größen:** Kleine Widgets schneiden ihre Karte ab, zum Beispiel der Sammel-Fortschritt mit 4×3 Zellen. Das ist bekannt und wird mit A7 gelöst.
@@ -154,6 +158,8 @@ Voraussetzungen für die Playwright-Tests:
 
 ## 8. Was auf Max wartet (Details in `WARTELISTE.md`)
 
+- **Pi-Update nach dem Merge der Anmeldung**, danach sofort am Handy registrieren (das erste Konto gilt ohne Freigabe) und **H15** (Anmeldung am Handy).
+- **AN4:** gleiches Layout auf verschieden großen Anzeige-Geräten (blockiert L5).
 - **H10:** Probe nach dem Umschalten auf das Dashboard.
 - **H11:** Weltordner am iPhone wählen (Welt-Import, W0).
 - **H13:** Welt-Funde am iPhone übernehmen (W2).
@@ -165,13 +171,13 @@ Voraussetzungen für die Playwright-Tests:
   - die Bereiche Handbuch und Baupläne
 - **Realm-Welt am iPhone** importieren (Laufzeit, Speicher). Rest von H2.
 - **H14:** Offline mit Daten am iPhone (Home-Bildschirm-App, Flugmodus, B3).
-- **Pi-Update** für die neuen Routen von W2 und B3 (Warteliste, Erinnerungen).
 - **Später:** E8 (Themes) an anderer Stelle.
 
 ---
 
 ## 9. Nächste Schritte
 
+0. **Anmeldung** (Bauplan „Anmeldung und Dashboard-Zugang“): L1–L3 gebaut, ⏸ **H15**. Weiter mit **L4** (Dashboard-Zugänge am Server: `dashboard-zugang.js`, Code + Dashboard-PIN, 15-Minuten-Regel), dann **L5** (Dashboard-Login und „Code generieren“, wartet auf AN4) und **L6** (Anzeige-Link mit Schlüssel abbauen).
 1. ⏸ **H10** (Max): Probe nach dem Umschalten, Schritte in `koordinaten-board/pi/ANLEITUNG.md`. Kommt dabei etwas zurück, gehört es in den Bauplan „Sitzung“. Danach zieht der Bauplan nach `docs/bauplaene/`.
 2. **Offline B3–B5** auf `bereich/offline`, neu zugeschnitten am 13.10.2026 (N5 hinfällig, HTTPS und Service Worker sind da; Einzelheiten im Nachtrag von `bauplaene/Bauplan-Offline-Sync-und-Identitaet.md`):
    - **B3 gebaut** (13.10.2026): Live-Modus ohne Netz statt DEMO-Rückfall, Spiegel in IndexedDB (in `api()`), Server `GET /api/aenderungen?seit=<nr>&lauf=` plus `nr`/`lauf` in `geaendert`, Nachladen nach Wiederverbinden, Playwright offline mit Daten (`netlify.test.mjs`).
