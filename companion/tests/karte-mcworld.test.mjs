@@ -10,7 +10,7 @@ import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { companionAusliefern, CHROMIUM_OPTIONEN } from "./hilfen.mjs";
-import { testweltBauen, zipBauen, levelDatBauen, SEED } from "./welt-bauen.mjs";
+import { testweltBauen, fundeweltBauen, zipBauen, levelDatBauen, SEED } from "./welt-bauen.mjs";
 
 const HIER = fileURLToPath(new URL(".", import.meta.url));
 const DIR = path.join(HIER, "bilder");
@@ -35,6 +35,8 @@ const DATEIEN = {
   andererSeed: { name: "Archiv.zip", ...ZIP, buffer: Buffer.from(testweltBauen({ levelname: "Kreativ", seed: "-123456789" }).zip) },
   leer: { name: "Archiv.zip", ...ZIP, buffer: Buffer.from(zipBauen([["level.dat", levelDatBauen({ seed: SEED })],
     ["db/CURRENT", new TextEncoder().encode("MANIFEST-000001\n")]])) },
+  // Bauplan „Welt-Funde“: Strukturen, Portale, Spieler, Vorlagen, Rüstung, Banner (welt-bauen.mjs)
+  funde: { name: "Funde.zip", ...ZIP, buffer: Buffer.from(fundeweltBauen().zip) },
 };
 
 // Weltordner wie in der Dateien-App am iPhone (mit Paketen, world_icon.jpeg, level.dat_old, LOCK, LOG)
@@ -258,6 +260,63 @@ try {
     "Leere Welt: nichts zu übernehmen");
   await p.click('[data-aktion="wi-verwerfen"]'); await schlafen(200);
 
+  // ---- Funde aus der Welt (Bauplan „Welt-Funde“, W2): je Art ein Schalter, automatisch übernehmen ----
+  await hochladen(p, DATEIEN.funde);
+  await warteAuf(p, () => wi.schritt === "bestaetigen"); await p.click('[data-aktion="wi-lesen"]');
+  pruefe(await warteAuf(p, () => wi.schritt === "pruefliste" && wi.funde?.gruppen), "Funde eingeordnet");
+  const fundZeilen = async (q) => q.$$eval(".wi-fund", (z) => z.map((e) =>
+    `${e.querySelector(".card-title").textContent}: ${e.querySelector(".card-meta").textContent}${e.querySelector(".switch") ? (e.querySelector(".switch").getAttribute("aria-checked") === "true" ? " [an]" : " [aus]") : ""}`));
+  const STRUKTUREN_NEU = ["Dorf", "Endsiedlung", "Mine", "Netherfestung", "Prüfungskammern", "Schiffswrack", "Wüstenbrunnen", "Wüstentempel", "Zerstörtes Portal"];
+  pruefe(JSON.stringify(await fundZeilen(p)) === JSON.stringify([...STRUKTUREN_NEU.map((n) => `${n}: 1 neu [an]`), "Portal-Verbindung: 1 neu [an]",
+    "Schmiedevorlage: 3 neu · 1 schon bekannt [an]", "Rüstungs-Set: 3 neu [an]", "Banner: 2 neu [an]"]),
+    `Je Art eine Zeile mit Anzahl, alle an (Strukturen nach Name, Portal-Paar, Wächterzier ist im Mock schon gefunden): ${(await fundZeilen(p)).join(" | ")}`);
+  pruefe((await text(p, '[data-testid="wi-spiel"]')) === "SpielKreativ · Schwer · 10 Tage · Cheats an", "Welt-Info aus level.dat in der Prüfliste");
+  await p.$eval('[data-testid="wi-funde"]', (k) => k.scrollIntoView({ block: "start" })); await schlafen(150);
+  await p.screenshot({ path: `${DIR}/m12-funde.png` });
+  await p.click('[data-gruppe="banner"] .switch'); await schlafen(150);
+  pruefe((await fundZeilen(p)).at(-1) === "Banner: 2 neu [aus]", "Schalter: Banner aus");
+  const vorher = await p.evaluate(() => ({ orte: MOCK.instanzen.length, banner: MOCK.banner.length, sets: MOCK.ruestung.length }));
+  await p.click('[data-aktion="wi-uebernehmen"]');
+  pruefe(await warteAuf(p, () => st.sheet === null && bm.import?.dateiname === "Funde.zip"), "Funde: übernommen, Sheet zu");
+  const funde = await p.evaluate((v) => ({ toast: document.getElementById("orteToast").textContent.replace(/\s+/g, " "),
+    orte: MOCK.instanzen.filter((i) => i.quelle === "welt").length, neu: MOCK.instanzen.length - v.orte,
+    karte: st.instanzen.filter((i) => i.quelle === "welt").map((i) => `${typVon(i).kategorie} ${i.x} ${i.z}`).sort(),
+    portal: MOCK.portale.w_1.find((x) => x.name === "Portal bei X 100 · Z 200"), portale: pt.liste.length === MOCK.portale.w_1.length,
+    sammel: ["sentry", "spire", "wild", "netherite"].map((id) => MOCK.sammel.w_1[id]?.von), sentry: MOCK.sammel.w_1.sentry.am,
+    banner: MOCK.banner.length - v.banner, sets: MOCK.ruestung.length - v.sets,
+    leder: MOCK.ruestung.find((x) => x.name === "Getragene Rüstung (29.9.)")?.teile.helmet, info: bm.import.info }), vorher);
+  pruefe(funde.toast === "Biome übernommen · 1 305 Chunks · 16 Funde", `Toast: ${funde.toast}`);
+  pruefe(funde.orte === 9 && funde.neu === 9 && funde.karte.length === 9 && funde.karte.includes("Desert Temple 165 170"),
+    `9 Orte mit Herkunft Welt-Import, gleich auf der Karte (${funde.karte.join(", ")})`);
+  pruefe(funde.portal?.oberwelt.x === 100 && funde.portal.nether.x === 12 && funde.portale, "Portal-Paar als Verbindung");
+  pruefe(funde.sammel.join() === "Lena,Max,Max,Max" && funde.sentry === "2026-09-20", `Vorlagen gefunden, die schon gefundene bleibt bei Lena (${funde.sammel.join()}, ${funde.sentry})`);
+  pruefe(funde.banner === 0 && funde.sets === 3 && funde.leder?.ruestung === "leather" && funde.leder.farbe === "red",
+    "Banner abgeschaltet, 3 Rüstungs-Sets, gefärbtes Leder → Rot");
+  pruefe(funde.info?.spielmodus === "creative" && funde.info.tage === 10, "Welt-Info im Import gespeichert");
+  // Ort-Detail sagt, woher der Ort kommt
+  await p.evaluate(() => detailOeffnen(st.instanzen.find((i) => i.quelle === "welt").id)); await schlafen(200);
+  pruefe((await sheet(p)).includes("Herkunftaus dem Welt-Import"), "Ort-Detail: aus dem Welt-Import");
+  await p.evaluate(() => alleSchliessen()); await schlafen(200);
+  // Zweiter Import derselben Welt: alles schon bekannt, nur die abgeschalteten Banner sind noch neu
+  await importOeffnen(p);
+  pruefe((await sheet(p)).includes("SpielKreativ · Schwer · 10 Tage · Cheats an"), "Welt-Info beim gespeicherten Import");
+  await hochladen(p, DATEIEN.funde);
+  await warteAuf(p, () => wi.schritt === "bestaetigen"); await p.click('[data-aktion="wi-lesen"]');
+  await warteAuf(p, () => wi.schritt === "pruefliste" && wi.funde?.gruppen);
+  const zweiter = await fundZeilen(p);
+  pruefe(zweiter.slice(0, 9).every((z) => z.endsWith(": nichts Neues · 1 schon bekannt")) && zweiter.slice(9).join(" | ")
+    === "Portal-Verbindung: nichts Neues · 1 schon bekannt | Schmiedevorlage: nichts Neues · 4 schon bekannt | Rüstungs-Set: nichts Neues · 3 schon bekannt | Banner: 2 neu [an]",
+    `Zweiter Import legt nichts doppelt an: ${zweiter.slice(9).join(" | ")}`);
+  await p.click('[data-aktion="wi-verwerfen"]'); await schlafen(200);
+  // Portale ohne Gegenstück werden „Eigene Orte · Netherportal“ (Frage 4, Max 13.10.2026); was eine Regel ablehnt, passt nicht
+  const einzeln = await p.evaluate(() => wiFundeEinordnen({ orte: [], ruestung: [],
+    portale: [{ dim: "overworld", x: 5000, y: 70, z: 5000, naehe: 8 }, { dim: "nether", x: -900, y: 40, z: -900, naehe: 8 }],
+    sammelobjekte: [{ id: "gibtsnicht" }], banner: [{ name: "Banner bei X 1 · Z 1", basis: null, ebenen: [] }] },
+  { verbindungen: [], sammel: {}, banner: [], ruestung: [] }).map((g) =>
+    `${g.id}: ${g.eintraege.map((e) => `${e.kategorie}/${e.variante}/${e.dimensionId.split("_").pop()}`).join(", ")} · passt nicht ${g.passtNicht}`));
+  pruefe(einzeln.join(" | ") === "netherportal: Eigene Orte/Netherportal/overworld, Eigene Orte/Netherportal/nether · passt nicht 0 | sammelobjekte:  · passt nicht 1 | banner:  · passt nicht 1",
+    `Portale ohne Gegenstück als Eigene Orte, Unpassendes gezählt: ${einzeln.join(" | ")}`);
+
   // ---- Import löschen (zweimal tippen) ----
   await p.click('[data-aktion="wi-loeschen"]');
   pruefe((await text(p, '[data-aktion="wi-loeschen"]')) === "Wirklich löschen?" && (await p.evaluate(() => Boolean(bm.import))), "Erstes Tippen fragt nach");
@@ -330,6 +389,24 @@ try {
   pruefe(gespeichert.kacheln.length === 13 && gespeichert.import.chunks.overworld === 1279, "Live: Board liefert die Kacheln aus");
   await lena.evaluate(() => karte.zentrieren(0, 0)); await schlafen(300);
   await lena.screenshot({ path: `${DIR}/m11-live-lena.png` });
+  // Funde live: Max übernimmt die Fundewelt, Lena sieht die Orte sofort
+  await importOeffnen(max);
+  await hochladen(max, DATEIEN.funde);
+  await warteAuf(max, () => wi.schritt === "bestaetigen"); await max.click('[data-aktion="wi-lesen"]');
+  pruefe(await warteAuf(max, () => wi.schritt === "pruefliste" && wi.funde?.gruppen?.length === 13), "Live: Funde eingeordnet");
+  await max.click('[data-aktion="wi-uebernehmen"]');
+  pruefe(await warteAuf(max, () => bm.import?.dateiname === "Funde.zip"), "Live: Funde übernommen");
+  pruefe(await warteAuf(lena, () => st.instanzen.filter((i) => i.quelle === "welt").length === 9), "Live: Lena bekommt die Orte aus dem Import sofort");
+  const kopf = { headers: { authorization: `Bearer ${token}` } };
+  const imBoard = {
+    orte: (await (await fetch(`${BOARD}/api/orte/welten/${welt.id}`, kopf)).json()).instanzen.filter((i) => i.quelle === "welt" && i.von === "Max").length,
+    portale: (await (await fetch(`${BOARD}/api/portale/welten/${welt.id}`, kopf)).json()).verbindungen.map((v) => v.name),
+    sammel: Object.keys((await (await fetch(`${BOARD}/api/sammelobjekte/welten/${welt.id}`, kopf)).json()).status).sort(),
+    banner: (await (await fetch(`${BOARD}/api/banner`, kopf)).json()).liste.length,
+    info: (await (await fetch(`${BOARD}/api/welten/${welt.id}/biome`, kopf)).json()).import.info?.schwierigkeit,
+  };
+  pruefe(imBoard.orte === 9 && imBoard.portale.join() === "Portal bei X 100 · Z 200" && imBoard.sammel.join() === "netherite,sentry,spire,wild"
+    && imBoard.banner === 2 && imBoard.info === "hard", `Live: Board hat Orte, Verbindung, Vorlagen, Banner und Welt-Info (${JSON.stringify(imBoard)})`);
   // Lena löscht, Max sieht es
   await importOeffnen(lena);
   await lena.click('[data-aktion="wi-loeschen"]'); await lena.click('[data-aktion="wi-loeschen"]');

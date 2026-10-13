@@ -338,6 +338,23 @@ function biomImportPruefen(body, welt){
   }
   return null;
 }
+/* Welt-Info aus level.dat (Bauplan „Welt-Funde“, welt-funde.js): nur bekannte Werte, sonst null */
+const SPIELMODI = Object.freeze({ survival:"Überleben", creative:"Kreativ", adventure:"Abenteuer", spectator:"Zuschauer" });
+const SCHWIERIGKEITEN = Object.freeze({ peaceful:"Friedlich", easy:"Einfach", normal:"Normal", hard:"Schwer" });
+function weltInfoSauber(i){
+  if(!i || typeof i !== "object") return null;
+  const koord = (v) => (Number.isInteger(v) && Math.abs(v) <= WELTGRENZE ? v : null);
+  const zeit = typeof i.zuletztGespielt === "string" ? Date.parse(i.zuletztGespielt) : NaN;
+  return {
+    spielmodus:Object.hasOwn(SPIELMODI, i.spielmodus ?? "") ? i.spielmodus : null,
+    schwierigkeit:Object.hasOwn(SCHWIERIGKEITEN, i.schwierigkeit ?? "") ? i.schwierigkeit : null,
+    tage:Number.isInteger(i.tage) && i.tage >= 0 ? i.tage : null,
+    spawn:koord(i.spawn?.x) != null && koord(i.spawn?.z) != null ? { x:i.spawn.x, y:koord(i.spawn.y), z:i.spawn.z } : null,
+    zuletztGespielt:Number.isNaN(zeit) ? null : new Date(zeit).toISOString(),
+    hardcore:i.hardcore === true,
+    cheats:i.cheats === true,
+  };
+}
 /** Nur bekannte Felder. Wer und wann setzt der Server (bzw. der Mock). */
 const biomImportSauber = (body) => {
   const imp = body.import, text = (v, n) => (typeof v === "string" ? v.trim().slice(0, n) : "");
@@ -347,6 +364,7 @@ const biomImportSauber = (body) => {
       dateiname:text(imp.dateiname, 120), weltname:text(imp.weltname, 60), seed:String(imp.seed),
       spielversion:text(imp.spielversion, 20) || null,
       chunks:Object.fromEntries(DIM_ORDER.map((d) => [d, anzahl(imp.chunks?.[d])])),
+      info:weltInfoSauber(imp.info),
       unbekannt:(Array.isArray(imp.unbekannt) ? imp.unbekannt : []).slice(0, 50)
         .filter((u) => Number.isInteger(u?.bedrockId))
         .map((u) => ({ bedrockId:u.bedrockId, chunks:anzahl(u.chunks),
@@ -356,6 +374,22 @@ const biomImportSauber = (body) => {
     kacheln:body.kacheln.map(({ dim, kx, kz, daten }) => ({ dim, kx, kz, daten })),
   };
 };
+
+/* ---- Regeln · Welt-Funde (Bauplan „Welt-Funde“, W2) ---------------------
+   POST /welten/:id/funde legt viele Einträge in einem Rutsch an: Orte (wie POST /orte/instanzen,
+   quelle "welt"), Verbindungen, Sammelobjekte (IDs), Rüstungs-Sets und Banner. Jeder Eintrag wird mit
+   seiner eigenen Regel geprüft; hier nur die Form der Anfrage. */
+const FUNDE_GRENZE = 5000;   // je Liste – weit mehr, als eine Welt hergibt
+const FUNDE_LISTEN = Object.freeze(["orte", "verbindungen", "sammelobjekte", "ruestung", "banner"]);
+function fundePruefen(body){
+  if(!body || typeof body !== "object") return "Funde fehlen";
+  for(const l of FUNDE_LISTEN){
+    if(body[l] == null) continue;
+    if(!Array.isArray(body[l])) return `${l}: Liste erwartet`;
+    if(body[l].length > FUNDE_GRENZE) return `${l}: höchstens ${FUNDE_GRENZE} Einträge`;
+  }
+  return null;
+}
 
 /* ---- Regeln · Portal-Verbindungen -------------------------------------- */
 /** Regeln für eine Verbindung – identisch im Server umzusetzen. Gibt Fehlertext oder null zurück. */

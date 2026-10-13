@@ -41,9 +41,22 @@ test('Welt-Import: Seed, Dimension, Kachelgröße, Grenzen, Dubletten', () => {
     unbekannt: [{ bedrockId: 192, chunks: 3, beispiel: { dim: 'overworld', x: 488, z: 8 } }, { bedrockId: 'x' }] }, kacheln: [{ ...kachel, extra: 1 }] })));
   assert.deepEqual(sauber, {
     import: { dateiname: '', weltname: 'Realm', seed: imp.seed, spielversion: null, chunks: { overworld: 1, nether: 0, end: 0 },
-      unbekannt: [{ bedrockId: 192, chunks: 3, beispiel: { dim: 'overworld', x: 488, z: 8 } }] },
+      info: null, unbekannt: [{ bedrockId: 192, chunks: 3, beispiel: { dim: 'overworld', x: 488, z: 8 } }] },
     kacheln: [kachel],
   });
+  // Welt-Info aus level.dat (Bauplan „Welt-Funde“): nur bekannte Werte
+  const info = JSON.parse(JSON.stringify(regeln.biomImportSauber({ import: { ...imp, info: {
+    spielmodus: 'survival', schwierigkeit: 'leicht', tage: -1, spawn: { x: 5, y: 32767, z: 'z' }, zuletztGespielt: '2026-09-29T17:12:51Z', hardcore: 1, cheats: true, extra: 1,
+  } }, kacheln: [] }))).import.info;
+  assert.deepEqual(info, { spielmodus: 'survival', schwierigkeit: null, tage: null, spawn: null, zuletztGespielt: '2026-09-29T17:12:51.000Z', hardcore: false, cheats: true });
+});
+
+test('Welt-Funde: Form der Anfrage (jeder Eintrag prüft seine eigene Regel)', () => {
+  assert.equal(regeln.fundePruefen({}), null);
+  assert.equal(regeln.fundePruefen({ orte: [], banner: [{}] }), null);
+  assert.equal(regeln.fundePruefen(null), 'Funde fehlen');
+  assert.equal(regeln.fundePruefen({ ruestung: {} }), 'ruestung: Liste erwartet');
+  assert.equal(regeln.fundePruefen({ sammelobjekte: Array(5001).fill('rib') }), 'sammelobjekte: höchstens 5000 Einträge');
 });
 
 test('Banner und Portale: dieselben Regeln wie in der Companion', () => {

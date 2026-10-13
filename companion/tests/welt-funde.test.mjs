@@ -122,6 +122,7 @@ test("Fundewelt: Orte je Struktur, Löschen und Überschreiben wie bei den Biome
     "end End City 970 80 5 · 1/0/0/0/0",
   ]);
   assert.deepEqual(funde.orte.find((o) => o.kategorie === "Nether Fortress").mobs, ["blaze"]);
+  assert.deepEqual(funde.orte.map((o) => o.naehe), [48, 16, 96, 48, 96, 96, 96, 16, 96]);
   assert.deepEqual(funde.orte.find((o) => o.kategorie === "Desert Well").beute, ["desert_well_brushable_block"]);
   assert.deepEqual(funde.unbekannt.beute, [{ name: "mod_kiste", anzahl: 2 }]);
   // Nur der kaputte Block-Eintrag zählt; das ~local_player-Füllstück der Standard-Testwelt ersetzt die .log später
@@ -131,8 +132,8 @@ test("Fundewelt: Orte je Struktur, Löschen und Überschreiben wie bei den Biome
 test("Fundewelt: Portale, Spieler, Welt-Info", async () => {
   const { funde } = await weltLesen(new Blob([fundeweltBauen().zip]));
   assert.deepEqual(funde.portale, [
-    { dim: "nether", x: 12, y: 40, z: 25, achse: "z", breite: 2 },
-    { dim: "overworld", x: 100, y: 70, z: 200, achse: "x", breite: 2 },
+    { dim: "nether", x: 12, y: 40, z: 25, achse: "z", breite: 2, naehe: 8 },
+    { dim: "overworld", x: 100, y: 70, z: 200, achse: "x", breite: 2, naehe: 8 },
   ]);
   assert.deepEqual(funde.spieler, { dim: "nether", x: 10, y: 70, z: -6, level: 30 });
   assert.equal(funde.andereSpieler, 1);

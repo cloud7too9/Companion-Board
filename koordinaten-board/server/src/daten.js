@@ -246,7 +246,7 @@ export class Daten {
     const d = this.dimension(body?.dimensionId);
     if (!d) fehler(400, 'Dimension unbekannt');
     const variante = body.variante ? String(body.variante).trim().slice(0, 60) : null;
-    const quelle = body.quelle === 'screenshot' ? 'screenshot' : 'manuell';
+    const quelle = body.quelle === 'screenshot' || body.quelle === 'welt' ? body.quelle : 'manuell';
     const vorhanden = this.typFinden(body.kategorie, variante);
     const problem = regeln.instanzPruefen({ ...body, variante, quelle }, d.type, Boolean(vorhanden));
     if (problem) fehler(422, problem);
@@ -327,6 +327,40 @@ export class Daten {
   async biomeLoeschen(weltId) {
     this.welt(weltId);
     this.oeffnen().biomeLoeschen(weltId);
+  }
+
+  // ---------- Welt-Funde: viele Einträge in einem Rutsch (Bauplan „Welt-Funde“, W2) ----------
+
+  /** Orte (quelle "welt"), Verbindungen, Sammelobjekte, Rüstungs-Sets und Banner aus dem Welt-Import anlegen.
+      Jeder Eintrag geht durch dieselbe Methode wie bei seiner eigenen Route; was eine Regel ablehnt, kommt mit
+      Meldung zurück, der Rest bleibt. Schon gefundene Sammelobjekte behalten von und am.
+      → { angelegt:{ orte, verbindungen, sammelobjekte, ruestung, banner }, abgelehnt:[{ art, nr, meldung }] } */
+  fundeAnlegen(weltId, body, von) {
+    this.welt(weltId);
+    const problem = regeln.fundePruefen(body);
+    if (problem) fehler(422, problem);
+    const angelegt = { orte: 0, verbindungen: 0, sammelobjekte: 0, ruestung: 0, banner: 0 };
+    const abgelehnt = [];
+    const je = (art, liste, anlegen) => (liste ?? []).forEach((eintrag, nr) => {
+      try {
+        if (anlegen(eintrag) !== false) angelegt[art] += 1;
+      } catch (f) {
+        if (!(f instanceof DatenFehler)) throw f;
+        abgelehnt.push({ art, nr, meldung: f.message });
+      }
+    });
+    je('orte', body.orte, (o) => {
+      if (this.dimension(o?.dimensionId)?.worldId !== weltId) fehler(400, 'Dimension gehört nicht zu dieser Welt');
+      this.instanzAnlegen({ ...o, quelle: 'welt' }, von);
+    });
+    je('verbindungen', body.verbindungen, (v) => this.portalAnlegen(weltId, v, von));
+    je('sammelobjekte', body.sammelobjekte, (id) => {
+      if (this.inhalt.sammel[weltId]?.[id]) return false;
+      this.sammelSetzen(weltId, String(id), { gefunden: true }, von);
+    });
+    je('ruestung', body.ruestung, (s) => this.ruestungAnlegen(s, von));
+    je('banner', body.banner, (b) => this.bannerAnlegen(b, von));
+    return { angelegt, abgelehnt };
   }
 
   // ---------- Sammelobjekte ----------

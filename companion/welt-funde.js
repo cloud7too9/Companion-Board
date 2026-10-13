@@ -205,7 +205,7 @@ function zuOrten(kandidaten) {
         ?? teile.reduce((a, b) => (Math.hypot(b.x - mx, b.z - mz) < Math.hypot(a.x - mx, a.z - mz) ? b : a));
       const zaehlen = (art) => teile.filter((k) => k.art === art).length;
       orte.push({
-        kategorie: mitte.kategorie, dim: mitte.dim, x: mitte.x, y: mitte.y, z: mitte.z,
+        kategorie: mitte.kategorie, dim: mitte.dim, x: mitte.x, y: mitte.y, z: mitte.z, naehe,
         behaelter: zaehlen("behaelter"), spawner: zaehlen("spawner"), kies: zaehlen("kies"),
         tresore: zaehlen("tresor"), pruefspawner: zaehlen("pruefspawner"),
         mobs: [...new Set(teile.map((k) => k.mob).filter(Boolean))].sort(),
@@ -238,8 +238,8 @@ export function weltInfo(levelDat) {
 /**
  * Sammler für einen Durchlauf. aufnehmen(keyBytes, value, geloescht) für jeden LevelDB-Eintrag in
  * der Reihenfolge des Lesens; levelDat(bytes) einmal; auswerten() am Ende → Funde:
- *   { orte:[{ kategorie, dim, x, y, z, behaelter, spawner, kies, tresore, pruefspawner, mobs, beute }],
- *     portale:[{ dim, x, y, z, achse, breite }],
+ *   { orte:[{ kategorie, dim, x, y, z, naehe, behaelter, spawner, kies, tresore, pruefspawner, mobs, beute }],
+ *     portale:[{ dim, x, y, z, achse, breite, naehe }],   naehe: ab hier „schon bekannt“ (Companion, W2)
  *     sammelobjekte:[{ id, wo:[Text] }],
  *     ruestung:[{ name, quelle:"spieler"|"staender", x?, z?, teile:{ helmet|chestplate|leggings|boots: { ruestung, muster, material, lederfarbe } | null } }],
  *     banner:[{ name, basis, ebenen:[{ muster, farbe }], dim, x, y, z }],
@@ -350,7 +350,7 @@ export function fundeSammler() {
       const liste = nbtLesen(value).wert?.data?.PortalRecords;
       portale = (Array.isArray(liste) ? liste : []).map((p) => ({
         dim: DIM_NUMMER[p?.DimId] ?? null, x: ganz(p?.TpX), y: ganz(p?.TpY), z: ganz(p?.TpZ),
-        achse: p?.Xa ? "x" : "z", breite: ganz(p?.Span),
+        achse: p?.Xa ? "x" : "z", breite: ganz(p?.Span), naehe: PORTAL_NAEHE,
       })).filter((p) => p.dim && p.dim !== "end" && p.x != null && p.z != null);
     }
   }

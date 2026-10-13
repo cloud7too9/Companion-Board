@@ -190,15 +190,13 @@ function funde(f) {
   if (!f) return;
   const kontext = vm.createContext({});
   for (const d of ["regeln.js", "board-karten.js"]) new vm.Script(readFileSync(path.join(HIER, "..", d), "utf8"), { filename: d }).runInContext(kontext);
-  const R = new vm.Script("({ kategorieName, SAMMELOBJEKTE, FARBEN, MUSTER, RUESTUNGEN, RUESTUNGS_TEILE, BESATZ_MATERIALIEN, zielSuchen })").runInContext(kontext);
+  const R = new vm.Script("({ kategorieName, SAMMELOBJEKTE, FARBEN, MUSTER, RUESTUNGEN, RUESTUNGS_TEILE, BESATZ_MATERIALIEN, SPIELMODI, SCHWIERIGKEITEN, zielSuchen })").runInContext(kontext);
   const name = (liste, id, feld = "name") => liste.find((x) => x.id === id)?.[feld] ?? id;
-  const MODUS = { survival: "Überleben", creative: "Kreativ", adventure: "Abenteuer", spectator: "Zuschauer" };
-  const STUFE = { peaceful: "Friedlich", easy: "Einfach", normal: "Normal", hard: "Schwer" };
 
   console.log("\n===== Funde (Bauplan „Welt-Funde“) =====");
   const i = f.info;
   if (i) {
-    console.log(`Spielmodus ${MODUS[i.spielmodus] ?? "?"} · Schwierigkeit ${STUFE[i.schwierigkeit] ?? "?"} · ${zahl(i.tage ?? 0)} Tage`
+    console.log(`Spielmodus ${R.SPIELMODI[i.spielmodus] ?? "?"} · Schwierigkeit ${R.SCHWIERIGKEITEN[i.schwierigkeit] ?? "?"} · ${zahl(i.tage ?? 0)} Tage`
       + `${i.hardcore ? " · Hardcore" : ""}${i.cheats ? " · Cheats an" : ""}`);
     console.log(`Weltspawn ${i.spawn ? ortText(i.spawn) : "?"} · zuletzt gespielt ${i.zuletztGespielt ? new Date(i.zuletztGespielt).toLocaleString("de-DE") : "?"}`);
   }
