@@ -3,13 +3,13 @@
 import Fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
 import fastifyWebsocket from '@fastify/websocket';
-import { randomBytes, randomInt } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Daten, DatenFehler } from './daten.js';
-import { identitaet, AnmeldeFehler, BOARD_PIN } from './identitaet.js';
+import { identitaet, AnmeldeFehler } from './identitaet.js';
 import QRCode from 'qrcode';
 import { companionApi } from './companion-api.js';
 import { anzeigeSicht } from './sicht.js';
@@ -24,17 +24,18 @@ const HOST = process.env.HOST ?? '0.0.0.0';
 // Öffentliche Adresse für QR-Code, Anzeige-Link und Konsole (Umbau Phase 6: auf dem Pi die Netlify-Adresse).
 // Ohne OEFFENTLICHE_URL gilt localhost; die LAN-Erkennung mit Adress-Lernen ist mit Phase 6 entfallen (E18).
 const OEFFENTLICHE_URL = (process.env.OEFFENTLICHE_URL ?? `http://localhost:${PORT}`).replace(/\/$/, '');
-// Pfad der Companion unter OEFFENTLICHE_URL (Umbau Phase 5): lokal liefert der Server sie unter / aus, auf Netlify liegt sie unter /app/
-const COMPANION_PFAD = `/${(process.env.COMPANION_PFAD ?? '/').replace(/^\/+|\/+$/g, '')}/`.replace('//', '/');
+// Seiten unter OEFFENTLICHE_URL, lokal wie auf Netlify (Bauplan „Anmeldung“, L3): / Anmeldeseite, /app/ Companion,
+// /dashboard/ Anzeige. Der QR-Code zum Beitreten führt auf die Anmeldeseite (COMPANION_PFAD gibt es nicht mehr).
+const BEITRITT_URL = `${OEFFENTLICHE_URL}/`;
 const DATEN = path.resolve(process.env.DATEN_ORDNER ?? path.join(HIER, '..', 'daten'));
 // Widget-Dashboard (companion/widgets, `npm run build` → dist/), ausgeliefert unter /dashboard: die Anzeige (Bauplan „Sitzung“, S4)
 const DASHBOARD_DIST = path.join(COMPANION_ORDNER, 'widgets', 'dist');
-// Seite der Companion, die unter / ausgeliefert wird (später z. B. modul-a-live-karte.html)
+// Seite der Companion, die unter /app/ ausgeliefert wird
 const COMPANION_DATEI = process.env.COMPANION_DATEI ?? 'companion-prototyp.html';
 // Anzeige nur mit Anzeige-Link (Anzeige + Schlüssel), auch auf dem Board-Gerät selbst (Umbau Phase 1):
 // hinter einem Tunnel käme sonst jede Anfrage aus dem Internet als „localhost“ herein.
 
-// ---------- PIN + Sitzungs-Signatur (bleiben über Neustarts erhalten) ----------
+// ---------- Signatur der Tokens (bleibt über Neustarts erhalten) ----------
 
 async function dauerwertLaden(datei, erzeugen) {
   const pfad = path.join(DATEN, datei);
@@ -48,23 +49,16 @@ async function dauerwertLaden(datei, erzeugen) {
 }
 
 await mkdir(DATEN, { recursive: true });
-// Board-PIN: mindestens 6 Ziffern (BOARD_PIN). Eine alte 4-stellige pin.txt wird ersetzt, eine zu kurze RAUM_PIN abgelehnt.
-if (process.env.RAUM_PIN !== undefined && !BOARD_PIN.test(process.env.RAUM_PIN)) {
-  console.error(`RAUM_PIN „${process.env.RAUM_PIN}“ geht nicht: Die Board-PIN hat mindestens 6 Ziffern.`);
-  process.exit(1);
-}
-const neuePin = () => String(randomInt(100000, 1000000));
-let PIN = process.env.RAUM_PIN ?? (await dauerwertLaden('pin.txt', neuePin));
-if (!BOARD_PIN.test(PIN)) {
-  PIN = neuePin();
-  await writeFile(path.join(DATEN, 'pin.txt'), PIN);
-  console.log(`  Die alte PIN in pin.txt war zu kurz – neue PIN mit 6 Ziffern: ${PIN}`);
-}
+// Die Board-PIN (RAUM_PIN, pin.txt) ist weg (Bauplan „Anmeldung“, L15): angemeldet wird mit Konto und Passwort.
 const GEHEIM = await dauerwertLaden('geheim.txt', () => randomBytes(32).toString('hex'));
+// Uhr des Servers für PIN-Pflicht und Gültigkeit. Mit TEST_UHR=1 (nur Tests) stellt POST /api/test/uhr { minuten }
+// sie vor – so lässt sich „über 30 Minuten offline“ prüfen, ohne zu warten.
+let uhrVersatz = 0;
+const jetzt = () => Date.now() + uhrVersatz;
 
 /** Kommt die Verbindung vom Gerät selbst (loopback)? Gibt keine Rechte mehr; dort sitzt hinter dem Tunnel cloudflared. */
 const istLokal = (req) => ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
-/** Adresse des Geräts für PIN-Sperre und Anmeldung. Hinter cloudflared (Umbau Phase 6) kommt jede Anfrage von
+/** Adresse des Geräts für Sperren. Hinter cloudflared (Umbau Phase 6) kommt jede Anfrage von
  *  127.0.0.1 und trägt die echte Adresse im Header CF-Connecting-IP. Der Header zählt nur von loopback, sonst
  *  könnte ein Handy im WLAN die Sperre mit einem erfundenen Header umgehen. */
 function clientIp(req) {
@@ -87,8 +81,8 @@ const anzeigeLink = (a) => `${OEFFENTLICHE_URL}/dashboard?anzeige=${encodeURICom
 // Die alte zustand.json (Orte der früheren Board-Steuerung) bleibt als Sicherung liegen.
 const daten = new Daten(DATEN);
 await daten.laden();
-// Accounts mit eigener PIN, Geräteschlüssel, „Wer bist du?“ (Strang B, identitaet.js)
-const ident = identitaet({ daten, geheim: GEHEIM, boardPin: PIN });
+// Konten mit Passwort und PIN, Geräteschlüssel, „Wer bist du?“ (Bauplan „Anmeldung“, identitaet.js)
+const ident = identitaet({ daten, geheim: GEHEIM, jetzt });
 
 // ---------- Server ----------
 
@@ -127,6 +121,28 @@ app.options('/api/*', async (req, reply) =>
     .header('Access-Control-Max-Age', '600')
     .code(204)
     .send());
+// ---------- Anmeldung (Bauplan „Anmeldung“, L2): Wer fragt, ist das Konto frei, fehlt die PIN? ----------
+// Bei jeder Anfrage mit gültigem Token: wartendes Konto → 403, PIN nötig (über 30 Min. ohne Kontakt oder PIN
+// woanders gewechselt) → 423. Erst danach zählt die Anfrage als Kontakt. Ohne gültiges Token entscheidet die Route
+// (öffentlich oder 401). req.nutzer ist danach der angemeldete Nutzer.
+const OEFFENTLICH = new Set(['/api/server', '/api/anmelden', '/api/registrieren', '/api/test/uhr']);
+const OHNE_FREIGABE = new Set(['/api/ich', '/api/abmelden']);
+const OHNE_PIN = new Set(['/api/ich', '/api/pin', '/api/pin/zuruecksetzen', '/api/abmelden']);
+const WARTET = 'Dein Konto wartet auf Freigabe';
+app.decorateRequest('nutzer', null);
+app.addHook('onRequest', async (req, reply) => {
+  const pfad = req.url.split('?')[0];
+  if (req.method === 'OPTIONS' || !pfad.startsWith('/api/') || OEFFENTLICH.has(pfad)) return;
+  const nutzer = ident.werBistDu(req);
+  if (!nutzer) return;
+  if (!nutzer.freigegeben && !OHNE_FREIGABE.has(pfad)) return reply.code(403).send({ error: 'freigabe', fehler: WARTET, message: WARTET });
+  if (!OHNE_PIN.has(pfad)) {
+    const grund = ident.pinGrund(nutzer);
+    if (grund) return reply.code(423).send({ error: 'pin', fehler: 'PIN nötig', message: 'PIN nötig', grund });
+    ident.kontakt(nutzer);
+  }
+  req.nutzer = nutzer;
+});
 await app.register(fastifyWebsocket);
 // Leerer Rumpf bei „Content-Type: application/json“ (z. B. DELETE) ist kein Fehler
 app.addContentTypeParser('application/json', { parseAs: 'string' }, (req, rumpf, fertig) => {
@@ -141,49 +157,101 @@ app.addContentTypeParser('application/json', { parseAs: 'string' }, (req, rumpf,
 
 /** Antwort bei abgelehnter Anmeldung (falsche PIN, Sperre, Name doppelt …) */
 function anmeldeFehler(reply, f) {
-  if (f instanceof AnmeldeFehler || f instanceof DatenFehler) return reply.code(f.status).send({ fehler: f.message });
+  if (f instanceof AnmeldeFehler || f instanceof DatenFehler) return reply.code(f.status).send({ fehler: f.message, message: f.message });
   throw f;
 }
 
-// Beitreten (B2): Board-PIN aus dem QR-Code, dann Account wählen oder anlegen – Name + eigene PIN
-app.post('/api/beitreten/konten', async (req, reply) => {
+// Konten (Bauplan „Anmeldung“, L2): anmelden, registrieren, PIN, Freigabe. Die Anmeldeseite (/) ruft sie auf.
+app.post('/api/anmelden', async (req, reply) => {
   try {
-    return { konten: ident.konten(req.body?.pin, clientIp(req)) };
+    return await ident.anmelden(req.body ?? {});
   } catch (f) {
     return anmeldeFehler(reply, f);
   }
 });
-
-app.post('/api/beitreten', async (req, reply) => {
-  const { pin, name, kontoPin } = req.body ?? {};
+app.post('/api/registrieren', async (req, reply) => {
   try {
-    return await ident.anmelden({ pin, name, kontoPin, ip: clientIp(req) });
+    const r = await ident.registrieren(req.body ?? {});
+    geaendertMelden('konten');
+    return reply.code(201).send(r);
   } catch (f) {
     return anmeldeFehler(reply, f);
   }
 });
-
-app.get('/api/ich', async (req, reply) => {
-  const nutzer = ident.werBistDu(req);
-  if (!nutzer) return reply.code(401).send({ fehler: 'Nicht angemeldet' });
-  return { id: nutzer.id, name: nutzer.name, farbe: nutzer.farbe };
+/** Route nur für angemeldete Geräte; req.nutzer setzt der Hook oben */
+const angemeldet = (req, reply) => {
+  if (req.nutzer) return true;
+  reply.code(401).send({ error: 'anmeldung', fehler: 'Nicht angemeldet', message: 'Nicht angemeldet' });
+  return false;
+};
+app.get('/api/ich', async (req, reply) => angemeldet(req, reply) && ident.ich(req.nutzer));
+app.post('/api/pin', async (req, reply) => {
+  if (!angemeldet(req, reply)) return reply;
+  try {
+    return await ident.pinBestaetigen(req.nutzer, req.body?.pin);
+  } catch (f) {
+    return anmeldeFehler(reply, f);
+  }
 });
+app.post('/api/pin/zuruecksetzen', async (req, reply) => {
+  if (!angemeldet(req, reply)) return reply;
+  try {
+    const r = await ident.pinZuruecksetzen(req.nutzer, req.body ?? {});
+    // Andere Geräte des Kontos brauchen die neue PIN: ihre Live-Verbindung endet, die nächste Anfrage bekommt 423
+    geraeteTrennen((v) => v.nutzer?.id === req.nutzer.id && v.nutzer.geraetId !== req.nutzer.geraetId, 4023, 'PIN nötig');
+    return r;
+  } catch (f) {
+    return anmeldeFehler(reply, f);
+  }
+});
+app.post('/api/abmelden', async (req, reply) => {
+  if (!angemeldet(req, reply)) return reply;
+  ident.abmelden(req.nutzer);
+  geraeteTrennen((v) => v.nutzer?.geraetId === req.nutzer.geraetId, 4001, 'Abgemeldet');
+  return { ok: true };
+});
+app.get('/api/konten', async (req, reply) => angemeldet(req, reply) && { konten: ident.konten() });
+app.post('/api/konten/:id/freigeben', async (req, reply) => {
+  if (!angemeldet(req, reply)) return reply;
+  try {
+    const konto = ident.freigeben(req.nutzer, req.params.id);
+    geaendertMelden('konten');
+    return { konto };
+  } catch (f) {
+    return anmeldeFehler(reply, f);
+  }
+});
+app.delete('/api/konten/:id', async (req, reply) => {
+  if (!angemeldet(req, reply)) return reply;
+  try {
+    ident.ablehnen(req.nutzer, req.params.id);
+    geaendertMelden('konten');
+    return { ok: true };
+  } catch (f) {
+    return anmeldeFehler(reply, f);
+  }
+});
+if (process.env.TEST_UHR === '1') {
+  app.post('/api/test/uhr', async (req) => {
+    uhrVersatz += Number(req.body?.minuten ?? 0) * 60_000;
+    return { versatzMinuten: uhrVersatz / 60_000 };
+  });
+}
 
 app.get('/api/anzeige', async (req, reply) => {
   const zugang = anzeigeZugang(req);
   if (!zugang.erlaubt) return reply.code(403).send({ fehler: 'Anzeige nur mit Anzeige-Link' });
   return {
     anzeige: zugang.anzeige && { id: zugang.anzeige.id, name: zugang.anzeige.name },
-    beitrittsUrl: `${OEFFENTLICHE_URL}${COMPANION_PFAD}?pin=${PIN}`,
+    beitrittsUrl: BEITRITT_URL,   // die Anmeldeseite (Bauplan „Anmeldung“: keine Board-PIN mehr)
     adresse: OEFFENTLICHE_URL,
-    pin: PIN,
   };
 });
 
-// QR-Code zum Beitreten als SVG fürs Widget „Beitreten“ des Dashboards (Bauplan „Sitzung“, S3)
+// QR-Code zur Anmeldeseite als SVG fürs Widget „Beitreten“ des Dashboards (Bauplan „Sitzung“, S3)
 app.get('/api/anzeige/qr', async (req, reply) => {
   if (!anzeigeZugang(req).erlaubt) return reply.code(403).send({ fehler: 'Anzeige nur mit Anzeige-Link' });
-  return { svg: await QRCode.toString(`${OEFFENTLICHE_URL}${COMPANION_PFAD}?pin=${PIN}`, { type: 'svg', margin: 0, errorCorrectionLevel: 'M' }) };
+  return { svg: await QRCode.toString(BEITRITT_URL, { type: 'svg', margin: 0, errorCorrectionLevel: 'M' }) };
 });
 
 // Widget-Dashboard (A6): Die Anzeige liest ihr Layout und meldet ihre Reihen. Welche Anzeige sie ist,
@@ -215,7 +283,7 @@ app.get('/api/server', async () => ({ name: 'koordinaten-board' }));
 await app.register(companionApi, {
   prefix: '/api',
   daten,
-  nutzer: (req) => ident.werBistDu(req),
+  nutzer: (req) => req.nutzer,
   geaendert: (bereich, weltId = null, anzeigeId = null) => {
     // anzeigeId (Bauplan „Sitzung“): beim Bereich layout, damit nur die betroffene Anzeige neu lädt
     geaendertMelden(bereich, weltId, anzeigeId);
@@ -233,7 +301,7 @@ await app.register(companionApi, {
 // Lesen darf die Anzeige (mit Anzeige-Link) und jedes angemeldete Handy.
 await app.register(async (widgets) => {
   widgets.addHook('onRequest', async (req, reply) => {
-    if (!anzeigeZugang(req).erlaubt && !ident.werBistDu(req)) {
+    if (!anzeigeZugang(req).erlaubt && !req.nutzer) {
       return reply.code(403).send({ fehler: 'Widgets nur auf der Anzeige oder für angemeldete Handys' });
     }
   });
@@ -339,6 +407,11 @@ function zeigenBearbeiten(op, verbindung) {
   return true;
 }
 
+/** Live-Verbindungen schließen, z. B. nach PIN-Wechsel (andere Geräte) oder Abmelden */
+function geraeteTrennen(passt, code, grund) {
+  for (const v of verbindungen) if (passt(v)) v.socket.close(code, grund);
+}
+
 function teilnehmerMelden() {
   const namen = [...new Set([...verbindungen].filter((v) => v.nutzer).map((v) => v.nutzer.name))];
   anAlle({ art: 'teilnehmer', namen });
@@ -353,9 +426,15 @@ app.get('/ws', { websocket: true }, (socket, req) => {
     // Wird der Schlüssel neu erzeugt, fliegt die Anzeige mit dem alten raus (veralteteAnzeigenTrennen)
     verbindung = { socket, rolle: 'anzeige', nutzer: null, zugang: { id: zugang.anzeige.id, schluessel: zugang.anzeige.schluessel } };
   } else {
+    // Wie bei REST: wartendes Konto oder fehlende PIN → keine Live-Verbindung (sonst hielte der Herzschlag das Gerät frisch)
     const nutzer = ident.ausToken(token);
     if (!nutzer) return socket.close(4001, 'Nicht angemeldet');
+    if (!nutzer.freigegeben) return socket.close(4030, WARTET);
+    if (ident.pinGrund(nutzer)) return socket.close(4023, 'PIN nötig');
+    ident.kontakt(nutzer);
     verbindung = { socket, rolle: 'steuerung', nutzer };
+    // Herzschlag: Der Server pingt alle 25 s, jedes Pong ist Kontakt – solange die Companion verbunden ist, läuft kein Timer
+    socket.on('pong', () => { if (!ident.pinGrund(nutzer)) ident.kontakt(nutzer); });
   }
 
   verbindungen.add(verbindung);
@@ -387,22 +466,31 @@ setInterval(() => {
   for (const v of verbindungen) if (v.socket.readyState === 1) v.socket.ping();
 }, 25_000).unref();
 
-// ---------- Ausliefern: Companion unter /, Anzeige (Widget-Dashboard) unter /dashboard ----------
+// ---------- Ausliefern: Anmeldeseite unter /, Companion unter /app/, Anzeige (Widget-Dashboard) unter /dashboard/ ----------
 
 const OHNE_CACHE = { 'cache-control': 'no-cache' };
-app.get('/', (req, reply) => reply.headers(OHNE_CACHE).sendFile(COMPANION_DATEI, COMPANION_ORDNER));
-for (const datei of ['konfig.js', 'regeln.js', 'board-karten.js', 'texterkennung.js']) {
-  app.get(`/${datei}`, (req, reply) => reply.headers(OHNE_CACHE).sendFile(datei, COMPANION_ORDNER));
+/** Weiterleiten und dabei die Query behalten (Anzeige-Link ?anzeige=…&schluessel=…, alte QR-Codes ?pin=…) */
+const mitQuery = (req, ziel) => {
+  const query = req.url.indexOf('?');
+  return `${ziel}${query === -1 ? '' : req.url.slice(query)}`;
+};
+// Anmeldeseite (Bauplan „Anmeldung“, L3); sie lädt app/konfig.js und app/regeln.js
+app.get('/', (req, reply) => reply.headers(OHNE_CACHE).sendFile('anmeldung.html', COMPANION_ORDNER));
+app.get('/app', (req, reply) => reply.redirect(mitQuery(req, '/app/')));
+app.get('/app/', (req, reply) => reply.headers(OHNE_CACHE).sendFile(COMPANION_DATEI, COMPANION_ORDNER));
+// Regeln, Texterkennung, Welt-Import (Worker und Dekoder sind ES-Module, die das Handy selbst liest)
+for (const datei of ['konfig.js', 'regeln.js', 'board-karten.js', 'texterkennung.js',
+  'biom-ids.js', 'biom-dekoder.js', 'biom-welt.js', 'welt-ordner.js', 'nbt.js', 'welt-funde.js', 'biom-import.worker.js']) {
+  app.get(`/app/${datei}`, (req, reply) => reply.headers(OHNE_CACHE).sendFile(datei, COMPANION_ORDNER));
 }
-await app.register(fastifyStatic, { root: path.join(COMPANION_ORDNER, 'icons'), prefix: '/icons/', maxAge: '7d' });
-// Welt-Import: Worker und Dekoder (ES-Module) liest das Handy selbst; die Bibliothek liegt in vendor/ (dort auch tesseract.js für die Texterkennung)
-for (const datei of ['biom-ids.js', 'biom-dekoder.js', 'biom-welt.js', 'welt-ordner.js', 'nbt.js', 'welt-funde.js', 'biom-import.worker.js']) {
-  app.get(`/${datei}`, (req, reply) => reply.headers(OHNE_CACHE).sendFile(datei, COMPANION_ORDNER));
-}
-await app.register(fastifyStatic, { root: path.join(COMPANION_ORDNER, 'vendor'), prefix: '/vendor/', maxAge: '7d', decorateReply: false });
+await app.register(fastifyStatic, { root: path.join(COMPANION_ORDNER, 'icons'), prefix: '/app/icons/', maxAge: '7d' });
+// Kennblöcke auch für das Dashboard (es lädt /icons/…, wie auf Netlify)
+await app.register(fastifyStatic, { root: path.join(COMPANION_ORDNER, 'icons'), prefix: '/icons/', maxAge: '7d', decorateReply: false });
+// Bibliotheken in vendor/ (Welt-Import, tesseract.js für die Texterkennung)
+await app.register(fastifyStatic, { root: path.join(COMPANION_ORDNER, 'vendor'), prefix: '/app/vendor/', maxAge: '7d', decorateReply: false });
 // Rüstungs-Baukasten: Texturen, fertige Item-Icons, baukasten.js/figur3d.js (ES-Module) und manifest.json
 await app.register(fastifyStatic, {
-  root: path.join(COMPANION_ORDNER, 'ruestungs-baukasten'), prefix: '/ruestungs-baukasten/', maxAge: '7d', decorateReply: false,
+  root: path.join(COMPANION_ORDNER, 'ruestungs-baukasten'), prefix: '/app/ruestungs-baukasten/', maxAge: '7d', decorateReply: false,
 });
 
 function dashboardSeite(reply) {
@@ -414,16 +502,10 @@ function dashboardSeite(reply) {
 }
 // Widget-Dashboard: Dateien mit Hash im Namen unter /dashboard/assets/, eigene Routen (z. B. /dashboard/vollbild/:id) → index.html
 await app.register(fastifyStatic, { root: DASHBOARD_DIST, prefix: '/dashboard/', index: false, maxAge: '7d', decorateReply: false });
-app.get('/dashboard', (req, reply) => {
-  const query = req.url.indexOf('?');
-  return reply.redirect(`/dashboard/${query === -1 ? '' : req.url.slice(query)}`);   // Anzeige-Link behält ?anzeige=…&schluessel=…
-});
+app.get('/dashboard', (req, reply) => reply.redirect(mitQuery(req, '/dashboard/')));   // Anzeige-Link behält ?anzeige=…&schluessel=…
 app.get('/dashboard/', (req, reply) => dashboardSeite(reply));
 // Die alte Anzeige gibt es nicht mehr (Bauplan „Sitzung“, S4): alte Anzeige-Links führen aufs Dashboard, mit Schlüssel
-const zumDashboard = (req, reply) => {
-  const query = req.url.indexOf('?');
-  return reply.redirect(`/dashboard/${query === -1 ? '' : req.url.slice(query)}`, 301);
-};
+const zumDashboard = (req, reply) => reply.redirect(mitQuery(req, '/dashboard/'), 301);
 app.get('/anzeige', zumDashboard);
 app.get('/anzeige/*', zumDashboard);
 
@@ -451,12 +533,12 @@ function anzeigeLinkMerken() {
 await app.listen({ port: PORT, host: HOST });
 anzeigeLinkMerken();
 console.log(`\n  Koordinaten-Board läuft (lauscht auf ${HOST}:${PORT})`);
-console.log(`  Companion (Handys):      ${OEFFENTLICHE_URL}${COMPANION_PFAD === '/' ? '' : COMPANION_PFAD}   PIN ${PIN}`);
+console.log(`  Anmeldung (Handys):      ${BEITRITT_URL}   (danach die Companion unter /app/)`);
 const anzeigen = daten.anzeigenListe();
 for (const a of anzeigen) console.log(`  Anzeige${anzeigen.length > 1 ? ` „${a.name}“` : ''}: ${anzeigeLink(a)}`);
 if (!existsSync(path.join(DASHBOARD_DIST, 'index.html'))) console.log('  (Dashboard nicht gebaut: npm run dashboard:installieren && npm run dashboard:build)');
 console.log(`  (Auch das Board-Gerät selbst braucht den Anzeige-Link; er steht in ${ANZEIGE_LINK_DATEI})`);
 if (!process.env.OEFFENTLICHE_URL) {
-  console.log('  (QR-Code und Anzeige-Link zeigen auf localhost. Sollen andere Geräte beitreten: OEFFENTLICHE_URL setzen, z. B. https://mainhubv1.com)');
+  console.log('  (QR-Code und Anzeige-Link zeigen auf localhost. Sollen andere Geräte sich anmelden: OEFFENTLICHE_URL setzen, z. B. https://mainhubv1.com)');
 }
 console.log('');
