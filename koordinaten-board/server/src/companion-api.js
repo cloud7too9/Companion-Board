@@ -6,6 +6,8 @@ import { DatenFehler } from './daten.js';
 
 // Ein Welt-Import schickt alle Kacheln auf einmal (je 2048 Byte als Base64, höchstens MAX_KACHELN aus regeln.js)
 const BIOME_GRENZE = 64 * 1024 * 1024;
+// Welt-Funde: bis zu FUNDE_GRENZE Einträge je Liste (regeln.js), ein Ort ist rund 200 Byte
+const FUNDE_BYTES = 16 * 1024 * 1024;
 
 /**
  * @param {import('fastify').FastifyInstance} app
@@ -72,6 +74,17 @@ export async function companionApi(app, { daten, nutzer, geaendert, anzeigeLink 
     await daten.biomeLoeschen(req.params.id);
     geaendert('biome', req.params.id);
     return { ok: true };
+  });
+  // Funde aus dem Welt-Import (Bauplan „Welt-Funde“, W2): alles in einem Rutsch, je Bereich eine Meldung
+  app.post('/welten/:id/funde', { bodyLimit: FUNDE_BYTES }, async (req) => {
+    const antwort = daten.fundeAnlegen(req.params.id, req.body, req.nutzer);
+    const { orte, verbindungen, sammelobjekte, ruestung, banner } = antwort.angelegt;
+    if (orte) geaendert('orte', req.params.id);
+    if (verbindungen) geaendert('portale', req.params.id);
+    if (sammelobjekte) geaendert('sammelobjekte', req.params.id);
+    if (ruestung) geaendert('ruestung');
+    if (banner) geaendert('banner');
+    return antwort;
   });
 
   // ---- Sammelobjekte ----

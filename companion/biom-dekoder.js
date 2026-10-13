@@ -2,7 +2,7 @@
    biom-dekoder.js  ·  Biome aus Bedrock-Weltdaten lesen (reine Funktionen)
    ----------------------------------------------------------------------------
    Genutzt vom Welt-Import (biom-welt.js → Web Worker) und von den Node-Tests.
-   Kein DOM, keine Abhängigkeiten. Formate: Minecraft Wiki „Bedrock Edition
+   Kein DOM; level.dat liest der NBT-Leser aus nbt.js. Formate: Minecraft Wiki „Bedrock Edition
    level format“, gegengeprüft mit prismarine-chunk (bedrock/1.18) und
    bedrock-provider (Data3D = 512 Byte Höhenkarte + Biome).
 
@@ -10,6 +10,7 @@
    Data3D (Tag 43):  256 × int16 LE Höhenkarte, danach Biom-Sektionen 16×16×16 von unten
    Kachel:           32 × 32 Chunks (512 × 512 Blöcke), Wert = Bedrock-ID + 1, 0 = unerkundet
    ========================================================================== */
+import { levelDatNbt } from "./nbt.js";
 
 export const DATA3D = 0x2b;
 export const KACHEL_CHUNKS = 32;
@@ -130,65 +131,14 @@ export function data3dBiom(value, dim, optionen = STANDARD_OPTIONEN) {
   return d ? chunkBiom(d, dim, optionen) : undefined;
 }
 
-// ---------- level.dat (8 Byte Kopf, danach NBT in Little Endian) ----------
-
-const NBT = { ENDE: 0, BYTE: 1, SHORT: 2, INT: 3, LONG: 4, FLOAT: 5, DOUBLE: 6, BYTES: 7, STRING: 8, LISTE: 9, COMPOUND: 10, INTS: 11, LONGS: 12 };
-const FEST = { [NBT.BYTE]: 1, [NBT.SHORT]: 2, [NBT.INT]: 4, [NBT.LONG]: 8, [NBT.FLOAT]: 4, [NBT.DOUBLE]: 8 };
+// ---------- level.dat (8 Byte Kopf, danach NBT in Little Endian, gelesen mit nbt.js) ----------
 
 /** level.dat → { seed: "…" (Dezimal, mit Vorzeichen), weltname, spielversion: "1.26.50" }; wirft bei kaputtem NBT */
 export function levelDatLesen(bytes) {
-  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const text = new TextDecoder();
-  let o = 8;   // int32 Version, int32 Länge
-  const pruefen = (n) => { if (o + n > bytes.length) throw new Error("level.dat ist abgeschnitten"); };
-  const name = () => { pruefen(2); const n = dv.getUint16(o, true); o += 2; pruefen(n); const s = text.decode(bytes.subarray(o, o + n)); o += n; return s; };
-  const int = () => { pruefen(4); const v = dv.getInt32(o, true); o += 4; return v; };
-
-  /** Wert lesen (lesen = true) oder überspringen */
-  function wert(typ, lesen) {
-    if (FEST[typ]) {
-      pruefen(FEST[typ]);
-      const v = !lesen ? undefined : typ === NBT.LONG ? dv.getBigInt64(o, true) : typ === NBT.INT ? dv.getInt32(o, true)
-        : typ === NBT.BYTE ? dv.getInt8(o) : typ === NBT.SHORT ? dv.getInt16(o, true) : undefined;
-      o += FEST[typ];
-      return v;
-    }
-    switch (typ) {
-      case NBT.STRING: { const s = name(); return lesen ? s : undefined; }
-      case NBT.BYTES: { const n = int(); pruefen(n); o += n; return undefined; }
-      case NBT.INTS: { const n = int(); pruefen(n * 4); o += n * 4; return undefined; }
-      case NBT.LONGS: { const n = int(); pruefen(n * 8); o += n * 8; return undefined; }
-      case NBT.LISTE: {
-        pruefen(1); const elem = dv.getUint8(o); o += 1;
-        const n = int(); const liste = [];
-        for (let i = 0; i < n; i += 1) { const v = wert(elem, lesen && elem === NBT.INT); if (lesen) liste.push(v); }
-        return lesen ? liste : undefined;
-      }
-      case NBT.COMPOUND: { compound(null); return undefined; }
-      default: throw new Error(`Unbekannter NBT-Typ ${typ}`);
-    }
-  }
-  /** Einträge eines Compounds; ziel: welche Namen gelesen werden sollen */
-  function compound(ziel) {
-    const gefunden = {};
-    for (;;) {
-      pruefen(1);
-      const typ = dv.getUint8(o); o += 1;
-      if (typ === NBT.ENDE) return gefunden;
-      const n = name();
-      const lesen = Boolean(ziel && ziel.includes(n));
-      const v = wert(typ, lesen);
-      if (lesen) gefunden[n] = v;
-    }
-  }
-
-  pruefen(1);
-  if (dv.getUint8(o) !== NBT.COMPOUND) throw new Error("level.dat beginnt nicht mit einem Compound");
-  o += 1;
-  name();
-  const w = compound(["RandomSeed", "LevelName", "lastOpenedWithVersion"]);
+  const w = levelDatNbt(bytes);
   if (typeof w.RandomSeed !== "bigint") throw new Error("RandomSeed fehlt in level.dat");
-  const version = Array.isArray(w.lastOpenedWithVersion) ? w.lastOpenedWithVersion.slice(0, 3).join(".") : null;
+  const version = Array.isArray(w.lastOpenedWithVersion) && w.lastOpenedWithVersion.every(Number.isInteger)
+    ? w.lastOpenedWithVersion.slice(0, 3).join(".") : null;
   return { seed: w.RandomSeed.toString(), weltname: typeof w.LevelName === "string" ? w.LevelName : null, spielversion: version };
 }
 

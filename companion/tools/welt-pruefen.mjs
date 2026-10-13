@@ -1,7 +1,11 @@
 // Prüfskript für eine .mcworld – Phase 1 des Bauplans „Biome aus .mcworld“.
 //
-//   node welt-pruefen.mjs <datei.mcworld> [--weg streaming|komplett|beide] [--massstab 4]
+//   node welt-pruefen.mjs <datei.mcworld | Weltordner> [--weg streaming|komplett|beide] [--massstab 4]
 //                         [--punkt x,z[,dimension]] … [--ziel ../tests/bilder]
+//
+// Statt der Datei geht auch der Weltordner (z. B. aus der Dateien-App kopiert) oder minecraftWorlds mit
+// genau einer Welt darin; es werden nur die gebrauchten Dateien gelesen (welt-ordner.js). „komplett“ gibt
+// es nur für Dateien.
 //
 // Gibt Weltname, Seed, Version, Chunks je Dimension, Ausdehnung, die häufigsten Biome,
 // unbekannte IDs, Laufzeit und Spitzenspeicher aus und schreibt je Dimension ein PNG
@@ -9,12 +13,17 @@
 // --weg beide: jeder Weg in einem eigenen Prozess (sauberer Spitzenspeicher), danach Vergleich.
 // --punkt: Biom des Chunks, Höhenkarte in beiden Lesarten (z*16+x und x*16+z) und das Biom
 //          an der Oberfläche – zum Abgleich mit Chunkbase und mit der Y-Anzeige im Spiel.
-import { openAsBlob, writeFileSync, mkdirSync } from "node:fs";
+// Danach die Funde (Bauplan „Welt-Funde“, W1): Orte aus Truhen und Spawnern, Portale mit Paaren,
+// Schmiedevorlagen, Rüstung, Banner, Spieler und Welt-Info – zum Abgleich mit dem Spiel (Haltepunkt H12).
+import { openAsBlob, writeFileSync, mkdirSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { deflateSync, crc32 } from "node:zlib";
 import path from "node:path";
+import vm from "node:vm";
 import { weltLesen, WeltFehler } from "../biom-welt.js";
+import { ortText } from "../welt-funde.js";
+import { weltenFinden } from "../welt-ordner.js";
 import { data3dLesen, biomAn, oberflaechenBiom, MIN_Y, kachelZuBase64, KACHEL_CHUNKS, DIMENSIONEN, STANDARD_OPTIONEN } from "../biom-dekoder.js";
 import "../biom-ids.js";
 
@@ -29,7 +38,7 @@ const args = process.argv.slice(2);
 const wert = (name, standard) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : standard; };
 const datei = args.find((a, i) => !a.startsWith("--") && !args[i - 1]?.startsWith("--"));
 if (!datei) {
-  console.log("Aufruf: node welt-pruefen.mjs <datei.mcworld> [--weg streaming|komplett|beide] [--massstab 4] [--punkt x,z[,dimension]] [--ziel ordner]");
+  console.log("Aufruf: node welt-pruefen.mjs <datei.mcworld | Weltordner> [--weg streaming|komplett|beide] [--massstab 4] [--punkt x,z[,dimension]] [--ziel ordner]");
   process.exit(1);
 }
 const weg = wert("--weg", "streaming");
@@ -41,10 +50,24 @@ const punkte = args.flatMap((a, i) => (a === "--punkt" ? [args[i + 1]] : [])).ma
 });
 
 // ---------- Einzelner Lauf (auch als Kindprozess mit --roh) ----------
+/** Datei → Blob; Ordner → Liste [{ pfad, datei }] der gebrauchten Dateien seiner einzigen Welt.
+    openAsBlob: dateigestützt wie eine File im Browser – die Welt liegt nicht als Ganzes im Speicher */
+async function quelle() {
+  if (!statSync(datei).isDirectory()) return openAsBlob(datei);
+  const pfade = readdirSync(datei, { recursive: true }).map(String).filter((p) => statSync(path.join(datei, p)).isFile());
+  const liste = await Promise.all(pfade.map(async (p) => ({ pfad: p.split(path.sep).join("/"), datei: await openAsBlob(path.join(datei, p)) })));
+  const welten = await weltenFinden(liste);
+  if (welten.length !== 1) {
+    console.error(welten.length ? `Darin sind ${welten.length} Welten, bitte eine wählen:\n${welten.map((w) => `  ${path.join(datei, w.ordner)}  (${w.name})`).join("\n")}`
+      : "Darin ist keine Welt (level.dat und db/CURRENT fehlen).");
+    process.exit(1);
+  }
+  return welten[0].dateien;
+}
+
 async function lauf(w) {
   const start = performance.now();
-  // openAsBlob: dateigestützt wie eine File im Browser – die Welt liegt nicht als Ganzes im Speicher
-  const ergebnis = await weltLesen(await openAsBlob(datei), {
+  const ergebnis = await weltLesen(await quelle(), {
     weg: w, biomIds: [...BIOME.keys()], roh: punkte.map((p) => `${p.dim}:${p.cx}:${p.cz}`),
   });
   return { ...ergebnis, sekunden: (performance.now() - start) / 1000, spitzeMB: process.resourceUsage().maxRSS / 1024 };
@@ -52,7 +75,7 @@ async function lauf(w) {
 
 if (args.includes("--roh")) {   // Kindprozess: Ergebnis als JSON
   const e = await lauf(weg);
-  process.stdout.write(JSON.stringify({ meta: e.meta, sekunden: e.sekunden, spitzeMB: e.spitzeMB,
+  process.stdout.write(JSON.stringify({ meta: e.meta, funde: e.funde, sekunden: e.sekunden, spitzeMB: e.spitzeMB,
     kacheln: e.kacheln.map((k) => [k.dim, k.kx, k.kz, kachelZuBase64(k.daten)]) }));
   process.exit(0);
 }
@@ -68,6 +91,8 @@ try {
     for (const [w, e] of kinder) console.log(`${w.padEnd(10)} ${e.sekunden.toFixed(2)} s · Spitzenspeicher ${Math.round(e.spitzeMB)} MB`);
     const [a, b] = kinder.map(([, e]) => JSON.stringify(e.kacheln));
     console.log(a === b ? "Vergleich: beide Wege liefern identische Kacheln ✔" : "Vergleich: UNTERSCHIED zwischen den Wegen ✘");
+    const [fa, fb] = kinder.map(([, e]) => JSON.stringify(e.funde));
+    console.log(fa === fb ? "Vergleich: beide Wege finden dasselbe ✔" : "Vergleich: UNTERSCHIED bei den Funden ✘");
     console.log("");
   }
   ergebnis = await lauf(weg === "beide" ? "streaming" : weg);
@@ -131,9 +156,12 @@ for (const dim of DIMENSIONEN) {
 if (meta.unbekannt.length) {
   console.log("\nUnbekannte Biom-IDs (in biom-ids.js nachtragen, sobald bestätigt):");
   for (const u of meta.unbekannt) {
-    console.log(`  ${String(u.bedrockId).padStart(4)} · ${zahl(u.chunks).padStart(6)} Chunks · z. B. ${DIM_NAME[u.beispiel.dim]} X ${u.beispiel.x} Z ${u.beispiel.z}${VERMUTET[u.bedrockId] ? ` · vermutlich ${VERMUTET[u.bedrockId]}` : ""}`);
+    console.log(`  ${String(u.bedrockId).padStart(4)} · ${zahl(u.chunks).padStart(6)} Chunks · z. B. ${DIM_NAME[u.beispiel.dim]} X ${u.beispiel.x} Z ${u.beispiel.z}`);
   }
 } else console.log("\nKeine unbekannten Biom-IDs.");
+
+// ---------- Funde ----------
+funde(ergebnis.funde);
 
 // ---------- Punkte: Höhenkarte und Biom an einer Stelle ----------
 for (const p of punkte) {
@@ -155,6 +183,71 @@ for (const p of punkte) {
     console.log(`  Höhenkarte ${name}: Wert ${hoehe} → Oberfläche y ${y} → ${BIOME.get(id)?.displayName ?? id}`);
   }
   console.log(`  Sektionen: ${d.sektionen.length} · Biome in der Spalte von unten: ${[...new Set(d.sektionen.map((s, n) => biomAn(s, lx, 0, lz)))].map((id) => BIOME.get(id)?.displayName ?? id).join(" → ")}`);
+}
+
+/** Funde ausgeben; deutsche Namen und die Portal-Prüfung aus regeln.js und board-karten.js (wie der Board-Server) */
+function funde(f) {
+  if (!f) return;
+  const kontext = vm.createContext({});
+  for (const d of ["regeln.js", "board-karten.js"]) new vm.Script(readFileSync(path.join(HIER, "..", d), "utf8"), { filename: d }).runInContext(kontext);
+  const R = new vm.Script("({ kategorieName, SAMMELOBJEKTE, FARBEN, MUSTER, RUESTUNGEN, RUESTUNGS_TEILE, BESATZ_MATERIALIEN, SPIELMODI, SCHWIERIGKEITEN, zielSuchen })").runInContext(kontext);
+  const name = (liste, id, feld = "name") => liste.find((x) => x.id === id)?.[feld] ?? id;
+
+  console.log("\n===== Funde (Bauplan „Welt-Funde“) =====");
+  const i = f.info;
+  if (i) {
+    console.log(`Spielmodus ${R.SPIELMODI[i.spielmodus] ?? "?"} · Schwierigkeit ${R.SCHWIERIGKEITEN[i.schwierigkeit] ?? "?"} · ${zahl(i.tage ?? 0)} Tage`
+      + `${i.hardcore ? " · Hardcore" : ""}${i.cheats ? " · Cheats an" : ""}`);
+    console.log(`Weltspawn ${i.spawn ? ortText(i.spawn) : "?"} · zuletzt gespielt ${i.zuletztGespielt ? new Date(i.zuletztGespielt).toLocaleString("de-DE") : "?"}`);
+  }
+  const sp = f.spieler;
+  console.log(sp ? `Spieler: ${DIM_NAME[sp.dim] ?? "?"} ${ortText(sp)} · Level ${sp.level ?? "?"}` : "Spieler: nicht in der Welt (~local_player fehlt)");
+  if (f.andereSpieler) console.log(`Andere Spieler: ${f.andereSpieler} (nicht gelesen)`);
+
+  console.log(`\nOrte (${f.orte.length}):`);
+  for (const o of f.orte) {
+    const teile = [o.behaelter ? `${o.behaelter} Behälter` : "", o.spawner ? `${o.spawner} Spawner${o.mobs.length ? ` (${o.mobs.join(", ")})` : ""}` : "",
+      o.kies ? `${o.kies} Seltsamer Kies/Sand` : "", o.tresore ? `${o.tresore} Tresor${o.tresore > 1 ? "e" : ""}` : "",
+      o.pruefspawner ? `${o.pruefspawner} Prüfungs-Spawner` : ""].filter(Boolean);
+    console.log(`  ${DIM_NAME[o.dim].padEnd(9)} ${R.kategorieName(o.kategorie).padEnd(22)} ${ortText(o).padEnd(30)} ${teile.join(" · ")}`);
+  }
+
+  console.log(`\nPortale (${f.portale.length}):`);
+  const portale = f.portale.map((p, n) => ({ vid: n, name: `${DIM_NAME[p.dim]} ${ortText(p)}`, ...p }));
+  for (const p of portale) {
+    // Paar: Das Spiel führt von hier zu einem Portal, das auch zurück hierher führt (Prüfung aus board-karten.js)
+    const hin = R.zielSuchen(p.dim, p, portale);
+    const zurueck = hin.treffer && R.zielSuchen(hin.treffer.portal.dim, hin.treffer.portal, portale);
+    const paar = zurueck?.treffer?.portal.vid === p.vid;
+    console.log(`  ${p.name.padEnd(40)} ${hin.treffer ? `→ ${hin.treffer.portal.name}${paar ? " (Paar)" : " (einseitig)"}` : "→ kein Gegenstück"}`);
+  }
+
+  console.log(`\nSchmiedevorlagen (${f.sammelobjekte.length}):`);
+  for (const o of f.sammelobjekte) console.log(`  ${name(R.SAMMELOBJEKTE, o.id).padEnd(20)} ${o.wo.join(" · ")}`);
+
+  console.log(`\nRüstung (${f.ruestung.length}):`);
+  for (const r of f.ruestung) {
+    console.log(`  ${r.name}`);
+    for (const t of R.RUESTUNGS_TEILE) {
+      const teil = r.teile[t.id];
+      if (!teil) continue;
+      const art = R.RUESTUNGEN.find((x) => x.id === teil.ruestung);
+      const besatz = teil.muster ? ` · ${name(R.SAMMELOBJEKTE, teil.muster)} aus ${name(R.BESATZ_MATERIALIEN, teil.material)}` : "";
+      console.log(`    ${art?.teile[t.id] ?? teil.ruestung}${besatz}${teil.lederfarbe ? ` · gefärbt ${teil.lederfarbe}` : ""}`);
+    }
+  }
+
+  console.log(`\nBanner (${f.banner.length}):`);
+  for (const b of f.banner) {
+    const ebenen = b.ebenen.map((e) => `${name(R.MUSTER, e.muster, "de")} ${name(R.FARBEN, e.farbe, "de")}`).join(", ");
+    console.log(`  ${b.name}: ${name(R.FARBEN, b.basis, "de")}${ebenen ? ` · ${ebenen}` : ""}`);
+  }
+
+  const u = f.unbekannt;
+  if (u.beute.length) console.log(`\nUnbekannte Beute-Tabellen: ${u.beute.map((b) => `${b.name} (${b.anzahl})`).join(", ")}`);
+  if (u.muster.length) console.log(`Unbekannte Banner-Muster: ${u.muster.join(", ")}`);
+  if (u.ruestung.length) console.log(`Unbekannte Rüstungsteile: ${u.ruestung.join(", ")}`);
+  if (f.fehler) console.log(`Nicht lesbare Einträge: ${f.fehler}`);
 }
 
 /** RGBA → PNG (Filter 0, zlib) */

@@ -136,11 +136,71 @@ test('Welt-Import: Biome hochladen (auch über 1 MB), lesen, ersetzen, löschen'
   ws.close();
 });
 
+test('Welt-Funde (Bauplan „Welt-Funde“, W2): Welt-Info im Import, viele Einträge in einem Rutsch, je Bereich eine Meldung', async () => {
+  const max = await beitreten('Max');
+  const welt = (await anfrage('POST', '/api/orte/welten', max, { seed: '1234567' })).daten.welt;
+  const info = { spielmodus: 'creative', schwierigkeit: 'hard', tage: 10, spawn: { x: 5, y: null, z: -7 },
+    zuletztGespielt: '2026-09-29T17:12:51.000Z', hardcore: false, cheats: true };
+  const daten = Buffer.alloc(2048, 3).toString('base64');
+  let r = await anfrage('PUT', `/api/welten/${welt.id}/biome`, max, {
+    import: { seed: welt.seed, weltname: 'Funde', dateiname: 'Funde/', info: { ...info, spielmodus: 'gott', fremd: 1 } },
+    kacheln: [{ dim: 'overworld', kx: 0, kz: 0, daten }] });
+  assert.equal(r.status, 200, r.daten.message);
+  assert.deepEqual(r.daten.import.info, { ...info, spielmodus: null });
+  assert.deepEqual((await anfrage('GET', `/api/welten/${welt.id}/biome`, max)).daten.import.info, { ...info, spielmodus: null });
+
+  const lena = await beitreten('Lena');
+  const ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws?token=${encodeURIComponent(lena)}`);
+  const meldungen = [];
+  ws.onmessage = (e) => meldungen.push(JSON.parse(e.data));
+  await new Promise((ok) => { ws.onopen = ok; });
+  await anfrage('PUT', `/api/sammelobjekte/welten/${welt.id}/wild`, lena, { gefunden: true });
+
+  const ort = (kategorie, x, dim = 'overworld', variante = null) => ({ dimensionId: `d_${welt.id}_${dim}`, kategorie, variante, x, y: 40, z: 7 });
+  const anderWelt = (await anfrage('POST', '/api/orte/welten', max, { seed: '7654321' })).daten.welt;
+  r = await anfrage('POST', `/api/welten/${welt.id}/funde`, max, {
+    orte: [ort('Dungeon', 10), ort('Treasure', 50), ort('Eigene Orte', 12, 'nether', 'Netherportal'), ort('Bastion', 1),
+      { ...ort('Dungeon', 9), dimensionId: `d_${anderWelt.id}_overworld` }],
+    verbindungen: [{ name: 'Portal bei X 100 · Z 200', oberwelt: { x: 100, y: 70, z: 200 }, nether: { x: 12, y: 40, z: 25 } }],
+    sammelobjekte: ['sentry', 'wild', 'gibtsnicht'],
+    ruestung: [{ name: 'Getragene Rüstung (29.9.)', teile: { boots: { ruestung: 'gold' } } }],
+    banner: [{ name: 'Banner bei X 40 · Z 41', basis: 'white', ebenen: [{ muster: 'creeper', farbe: 'black' }] }, { name: 'kaputt', basis: null, ebenen: [] }],
+  });
+  assert.equal(r.status, 200, r.daten.message);
+  assert.deepEqual(r.daten.angelegt, { orte: 3, verbindungen: 1, sammelobjekte: 1, ruestung: 1, banner: 1 });
+  assert.deepEqual(r.daten.abgelehnt, [
+    { art: 'orte', nr: 3, meldung: '„Bastion“ gibt es in der Oberwelt nicht' },
+    { art: 'orte', nr: 4, meldung: 'Dimension gehört nicht zu dieser Welt' },
+    { art: 'sammelobjekte', nr: 2, meldung: 'Unbekanntes Sammelobjekt' },
+    { art: 'banner', nr: 1, meldung: 'Unbekannte Grundfarbe' },
+  ]);
+  const orte = (await anfrage('GET', `/api/orte/welten/${welt.id}`, lena)).daten;
+  assert.deepEqual(orte.instanzen.map((i) => [i.quelle, i.von, i.x]), [['welt', 'Max', 10], ['welt', 'Max', 50], ['welt', 'Max', 12]]);
+  assert.ok(orte.typen.some((t) => t.kategorie === 'Eigene Orte' && t.variante === 'Netherportal'));
+  // Schon gefunden: von und am bleiben bei Lena
+  const sammel = (await anfrage('GET', `/api/sammelobjekte/welten/${welt.id}`, max)).daten.status;
+  assert.deepEqual([sammel.wild.von, sammel.sentry.von], ['Lena', 'Max']);
+  assert.equal((await anfrage('GET', `/api/portale/welten/${welt.id}`, max)).daten.verbindungen.length, 1);
+  // Je Bereich genau eine Meldung
+  for (let i = 0; i < 20 && meldungen.filter((m) => m.bereich !== 'sammelobjekte').length < 4; i += 1) await new Promise((ok) => setTimeout(ok, 50));
+  const bereiche = meldungen.map((m) => m.bereich).filter((b) => ['orte', 'portale', 'ruestung', 'banner'].includes(b));
+  assert.deepEqual(bereiche.sort(), ['banner', 'orte', 'portale', 'ruestung']);
+  assert.equal(meldungen.filter((m) => m.bereich === 'sammelobjekte').length, 2);   // Lena von Hand, dann der Import
+
+  r = await anfrage('POST', `/api/welten/${welt.id}/funde`, max, { orte: 'alle' });
+  assert.deepEqual([r.status, r.daten.message], [422, 'orte: Liste erwartet']);
+  r = await anfrage('POST', `/api/welten/${welt.id}/funde`, max, { orte: Array.from({ length: 5001 }, () => ({})) });
+  assert.deepEqual([r.status, r.daten.message], [422, 'orte: höchstens 5000 Einträge']);
+  assert.equal((await anfrage('POST', '/api/welten/w_99/funde', max, {})).status, 404);
+  assert.equal((await anfrage('POST', `/api/welten/${welt.id}/funde`, null, {})).status, 401);
+  ws.close();
+});
+
 test('Companion-Dateien: konfig.js, Regeln, Karten, Texterkennung, Welt-Import und tesseract.js werden ausgeliefert', async () => {
   const sprache = await fetch(`${BASIS}/vendor/tesseract/eng.traineddata.gz`);
   assert.equal(sprache.status, 200);
   assert.equal((await sprache.arrayBuffer()).byteLength > 2_000_000, true, 'Sprachdaten (gz) kommen ganz an');
-  for (const pfad of ['/konfig.js', '/regeln.js', '/board-karten.js', '/texterkennung.js', '/biom-import.worker.js', '/biom-welt.js', '/welt-ordner.js', '/biom-dekoder.js', '/biom-ids.js',
+  for (const pfad of ['/konfig.js', '/regeln.js', '/board-karten.js', '/texterkennung.js', '/biom-import.worker.js', '/biom-welt.js', '/welt-ordner.js', '/nbt.js', '/welt-funde.js', '/biom-dekoder.js', '/biom-ids.js',
     '/vendor/mcbe-leveldb.js', '/vendor/tesseract/tesseract.min.js', '/vendor/tesseract/worker.min.js', '/vendor/tesseract/tesseract-core-simd-lstm.wasm.js']) {
     const res = await fetch(BASIS + pfad);
     assert.equal(res.status, 200, pfad);

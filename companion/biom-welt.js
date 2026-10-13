@@ -1,11 +1,13 @@
 /* ============================================================================
-   biom-welt.js  ·  .mcworld/.zip oder Weltordner lesen → Biom je Chunk → Kacheln
+   biom-welt.js  ·  .mcworld/.zip oder Weltordner lesen → Biom je Chunk → Kacheln, Funde
    ----------------------------------------------------------------------------
    Gemeinsamer Ablauf für den Web Worker (biom-import.worker.js) und Node
    (tools/welt-pruefen.mjs, Tests). ES-Modul, nutzt das Bundle aus vendor/.
    Eingabe: eine ZIP (.zip/.mcworld als Blob/File) oder ein Weltordner als Liste
    [{ pfad, datei }] (welt-ordner.js, nur die gebrauchten Dateien); beides wird
-   zu derselben Liste von Einträgen, der Rest läuft gleich.
+   zu derselben Liste von Einträgen, der Rest läuft gleich. Im selben Durchlauf
+   sieht der Sammler aus welt-funde.js jeden Eintrag (Strukturen, Portale,
+   Spieler, Banner; Bauplan „Welt-Funde“).
 
    Zwei Wege, die dasselbe Raster liefern müssen (Test):
    · "streaming" (Standard): jede LevelDB-Datei EINZELN entpacken und mit einem
@@ -20,6 +22,7 @@
    ========================================================================== */
 import { configure, ZipReader, BlobReader, Uint8ArrayWriter, LevelDb, readMcworld } from "./vendor/mcbe-leveldb.js";
 import { ordnerAlsEintraege } from "./welt-ordner.js";
+import { fundeSammler } from "./welt-funde.js";
 import {
   chunkSchluesselLesen, chunkId, data3dBiom, levelDatLesen, kachelnBauen, chunksAuswerten, STANDARD_OPTIONEN,
 } from "./biom-dekoder.js";
@@ -65,7 +68,7 @@ async function quelleOeffnen(eingabe) {
 }
 
 /** Aufbau prüfen und die Kopfdaten lesen: level.dat (Seed, Name, Version) und levelname.txt.
-    Dateien per Basisname, der oberste Treffer gewinnt. → { current, welt } */
+    Dateien per Basisname, der oberste Treffer gewinnt. → { current, welt, levelDat (Bytes) } */
 async function aufbauLesen(eintraege) {
   if (eintraege.some((e) => /(^|\/)region\/[^/]+\.mca$/.test(e.filename))) throw new WeltFehler(FEHLER.JAVA);
   const current = eintraege.filter((e) => basisname(e) === "CURRENT" && /(^|\/)db\/$/.test(ordner(e))).sort(kuerzester)[0];
@@ -73,15 +76,16 @@ async function aufbauLesen(eintraege) {
   if (!current || !levelDat) throw new WeltFehler(FEHLER.KEIN_WELTORDNER);
   const levelname = eintraege.filter((e) => basisname(e) === "levelname.txt").sort(kuerzester)[0];
 
-  let welt;
+  let welt, bytes;
   try {
-    welt = levelDatLesen(await entpacken(levelDat));
+    bytes = await entpacken(levelDat);
+    welt = levelDatLesen(bytes);
   } catch (f) {
     throw new WeltFehler(FEHLER.LESEN, { cause: f });
   }
   // Der Name aus levelname.txt ist der, den man in der Dateien-App sieht; sonst LevelName aus level.dat
   const name = levelname ? new TextDecoder().decode(await entpacken(levelname)).trim() : "";
-  return { current, welt: { ...welt, weltname: name || welt.weltname } };
+  return { current, welt: { ...welt, weltname: name || welt.weltname }, levelDat: bytes };
 }
 
 /**
@@ -98,22 +102,26 @@ export async function weltPruefen(datei) {
 }
 
 /**
- * .mcworld oder .zip (Blob/File) oder Weltordner ([{ pfad, datei }]) → { meta: { weltname, seed, spielversion, chunks, unbekannt }, kacheln }
- * optionen: weg "streaming" | "komplett", biomIds (bekannte IDs, für „unbekannt“),
+ * .mcworld oder .zip (Blob/File) oder Weltordner ([{ pfad, datei }]) → { meta: { weltname, seed, spielversion, chunks, unbekannt }, kacheln, funde }
+ * funde: Ergebnis von fundeSammler().auswerten() (welt-funde.js), null mit funde: false
+ * optionen: weg "streaming" | "komplett", biomIds (bekannte IDs, für „unbekannt“), funde (Standard true),
  *           hoehen { netherBiomY, endBiomY }, fortschritt({ phase, aktuell, gesamt }),
  *           roh: Chunk-IDs ("dim:cx:cz"), deren Data3D-Wert zusätzlich zurückkommt (Prüfskript)
  * Wirft WeltFehler mit einem Text aus FEHLER.
  */
-export async function weltLesen(datei, { weg = "streaming", biomIds = null, hoehen = STANDARD_OPTIONEN, fortschritt = () => {}, roh = [] } = {}) {
+export async function weltLesen(datei, { weg = "streaming", biomIds = null, hoehen = STANDARD_OPTIONEN, fortschritt = () => {}, roh = [], funde = true } = {}) {
   fortschritt({ phase: "oeffnen", aktuell: 0, gesamt: 1 });
   const { zip, eintraege } = await quelleOeffnen(datei);
   try {
-    const { current, welt } = await aufbauLesen(eintraege);
+    const { current, welt, levelDat } = await aufbauLesen(eintraege);
+    const sammler = funde ? fundeSammler() : null;
+    sammler?.levelDat(levelDat);
 
     // Biom je Chunk; ein späterer Eintrag ersetzt einen früheren, gelöschte fallen raus
     const chunks = new Map();
     const rohGesucht = new Set(roh), rohWerte = {};
     const aufnehmen = (keyBytes, value, geloescht) => {
+      sammler?.aufnehmen(keyBytes, value, geloescht);
       const k = chunkSchluesselLesen(keyBytes);
       if (!k) return;
       const s = chunkId(k.dim, k.cx, k.cz);
@@ -134,7 +142,7 @@ export async function weltLesen(datei, { weg = "streaming", biomIds = null, hoeh
     const { chunks: anzahl, unbekannt } = chunksAuswerten(liste, biomIds);
     const kacheln = kachelnBauen(liste);
     fortschritt({ phase: "berechnen", aktuell: chunks.size, gesamt: chunks.size });
-    return { meta: { ...welt, chunks: anzahl, unbekannt }, kacheln, ...(roh.length ? { roh: rohWerte } : {}) };
+    return { meta: { ...welt, chunks: anzahl, unbekannt }, kacheln, funde: sammler?.auswerten() ?? null, ...(roh.length ? { roh: rohWerte } : {}) };
   } finally {
     await zip.close();
   }

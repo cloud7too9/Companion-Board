@@ -629,6 +629,12 @@ select.orte-eingabe { padding-right:34px;
 .wi-biome div { display:flex; align-items:center; gap:8px; }
 .wi-biome i { width:11px; height:11px; border-radius:3px; flex:0 0 auto; }
 .wi-biome b { margin-left:auto; font-weight:600; color:var(--text-dim); }
+.wi-funde { display:grid; }
+.wi-fund { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--border-soft); }
+.wi-fund:last-child { border-bottom:0; }
+.wi-fund .text { flex:1; min-width:0; }
+.wi-fund .card-meta { display:block; }
+.wi-fund.leer { opacity:.55; }
 
 /* ---- Sheets ---------------------------------------------------------------- */
 .orte-sheet { max-height:88%; padding-bottom:0; color:var(--text); }
@@ -1466,7 +1472,7 @@ function koordinatenErkennen(text){
    POST   /orte/welten   { seed }     → { welt }            (legt 3 Dimensionen an)
    GET    /orte/welten/:id            → { welt, dimensionen, typen, instanzen }
    POST   /orte/instanzen             { id?, dimensionId, kategorie, variante|null, x, y|null, z,
-                                        quelle:"screenshot"|"manuell" }
+                                        quelle:"screenshot"|"manuell"|"welt" }
                                       → { instanz, typ }   (Typ wird gefunden oder angelegt)
    PATCH  /orte/instanzen/:id  { x, y, z }   → { instanz }
    PUT    /orte/instanzen/:id/angeheftet { angeheftet } → { instanz }  (groß auf der Anzeige)
@@ -1488,7 +1494,13 @@ function koordinatenErkennen(text){
                                        → { import }   (ersetzt Import und alle Kacheln der Welt)
    DELETE /welten/:id/biome            → { ok:true }
    WeltImport = { id, weltId, dateiname, weltname, seed, spielversion, chunks:{ overworld, nether, end },
-                  unbekannt:[{ bedrockId, chunks, beispiel:{ dim, x, z } }], von, importiertAm }
+                  unbekannt:[{ bedrockId, chunks, beispiel:{ dim, x, z } }],
+                  info:{ spielmodus, schwierigkeit, tage, spawn, zuletztGespielt, hardcore, cheats }|null, von, importiertAm }
+   POST   /welten/:id/funde   { orte, verbindungen, sammelobjekte:[objektId], ruestung, banner }
+                                       → { angelegt:{ orte, verbindungen, sammelobjekte, ruestung, banner },
+                                           abgelehnt:[{ art, nr, meldung }] }
+          Funde aus dem Welt-Import in einem Rutsch (Bauplan „Welt-Funde“, W2): jeder Eintrag wie bei seiner
+          eigenen Route geprüft, Orte mit quelle "welt", schon gefundene Sammelobjekte bleiben, wie sie sind.
    Kachel: 32 × 32 Chunks, daten = Base64 von 1024 × Uint16 LE (Bedrock-ID + 1, 0 = unerkundet)
 
    Sammelobjekte (Fortschritt je Welt, für alle gemeinsam):
@@ -1706,7 +1718,8 @@ function mockApi(path, opts){
     const neu = eintragId("i", MOCK.instanzen); if(neu.fehler) return neu.fehler;
     let typ = vorhanden;
     if(!typ){ typ = { id:MOCK.neueId("t"), kategorie:body.kategorie, variante }; MOCK.typen.push(typ); }
-    const instanz = { id:neu.id, dimensionId:d.id, featureTypeId:typ.id, x:body.x, y:body.y ?? null, z:body.z };
+    const quelle = body.quelle === "screenshot" || body.quelle === "welt" ? body.quelle : "manuell";
+    const instanz = { id:neu.id, dimensionId:d.id, featureTypeId:typ.id, x:body.x, y:body.y ?? null, z:body.z, quelle };
     MOCK.instanzen.push(instanz);
     return ok({ instanz:{ ...instanz }, typ }, 201);
   }
@@ -1750,6 +1763,28 @@ function mockApi(path, opts){
       MOCK.biome[welt.id] = { import:imp, kacheln:sauber.kacheln };
       return ok({ import:structuredClone(imp) });
     }
+  }
+
+  // Welt-Funde (Bauplan „Welt-Funde“, W2): wie am Board jeder Eintrag über seine eigene Route
+  if(method === "POST" && (m = path.match(/^\/welten\/([\w-]+)\/funde$/))){
+    const welt = MOCK.welten.find((w) => w.id === m[1]);
+    if(!welt) return fehler(404, "Welt nicht gefunden");
+    const problem = fundePruefen(body); if(problem) return fehler(422, problem);
+    const angelegt = { orte:0, verbindungen:0, sammelobjekte:0, ruestung:0, banner:0 }, abgelehnt = [];
+    const senden = (pfad, methode, daten) => mockApi(pfad, { method:methode, body:JSON.stringify(daten) });
+    const je = (art, liste, anlegen) => (liste || []).forEach((e, nr) => {
+      const r = anlegen(e);
+      if(r?.ok) angelegt[art] += 1;
+      else if(r) abgelehnt.push({ art, nr, meldung:r.data.message });
+    });
+    je("orte", body.orte, (o) => MOCK.dimensionen.find((d) => d.id === o?.dimensionId)?.worldId !== welt.id
+      ? fehler(400, "Dimension gehört nicht zu dieser Welt") : senden("/orte/instanzen", "POST", { ...o, quelle:"welt" }));
+    je("verbindungen", body.verbindungen, (v) => senden(`/portale/welten/${welt.id}`, "POST", v));
+    je("sammelobjekte", body.sammelobjekte, (id) => MOCK.sammel[welt.id]?.[id] ? null
+      : SAMMELOBJEKTE.some((o) => o.id === id) ? senden(`/sammelobjekte/welten/${welt.id}/${id}`, "PUT", { gefunden:true }) : fehler(404, "Unbekanntes Sammelobjekt"));
+    je("ruestung", body.ruestung, (x) => senden("/ruestung", "POST", x));
+    je("banner", body.banner, (b) => senden("/banner", "POST", b));
+    return ok({ angelegt, abgelehnt });
   }
 
   if(method === "GET" && (m = path.match(/^\/sammelobjekte\/welten\/([\w-]+)$/))){
@@ -2438,6 +2473,7 @@ function detailOeffnen(id, loeschenFragen){
       </div>
       ${umrechnen(i.x, i.z, dim) ? `<div class="result-row"><span class="rname">${portalHtml(i.x, i.z, dim, "mono")}</span></div>` : ""}
       ${w ? `<div class="result-row"><span class="rname">Von deinem Standort</span><span><b class="rval mono">${entfernungText(w.meter)}</b><span class="runit">${w.richtung}</span></span></div>` : ""}
+      ${i.quelle === "welt" ? `<div class="result-row"><span class="rname">Herkunft</span><span>aus dem Welt-Import</span></div>` : ""}
     </div>
     ${i.erledigt
       ? `<div class="banner ok">Erledigt${i.erledigt.von ? ` von ${esc(i.erledigt.von)}` : ""}${i.erledigt.am ? ` am ${datumKurz(i.erledigt.am)}` : ""}</div>
@@ -4832,8 +4868,9 @@ const WELT_ANLEITUNGEN = Object.freeze([
 ]);
 const WI_PHASEN = { oeffnen:"Öffne die Datei …", lesen:"Lese die Weltdaten", berechnen:"Berechne die Biome …" };
 // quelle: was der Worker liest (File der ZIP oder die Ordner-Liste [{ pfad, datei }]); dateiname: was angezeigt und gespeichert wird;
-// ordner: { behalten, alle } beim Weltordner; welten: mehrere Welten im gewählten Ordner (Schritt „waehlen“)
-const wi = { schritt:"start", quelle:null, dateiname:"", ordner:null, welten:null, welt:null, fortschritt:null, ergebnis:null, fehler:null, worker:null, loeschen:false, dim:"overworld", sendet:false };
+// ordner: { behalten, alle } beim Weltordner; welten: mehrere Welten im gewählten Ordner (Schritt „waehlen“);
+// funde: eingeordnete Funde { laedt } | { gruppen } | { fehler }, schalter: je Gruppe an/aus (Bauplan „Welt-Funde“, W2)
+const wi = { schritt:"start", quelle:null, dateiname:"", ordner:null, welten:null, welt:null, fortschritt:null, ergebnis:null, fehler:null, worker:null, loeschen:false, dim:"overworld", sendet:false, funde:null, schalter:{} };
 const $weltDatei = document.getElementById("weltDatei");
 const $weltOrdner = document.getElementById("weltOrdner");
 let weltOrdnerModul = null;
@@ -4849,7 +4886,7 @@ function weltImportOeffnen(){
 }
 function weltImportZuruecksetzen(){
   wi.worker?.terminate();
-  Object.assign(wi, { schritt:"start", quelle:null, dateiname:"", ordner:null, welten:null, welt:null, fortschritt:null, ergebnis:null, fehler:null, worker:null, loeschen:false, sendet:false });
+  Object.assign(wi, { schritt:"start", quelle:null, dateiname:"", ordner:null, welten:null, welt:null, fortschritt:null, ergebnis:null, fehler:null, worker:null, loeschen:false, sendet:false, funde:null, schalter:{} });
 }
 function wiWorker(){
   wi.worker?.terminate();
@@ -4913,8 +4950,10 @@ function weltImportNachricht(m){
   wi.worker?.terminate(); wi.worker = null;
   if(m.typ === "geprueft") Object.assign(wi, { schritt:"bestaetigen", welt:m.welt });
   if(m.typ === "fertig"){
-    Object.assign(wi, { schritt:"pruefliste", ergebnis:{ meta:m.meta, kacheln:m.kacheln, auswertung:null } });
+    // funde: Strukturen, Portale, Spieler, Banner (welt-funde.js), eingeordnet in wiFundeVorbereiten
+    Object.assign(wi, { schritt:"pruefliste", ergebnis:{ meta:m.meta, kacheln:m.kacheln, funde:m.funde ?? null, auswertung:null } });
     wi.dim = DIM_ORDER.find((d) => m.meta.chunks[d]) || "overworld";
+    wiFundeVorbereiten();
   }
   weltImportRendern();
 }
@@ -4949,6 +4988,165 @@ function wiAuswertung(){
       ausschnitt:`X ${zahl(cx0 * 16)} … ${zahl((cx1 + 1) * 16)} · Z ${zahl(cz0 * 16)} … ${zahl((cz1 + 1) * 16)}` };
   }
   return (e.auswertung = je);
+}
+
+/* ---- Funde aus der Welt (Bauplan „Welt-Funde“, W2) --------------------------
+   Der Worker liefert die Funde (welt-funde.js), hier werden sie Einträge der API. Je Art eine Zeile mit
+   Anzahl und Schalter, alle an (Entscheidung von Max, 13.10.2026): „Übernehmen“ legt alles Eingeschaltete
+   in einem Rutsch an (POST /welten/:id/funde). Schon Bekanntes wird gezählt, aber nicht geschickt; was
+   eine Regel aus regeln.js ablehnt, zählt als „passt nicht“. Portal-Paare prüft zielSuchen (board-karten.js)
+   wie die Portal-Verwaltung; ein Portal ohne Gegenstück wird ein Ort „Eigene Orte · Netherportal“.
+   Gefärbtes Leder bekommt die nächste Farbe aus FARBEN. */
+const NETHERPORTAL = "Netherportal";
+const abstandXZ = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+const hexRgb = (hex) => [1, 3, 5].map((o) => parseInt(hex.slice(o, o + 2), 16));
+function naechsteFarbe(hex){
+  const [r, g, b] = hexRgb(hex);
+  let beste = null, abstand = Infinity;
+  for(const f of FARBEN){
+    const [fr, fg, fb] = hexRgb(f.hex), d = (fr - r) ** 2 + (fg - g) ** 2 + (fb - b) ** 2;
+    if(d < abstand){ beste = f.id; abstand = d; }
+  }
+  return beste;
+}
+/** Gleicher Aufbau aller vier Teile = dasselbe Set */
+const teileSchluessel = (teile) => JSON.stringify(RUESTUNGS_TEILE.map(({ id }) => {
+  const t = teile?.[id];
+  return t ? [t.ruestung, t.muster ?? null, t.material ?? null, t.farbe ?? null] : null;
+}));
+
+/** Funde + was schon da ist → Gruppen je Art { id, name, art, eintraege, bekannt, passtNicht } (art = Liste der Anfrage) */
+function wiFundeEinordnen(funde, vorhanden){
+  const gruppen = new Map();
+  const gruppe = (id, name, art) => gruppen.get(id) ?? gruppen.set(id, { id, name, art, eintraege:[], bekannt:0, passtNicht:0 }).get(id);
+  // Vorhandene Orte einmal nach Dimension und Kategorie ordnen – große Welten bringen hunderte Funde
+  const orteJe = new Map();
+  for(const i of st.instanzen){
+    const t = typVon(i), k = `${dimTypeVon(i.dimensionId)}|${t?.kategorie}`;
+    (orteJe.get(k) ?? orteJe.set(k, []).get(k)).push({ x:i.x, z:i.z, variante:t?.variante ?? null });
+  }
+  const ortDa = (dim, kategorie, variante, p, naehe) => (orteJe.get(`${dim}|${kategorie}`) || [])
+    .some((i) => (variante == null || i.variante === variante) && abstandXZ(i, p) <= naehe);
+  const ortEintrag = (dim, kategorie, variante, p) => ({ dimensionId:dimIdVon(dim), kategorie, variante, x:p.x, y:p.y ?? null, z:p.z });
+
+  for(const o of funde.orte){
+    const g = gruppe(`ort:${o.kategorie}`, kategorieName(o.kategorie), "orte"), e = ortEintrag(o.dim, o.kategorie, null, o);
+    if(instanzPruefen(e, o.dim, true)) g.passtNicht += 1;
+    else if(ortDa(o.dim, o.kategorie, null, o, o.naehe)) g.bekannt += 1;
+    else g.eintraege.push(e);
+  }
+
+  // Portale: Paare (das Spiel führt hin und zurück zum jeweils anderen) werden Verbindungen
+  const portale = funde.portale.map((p, vid) => ({ ...p, vid, name:"" }));
+  const gepaart = new Set(), paare = [];
+  for(const o of portale.filter((p) => p.dim === "overworld")){
+    const n = zielSuchen("overworld", o, portale).treffer?.portal;
+    if(!n || gepaart.has(n.vid) || zielSuchen("nether", n, portale).treffer?.portal.vid !== o.vid) continue;
+    paare.push([o, n]); gepaart.add(o.vid); gepaart.add(n.vid);
+  }
+  const seite = (p) => ({ x:p.x, y:p.y ?? null, z:p.z });
+  const verbunden = (p) => vorhanden.verbindungen.some((v) => abstandXZ(p.dim === "overworld" ? v.oberwelt : v.nether, p) <= p.naehe);
+  const gv = gruppe("verbindungen", "Portal-Verbindung", "verbindungen");
+  for(const [o, n] of paare){
+    const v = { name:`Portal bei X ${zahl(o.x)} · Z ${zahl(o.z)}`, oberwelt:seite(o), nether:seite(n) };
+    if(verbindungRegelPruefen(v)) gv.passtNicht += 1;
+    else if(verbunden(o) || verbunden(n)) gv.bekannt += 1;
+    else gv.eintraege.push(v);
+  }
+  const gp = gruppe("netherportal", "Netherportal ohne Gegenstück", "orte");
+  for(const p of portale.filter((x) => !gepaart.has(x.vid))){
+    const e = ortEintrag(p.dim, EIGENE_ORTE, NETHERPORTAL, p);
+    if(instanzPruefen(e, p.dim, true)) gp.passtNicht += 1;
+    else if(verbunden(p) || ortDa(p.dim, EIGENE_ORTE, NETHERPORTAL, p, p.naehe)) gp.bekannt += 1;
+    else gp.eintraege.push(e);
+  }
+
+  const gs = gruppe("sammelobjekte", "Schmiedevorlage", "sammelobjekte");
+  for(const o of funde.sammelobjekte){
+    if(!SAMMELOBJEKTE.some((x) => x.id === o.id)) gs.passtNicht += 1;
+    else if(vorhanden.sammel[o.id]) gs.bekannt += 1;
+    else gs.eintraege.push(o.id);
+  }
+  // Rüstung und Banner gelten für alle Welten; auch im selben Import nur einmal
+  const gr = gruppe("ruestung", "Rüstungs-Set", "ruestung");
+  const sets = new Set(vorhanden.ruestung.map((x) => teileSchluessel(x.teile)));
+  for(const r of funde.ruestung){
+    const s = { name:r.name, teile:Object.fromEntries(RUESTUNGS_TEILE.map(({ id }) => {
+      const t = r.teile[id];
+      return [id, t ? { ruestung:t.ruestung, muster:t.muster, material:t.material, farbe:t.lederfarbe ? naechsteFarbe(t.lederfarbe) : null } : null];
+    })) };
+    const schluessel = ruestungPruefen(s) ? null : teileSchluessel(ruestungSauber(s).teile);
+    if(!schluessel) gr.passtNicht += 1;
+    else if(sets.has(schluessel)) gr.bekannt += 1;
+    else { gr.eintraege.push(s); sets.add(schluessel); }
+  }
+  const gb = gruppe("banner", "Banner", "banner");
+  const banner = new Set(vorhanden.banner.map(bannerSchluessel));
+  for(const b of funde.banner){
+    const e = { name:b.name, basis:b.basis, ebenen:b.ebenen };
+    if(bannerPruefen(e)) gb.passtNicht += 1;
+    else if(banner.has(bannerSchluessel(e))) gb.bekannt += 1;
+    else { gb.eintraege.push(e); banner.add(bannerSchluessel(e)); }
+  }
+  // Strukturen nach Name, danach die übrigen Arten; Arten ohne jeden Fund fallen weg
+  const istOrt = (g) => g.id.startsWith("ort:");
+  return [...gruppen.values()].filter((g) => g.eintraege.length || g.bekannt || g.passtNicht)
+    .sort((a, b) => Number(!istOrt(a)) - Number(!istOrt(b)) || (istOrt(a) && istOrt(b) ? a.name.localeCompare(b.name, "de") : 0));
+}
+
+/** Vorhandenes holen (die Orte hat die Karte schon), dann einordnen; alle Schalter an */
+async function wiFundeVorbereiten(){
+  const funde = wi.ergebnis?.funde, weltId = st.weltId;
+  if(!funde || !weltId) return;
+  wi.funde = { laedt:true };
+  const antworten = await Promise.all([api(`/portale/welten/${weltId}`), api(`/sammelobjekte/welten/${weltId}`), api("/banner"), api("/ruestung")]);
+  if(wi.ergebnis?.funde !== funde || st.weltId !== weltId) return;   // inzwischen verworfen oder Welt gewechselt
+  const schlecht = antworten.find((r) => !r.ok);
+  if(schlecht) wi.funde = { fehler:meldungAus(schlecht) };
+  else {
+    const [p, s, b, r] = antworten.map((x) => x.data);
+    const gruppen = wiFundeEinordnen(funde, { verbindungen:p.verbindungen, sammel:s.status || {}, banner:b.liste, ruestung:r.sets });
+    wi.funde = { gruppen };
+    wi.schalter = Object.fromEntries(gruppen.map((g) => [g.id, true]));
+  }
+  if(wi.schritt === "pruefliste") weltImportRendern();
+}
+/** Was „Übernehmen“ schickt: alle eingeschalteten Gruppen, IDs vom Handy (B1) → Anfrage oder null */
+function wiFundeAnfrage(){
+  const gruppen = (wi.funde?.gruppen || []).filter((g) => wi.schalter[g.id] && g.eintraege.length);
+  if(!gruppen.length) return null;
+  const anfrage = { orte:[], verbindungen:[], sammelobjekte:[], ruestung:[], banner:[] };
+  for(const g of gruppen) for(const e of g.eintraege) anfrage[g.art].push(g.art === "sammelobjekte" ? e : { id:neueEintragId(), ...e });
+  return anfrage;
+}
+function wiFundeHtml(){
+  if(!wi.ergebnis?.funde) return "";
+  const f = wi.funde;
+  if(!f || f.laedt) return `<div class="result-hint"><span class="dreher"></span>Funde werden mit dem Vorhandenen verglichen …</div>`;
+  if(f.fehler) return `<div class="banner warn">Funde nicht geprüft (${esc(f.fehler)}). Übernommen werden nur die Biome.</div>`;
+  if(!f.gruppen.length) return `<div class="result-hint">Keine weiteren Funde: keine Truhen mit Beute, Spawner, Portale, Banner oder Vorlagen.</div>`;
+  return `<div class="result-card" data-testid="wi-funde">
+    <div class="result-label">Aus der Welt</div>
+    <div class="wi-funde">${f.gruppen.map((g) => {
+      const n = g.eintraege.length, an = Boolean(n && wi.schalter[g.id]);
+      const meta = [n ? `${zahl(n)} neu` : "nichts Neues", g.bekannt ? `${zahl(g.bekannt)} schon bekannt` : "",
+        g.passtNicht ? `${zahl(g.passtNicht)} passt nicht` : ""].filter(Boolean).join(" · ");
+      return `<div class="wi-fund ${n ? "" : "leer"}" data-gruppe="${esc(g.id)}">
+        <span class="text"><span class="card-title">${esc(g.name)}</span><span class="card-meta">${meta}</span></span>
+        ${n ? `<button class="switch ${an ? "on" : ""}" data-aktion="wi-fund-an" data-id="${esc(g.id)}" role="switch" aria-checked="${an}" aria-label="${esc(g.name)} übernehmen"></button>` : ""}
+      </div>`;
+    }).join("")}</div>
+    <div class="result-hint">Gelesen wird, was das Spiel schon erzeugt hat, auch Gebiete, die niemand gesehen hat. Geöffnete Truhen verraten ihre Struktur nicht mehr.</div>
+  </div>`;
+}
+/** Welt-Info aus level.dat als Zeilen einer result-card */
+function weltInfoZeilen(i){
+  if(!i) return "";
+  const spiel = [SPIELMODI[i.spielmodus], SCHWIERIGKEITEN[i.schwierigkeit], i.tage != null ? `${zahl(i.tage)} ${i.tage === 1 ? "Tag" : "Tage"}` : "",
+    i.hardcore ? "Hardcore" : "", i.cheats ? "Cheats an" : ""].filter(Boolean).join(" · ");
+  return `${spiel ? `<div class="result-row" data-testid="wi-spiel"><span class="rname">Spiel</span><span>${esc(spiel)}</span></div>` : ""}
+    ${i.spawn ? `<div class="result-row"><span class="rname">Weltspawn</span><span class="mono">${esc(kurzKoord(i.spawn))}</span></div>` : ""}
+    ${i.zuletztGespielt ? `<div class="result-row"><span class="rname">Zuletzt gespielt</span><span>${datumLang(i.zuletztGespielt)}</span></div>` : ""}`;
 }
 
 /** Sheet zeichnen. oeffnen = auch dann, wenn gerade ein anderes Sheet offen ist (Knopf) */
@@ -5002,10 +5200,11 @@ function weltImportRendern(oeffnen){
     const { meta } = wi.ergebnis, auswertung = wiAuswertung(), summe = chunkSumme(meta.chunks);
     const passt = st.welt && meta.seed === st.welt.seed;
     const a = auswertung[wi.dim], gesamt = meta.chunks[wi.dim] || 1;
-    html = kopfHtml("Biome prüfen", `${esc(meta.weltname || "Welt")} · ${zahl(summe)} Chunks`) + `<div class="orte-inhalt">
+    html = kopfHtml("Welt prüfen", `${esc(meta.weltname || "Welt")} · ${zahl(summe)} Chunks`) + `<div class="orte-inhalt">
       <div class="result-card">
         <div class="result-row"><span class="rname">Seed</span><span class="mono">${esc(meta.seed)} ${passt ? "✔" : "✘"}</span></div>
         ${meta.spielversion ? `<div class="result-row"><span class="rname">Spielversion</span><span class="mono">${esc(meta.spielversion)}</span></div>` : ""}
+        ${weltInfoZeilen(wi.ergebnis.funde?.info)}
         ${DIM_ORDER.map((d) => `<div class="result-row"><span class="rname">${dimLabel(d)}</span><span class="mono">${zahl(meta.chunks[d] || 0)} Chunks</span></div>`).join("")}
       </div>
       ${summe ? `<div class="tool-segment">${DIM_ORDER.filter((d) => meta.chunks[d]).map((d) =>
@@ -5017,11 +5216,12 @@ function weltImportRendern(oeffnen){
       : `<div class="banner warn">In dieser Welt ist noch nichts erkundet – es gibt keine Biome zu übernehmen.</div>`}
       ${meta.unbekannt.length ? `<div class="banner warn">Unbekannte Biom-IDs (bleiben leer, bis die Biom-Liste sie kennt): ${meta.unbekannt.slice(0, 6).map((u) =>
         `${u.bedrockId} · ${zahl(u.chunks)} Chunks, z. B. ${dimLabel(u.beispiel.dim)} X ${zahl(u.beispiel.x)} Z ${zahl(u.beispiel.z)}`).map(esc).join(" · ")}</div>` : ""}
-      ${imp ? `<div class="banner info">Ersetzt den Import vom ${datumLang(imp.importiertAm)}.</div>` : ""}
+      ${wiFundeHtml()}
+      ${imp ? `<div class="banner info">Ersetzt den Import vom ${datumLang(imp.importiertAm)}${wi.ergebnis.funde ? ". Funde kommen nur dazu" : ""}.</div>` : ""}
       ${passt ? "" : `<div class="banner bad">Die gewählte Welt hat inzwischen einen anderen Seed – erst die passende Welt wählen.</div>`}
       ${fehler}
       <div class="sheet-fuss"><button class="btn-secondary" data-aktion="wi-verwerfen">Verwerfen</button>
-        <button class="btn-primary" data-aktion="wi-uebernehmen" ${summe && passt && !wi.sendet ? "" : "disabled"}>${wi.sendet ? "Speichere …" : "Übernehmen"}</button></div>
+        <button class="btn-primary" data-aktion="wi-uebernehmen" ${summe && passt && !wi.sendet && !wi.funde?.laedt ? "" : "disabled"}>${wi.sendet ? "Speichere …" : "Übernehmen"}</button></div>
     </div>`;
   } else {
     html = kopfHtml("Welt importieren", `Biome für ${seedText}`) + `<div class="orte-inhalt">
@@ -5030,6 +5230,7 @@ function weltImportRendern(oeffnen){
         <div class="result-row"><span class="rname">Stand</span><span>${datumLang(imp.importiertAm)}</span></div>
         <div class="result-row"><span class="rname">Chunks</span><span class="mono">${zahl(chunkSumme(imp.chunks))}</span></div>
         <div class="result-row"><span class="rname">Aus</span><span>${esc(imp.weltname || imp.dateiname || "–")}${imp.von ? ` · ${esc(imp.von)}` : ""}</span></div>
+        ${weltInfoZeilen(imp.info)}
       </div>` : ""}
       ${fehler}
       <div class="wi-ablage" data-testid="wi-ablage">
@@ -5065,20 +5266,35 @@ function weltImportFortschritt(){
   if($b) $b.style.width = `${wiProzent(wi.fortschritt)}%`;
 }
 
+/** Erst die Biome (ersetzt den alten Import), dann die eingeschalteten Funde in einem Rutsch (kommen nur dazu) */
 async function weltImportUebernehmen(){
   if(wi.sendet || !wi.ergebnis) return;
-  const { meta, kacheln } = wi.ergebnis, weltId = st.weltId;
+  const { meta, kacheln, funde } = wi.ergebnis, weltId = st.weltId;
   wi.sendet = true; wi.fehler = null; weltImportRendern();
   const imp = { dateiname:wi.dateiname, weltname:meta.weltname, seed:meta.seed, spielversion:meta.spielversion,
-                chunks:meta.chunks, unbekannt:meta.unbekannt };
+                chunks:meta.chunks, unbekannt:meta.unbekannt, info:funde?.info ?? null };
   const r = await api(`/welten/${weltId}/biome`, { method:"PUT", body:JSON.stringify({ import:imp, kacheln }) });
-  wi.sendet = false;
-  if(!r.ok){ wi.fehler = meldungAus(r); return weltImportRendern(); }
+  if(!r.ok){ wi.sendet = false; wi.fehler = meldungAus(r); return weltImportRendern(); }
   biomeSetzen(weltId, r.data.import, kacheln);
+  let text = `Biome übernommen · ${zahl(chunkSumme(meta.chunks))} Chunks`, schlecht = false;
+  const anfrage = wiFundeAnfrage();
+  if(anfrage){
+    const f = await api(`/welten/${weltId}/funde`, { method:"POST", body:JSON.stringify(anfrage) });
+    if(!f.ok){ text += ` · Funde nicht: ${meldungAus(f)}`; schlecht = true; }
+    else {
+      const a = f.data.angelegt, summe = Object.values(a).reduce((x, y) => x + y, 0);
+      text += ` · ${zahl(summe)} Funde${f.data.abgelehnt.length ? ` (${zahl(f.data.abgelehnt.length)} abgelehnt)` : ""}`;
+      if(f.data.abgelehnt.length) console.warn("Welt-Funde abgelehnt:", f.data.abgelehnt);
+      // Live meldet das Board die Bereiche ohnehin; so stimmt die Ansicht auch im DEMO und ohne WebSocket sofort
+      await Promise.all([a.orte && orteAuffrischen(), a.verbindungen && portaleLaden(), a.sammelobjekte && samLaden(),
+        a.banner && bannerLaden(), a.ruestung && ruestungLaden()].filter(Boolean));
+    }
+  }
+  wi.sendet = false;
   weltImportZuruecksetzen();
   alleSchliessen();
   if(aktivesModul === "karte"){ karte.neuAnpassen(); render(); }
-  toast(`Biome übernommen · ${zahl(chunkSumme(meta.chunks))} Chunks`);
+  toast(text, schlecht);
 }
 async function weltImportLoeschen(){
   const r = await api(`/welten/${st.weltId}/biome`, { method:"DELETE" });
@@ -5275,6 +5491,7 @@ $sheet.addEventListener("click", async (e) => {
     case "wi-abbrechen": wi.schritt === "pruefe" ? (weltImportZuruecksetzen(), weltImportRendern()) : weltImportAbbrechen(); break;
     case "wi-verwerfen": weltImportZuruecksetzen(); weltImportRendern(); break;
     case "wi-uebernehmen": weltImportUebernehmen(); break;
+    case "wi-fund-an": wi.schalter[id] = !wi.schalter[id]; weltImportRendern(); break;
     case "wi-loeschen":
       if(!wi.loeschen){ wi.loeschen = true; a.textContent = "Wirklich löschen?"; return; }
       weltImportLoeschen(); break;

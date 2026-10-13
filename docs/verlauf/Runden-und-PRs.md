@@ -8,6 +8,7 @@ PR-Nummern bis #26 meinen das alte Repo `flexibel-visionboard`, ab dem Repo-Umzu
 
 | PR | Inhalt |
 |---|---|
+| #20 | Welt-Funde lesen (W1): NBT-Leser, Sammler für Strukturen, Portale, Spieler, Vorlagen, Rüstung, Banner und Welt-Info im Welt-Import; `welt-pruefen.mjs` zeigt die Funde und liest Weltordner (⏸ H12) |
 | #19 | Welt-Import: Weltordner wählen oder hineinziehen, nur gebrauchte Dateien (W0, ⏸ H11); Bauplan „Welt-Funde“ (erweiterter Welt-Import) zum Abnicken, E21 auf der Warteliste |
 | #18 | Aufräumen: Erledigtes aus `planung/` ins Archiv `docs/` (Pläne, Baupläne, Ideen, Verlauf, erledigte Haltepunkte und Entscheidungen), Test-Cache aus dem Repo, `.gitignore` im Hauptordner |
 | #17 | S4 Umschalten: Anzeige-Link aufs Dashboard, `/` und `/anzeige` leiten um (E20), `koordinaten-board/client/` und `gezeigt` entfernt, Hinweis „Dieser Anzeige-Link gilt nicht mehr“, Tests auf das Dashboard umgeschrieben; ⏸ H10 wartet auf Max |

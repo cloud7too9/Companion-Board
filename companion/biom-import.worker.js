@@ -10,7 +10,8 @@
    → { typ:"start", datei, biomIds, hoehen }  ganze Welt lesen
    ← { typ:"fortschritt", phase:"oeffnen"|"lesen"|"berechnen", aktuell, gesamt }
    ← { typ:"fertig", meta:{ weltname, seed, spielversion, chunks, unbekannt },
-                     kacheln:[{ dim, kx, kz, daten }] }   daten als Base64 (2048 Byte), wie die API sie will
+                     kacheln:[{ dim, kx, kz, daten }],    daten als Base64 (2048 Byte), wie die API sie will
+                     funde }                              Strukturen, Portale, Spieler, Banner (welt-funde.js)
    ← { typ:"fehler", text }                   Text für die Oberfläche, Einzelheiten in der Konsole
    ========================================================================== */
 import { weltLesen, weltPruefen, WeltFehler, FEHLER } from "./biom-welt.js";
@@ -31,13 +32,13 @@ self.onmessage = async ({ data }) => {
       return;
     }
     if (data?.typ === "start") {
-      const { meta, kacheln } = await weltLesen(data.datei, {
+      const { meta, kacheln, funde } = await weltLesen(data.datei, {
         biomIds: data.biomIds ?? null,
         hoehen: data.hoehen ?? STANDARD_OPTIONEN,
         fortschritt: (f) => self.postMessage({ typ: "fortschritt", ...f }),
       });
       self.postMessage({
-        typ: "fertig", meta,
+        typ: "fertig", meta, funde,
         kacheln: kacheln.map(({ dim, kx, kz, daten }) => ({ dim, kx, kz, daten: kachelZuBase64(daten) })),
       });
     }
