@@ -28,6 +28,12 @@ export const WIDGETS = Object.freeze({
   'bauplaene.bauplan': { hinweis: 'Bereich geplant' },
   'banner.banner': { art: 'banner', quelle: 'banner' },
   'ruestung.set': { art: 'ruestung', quelle: 'ruestung' },
+  // Widgets der Anzeige (Bauplan „Sitzung“, S3): das Dashboard rendert sie aus zustand/teilnehmer über /ws,
+  // der Server kennt sie nur fürs Layout (layoutPruefen) und antwortet auf /api/widgets mit einem Hinweis
+  'karte.orte': { hinweis: 'Zeigt die Anzeige selbst aus ihrem Zustand' },
+  'board.beitreten': { hinweis: 'Zeigt die Anzeige selbst aus ihrem Zustand' },
+  'board.spieler': { hinweis: 'Zeigt die Anzeige selbst aus ihrem Zustand' },
+  'board.zuletzt': { hinweis: 'Zeigt die Anzeige selbst aus ihrem Zustand' },
 });
 
 /**
