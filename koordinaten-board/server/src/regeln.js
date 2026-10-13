@@ -19,6 +19,8 @@ const NAMEN = [
   'SAMMELOBJEKTE', 'FARBEN', 'MUSTER', 'MAX_EBENEN', 'RUESTUNGS_TEILE', 'RUESTUNGEN', 'BESATZ_MATERIALIEN',
   'instanzPruefen', 'bannerPruefen', 'bannerSauber', 'verbindungRegelPruefen', 'verbindungSauber',
   'ruestungPruefen', 'ruestungSauber', 'biomImportPruefen', 'biomImportSauber', 'idGueltig', 'fundePruefen',
+  'KONTO_PIN', 'PASSWORT_MIN', 'ANZEIGENAME_MAX', 'ECHTER_NAME_MAX', 'OFFLINE_MINUTEN', 'CODE_ZEICHEN', 'CODE_LAENGE', 'ZUGANGS_CODE',
+  'GUELTIGKEITEN', 'anzeigenameSauber', 'passwortPruefen', 'kontoPruefen', 'gueltigkeitPruefen',
 ];
 
 const KARTEN_NAMEN = ['BOARD_KARTEN', 'strukturName', 'zahl'];

@@ -189,6 +189,67 @@ test('Strang B: IDs vom Handy, erstellerId, Benutzer-Sammlungen', async () => {
   rmSync(o2, { recursive: true, force: true });
 });
 
+test('Konten (Anmeldung L1): erstes Konto frei, weitere warten, Name eindeutig, ablehnen nur wartende', () => {
+  const d = new Daten(ordner());
+  const am = '2026-10-14T08:00:00.000Z';
+  const max = d.benutzerAnlegen({ echterName: 'Max Muster', anzeigename: 'Max', passwortHash: 'scrypt:a:b', pinHash: 'scrypt:c:d', am });
+  assert.deepEqual([max.freigegebenAm, max.freigegebenVon, max.pinGeaendertAm], [am, null, am], 'das erste Konto gilt sofort');
+  wirft(() => d.benutzerAnlegen({ echterName: 'X', anzeigename: 'MAX', passwortHash: 'p', pinHash: 'p', am }), 409, 'Den Namen „MAX“ gibt es schon');
+  assert.equal(d.benutzerMitName(' max ')?.id, max.id);
+  const lena = d.benutzerAnlegen({ echterName: 'Lena L.', anzeigename: 'Lena', passwortHash: 'p', pinHash: 'p', am });
+  assert.equal(lena.freigegebenAm, null, 'weitere Konten warten auf Freigabe');
+  const g = d.geraetAnlegen(lena.id, am);
+  assert.deepEqual([g.benutzerId, g.freigeschaltetAm, g.letzterKontakt, g.pinBestaetigtAm], [lena.id, am, am, am]);
+  assert.equal(d.benutzerVonGeraet(g.id).id, lena.id);
+  assert.equal(d.geraetAendern(g.id, { letzterKontakt: '2026-10-14T09:00:00.000Z' }).letzterKontakt, '2026-10-14T09:00:00.000Z');
+  assert.equal(d.geraetAendern('gibts-nicht', { letzterKontakt: am }), null);
+  const tom = d.benutzerAnlegen({ echterName: 'Tom', anzeigename: 'Tom', passwortHash: 'p', pinHash: 'p', am });
+  d.geraetAnlegen(tom.id, am);
+  wirft(() => d.kontoAblehnen(max.id), 409, 'Nur wartende Konten lassen sich ablehnen');
+  d.kontoAblehnen(tom.id);
+  assert.equal(d.benutzer(tom.id), null);
+  assert.equal(d.inhalt.geraete.some((x) => x.benutzerId === tom.id), false, 'seine Geräte sind weg');
+  const k = d.kontoFreigeben(lena.id, max.id, '2026-10-14T10:00:00.000Z');
+  assert.deepEqual([k.freigegebenAm, k.freigegebenVon, k.echterName], ['2026-10-14T10:00:00.000Z', 'Max', 'Lena L.']);
+  assert.equal(d.kontoFreigeben(lena.id, max.id, 'später').freigegebenAm, '2026-10-14T10:00:00.000Z', 'zweimal ändert nichts');
+  assert.deepEqual(Object.keys(d.kontenListe()[0]).sort(), ['am', 'anzeigename', 'echterName', 'freigegebenAm', 'freigegebenVon', 'id'], 'ohne Hashes');
+  d.geraetEntfernen(g.id);
+  assert.equal(d.benutzerVonGeraet(g.id), null);
+});
+
+test('Konten (Anmeldung L1): alte Konten ohne Passwort fallen beim Laden weg, ihre Einträge bleiben', async () => {
+  const o = ordner();
+  const alt = 'aaaaaaaa-0000-4000-8000-000000000001';
+  writeFileSync(path.join(o, 'daten.json'), JSON.stringify({
+    zaehler: 3, welten: [{ id: 'w_1', seed: '7' }], typen: [{ id: 't_1', kategorie: 'Village', variante: null }],
+    instanzen: [{ id: 'i_1', dimensionId: 'd_w_1_overworld', featureTypeId: 't_1', x: 1, y: null, z: 2, quelle: 'manuell',
+      von: 'Max', erstellerId: alt, erledigt: { von: 'Max', erstellerId: alt, am: '2026-10-01' } }],
+    benutzer: [{ id: alt, anzeigename: 'Max', pinHash: 'scrypt:x:y', rolle: 'Besitzer' }],
+    profile: [{ id: 'p_1', benutzerId: alt, geteilt: false }],
+    geraete: [{ id: 'g_1', freigeschaltet: true, typ: 'persoenlich', profilId: 'p_1' }],
+    banner: [{ id: 'b_1', name: 'Alt', basis: 'white', ebenen: [], von: 'Max', erstellerId: alt, am: '2026-09-01' }],
+    sammel: { w_1: { rib: { von: 'Max', erstellerId: alt, am: '2026-09-02' } } },
+  }));
+  const d = new Daten(o);
+  await d.laden();
+  assert.deepEqual([d.inhalt.benutzer, d.inhalt.profile, d.inhalt.geraete], [[], [], []]);
+  assert.deepEqual([d.inhalt.banner[0].von, d.inhalt.banner[0].erstellerId], ['Max', 'unbekannt']);
+  assert.equal(d.inhalt.instanzen[0].erstellerId, 'unbekannt');
+  assert.equal(d.inhalt.instanzen[0].erledigt.erstellerId, 'unbekannt');
+  assert.equal(d.inhalt.sammel.w_1.rib.erstellerId, 'unbekannt');
+  // Zugänge und Anzeige-Geräte sind eigene Sammlungen in daten.db
+  assert.deepEqual([d.inhalt.zugaenge, d.inhalt.anzeigeGeraete], [[], []]);
+  const neu = d.benutzerAnlegen({ echterName: 'Max', anzeigename: 'Max', passwortHash: 'scrypt:a:b', pinHash: 'scrypt:c:d', am: '2026-10-14T08:00:00.000Z' });
+  d.geraetAnlegen(neu.id, '2026-10-14T08:00:00.000Z');
+  d.inhalt.zugaenge.push({ id: 'z_1', code: 'aB3x9', pinHash: 'scrypt:e:f', erstelltVon: neu.id, erstelltAm: 'x', gueltigBis: null });
+  await d.schliessen();
+  const wieder = new Daten(o);
+  await wieder.laden();
+  assert.deepEqual([wieder.inhalt.benutzer.length, wieder.inhalt.geraete.length, wieder.inhalt.zugaenge[0].code], [1, 1, 'aB3x9'], 'neue Konten bleiben');
+  await wieder.schliessen();
+  rmSync(o, { recursive: true, force: true });
+});
+
 test('Speichern und Laden', async () => {
   const o = ordner();
   const d = new Daten(o);

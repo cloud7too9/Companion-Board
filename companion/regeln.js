@@ -413,3 +413,42 @@ const verbindungSauber = (v) => ({
   oberwelt:{ x:v.oberwelt.x, y:v.oberwelt.y ?? null, z:v.oberwelt.z },
   nether:{ x:v.nether.x, y:v.nether.y ?? null, z:v.nether.z },
 });
+
+/* ---- Regeln · Anmeldung (Bauplan „Anmeldung und Dashboard-Zugang“) ------------
+   Konto: echter Name, Anzeigename, Passwort (erste Anmeldung auf einem Gerät, PIN
+   zurücksetzen) und PIN (nach über OFFLINE_MINUTEN.konto ohne Kontakt zum Board).
+   Anzeige-Geräte melden sich mit einem Zugangs-Code (5 Zeichen) und einer eigenen
+   Dashboard-PIN an. Anmeldeseite, Companion und Server prüfen mit diesen Regeln. */
+const KONTO_PIN = /^\d{4,8}$/;                 // eigene PIN, gilt auch für die Dashboard-PIN
+const PASSWORT_MIN = 8;
+const ANZEIGENAME_MAX = 24;
+const ECHTER_NAME_MAX = 60;
+/** Ohne Kontakt zum Board: nach so vielen Minuten fragt das Gerät wieder nach der PIN */
+const OFFLINE_MINUTEN = Object.freeze({ konto:30, anzeige:15 });
+/** Zeichen der Zugangs-Codes: Ziffern, Groß- und Kleinbuchstaben ohne die verwechselbaren 0 O 1 l I → 57 */
+const CODE_ZEICHEN = "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+const CODE_LAENGE = 5;
+/** Eingabe eines Codes: bewusst großzügig, ein vertipptes 0 oder l ist einfach ein falscher Code */
+const ZUGANGS_CODE = /^[0-9A-Za-z]{5}$/;
+/** Gültigkeit beim Erzeugen eines Codes in Minuten, null = dauerhaft; der erste Eintrag ist der Standard */
+const GUELTIGKEITEN = Object.freeze([20, 5, 60, 1440, null]);
+
+/** Anzeigename: Leerraum zusammenziehen, damit „Max “ und „Max“ derselbe Name sind */
+const anzeigenameSauber = (name) => String(name ?? "").trim().replace(/\s+/g, " ");
+function passwortPruefen(passwort){
+  if(typeof passwort !== "string" || passwort.length < PASSWORT_MIN) return `Das Passwort braucht mindestens ${PASSWORT_MIN} Zeichen`;
+  if(passwort.length > 200) return "Das Passwort ist zu lang";
+  return null;
+}
+/** Neues Konto → Fehlertext oder null */
+function kontoPruefen(k){
+  const echt = String(k?.echterName ?? "").trim(), name = anzeigenameSauber(k?.anzeigename);
+  if(!echt) return "Bitte deinen echten Namen eingeben";
+  if(echt.length > ECHTER_NAME_MAX) return `Echter Name ist zu lang (max. ${ECHTER_NAME_MAX} Zeichen)`;
+  if(!name) return "Bitte einen Anzeigenamen eingeben";
+  if(name.length > ANZEIGENAME_MAX) return `Anzeigename ist zu lang (max. ${ANZEIGENAME_MAX} Zeichen)`;
+  return passwortPruefen(k.passwort) || (KONTO_PIN.test(String(k.pin ?? "")) ? null : "Deine PIN hat 4 bis 8 Ziffern");
+}
+/** Gültigkeit aus der Auswahl: Minuten oder null (dauerhaft) → Fehlertext oder null */
+const gueltigkeitPruefen = (minuten) => minuten === null || (Number.isInteger(minuten) && minuten > 0 && minuten <= 60 * 24 * 365)
+  ? null : "Ungültige Gültigkeit";

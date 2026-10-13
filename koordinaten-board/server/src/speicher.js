@@ -6,7 +6,7 @@
 import { DatabaseSync } from 'node:sqlite';
 
 /** Sammlungen aus daten.js, die als Zeilen gespeichert werden (sammel als weltId|objektId) */
-export const SAMMLUNGEN = ['benutzer', 'profile', 'geraete', 'welten', 'typen', 'instanzen', 'sammel', 'banner', 'ruestung', 'portale', 'anzeigen'];
+export const SAMMLUNGEN = ['benutzer', 'profile', 'geraete', 'welten', 'typen', 'instanzen', 'sammel', 'banner', 'ruestung', 'portale', 'anzeigen', 'zugaenge', 'anzeigeGeraete'];
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS werte (name TEXT PRIMARY KEY, wert TEXT NOT NULL);

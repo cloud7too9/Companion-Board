@@ -31,10 +31,13 @@ const fehler = (status, message) => { throw new DatenFehler(status, message); };
 const STANDARD_EINSTELLUNGEN = { titel: 'Unsere Welt', qrZeigen: true, aktiveWelt: null };
 const leer = () => ({
   zaehler: 0,
-  // Identität (Strang B): stabile Benutzer, Profile und Geräte. Gefüllt werden sie mit den Accounts (B2).
-  benutzer: [],      // { id, anzeigename, pinHash, rolle:"Besitzer" }
+  // Identität (Strang B, Bauplan „Anmeldung“): Konten mit Passwort und PIN, Profile und Geräte. Feldnamen wie im
+  // Referenzschema (planung/schema/): benutzer, geraete, zugaenge, anzeige_geraete.
+  benutzer: [],      // { id, echterName, anzeigename, passwortHash, pinHash, pinGeaendertAm, freigegebenAm|null, freigegebenVon|null, rolle:"Besitzer", am }
   profile: [],       // { id, benutzerId, geteilt }
-  geraete: [],       // { id, freigeschaltet, typ:"persoenlich"|"geteilt", profilId }
+  geraete: [],       // { id, benutzerId, freigeschaltet, typ:"persoenlich"|"geteilt", profilId, freigeschaltetAm, letzterKontakt, pinBestaetigtAm, am }
+  zugaenge: [],      // Dashboard-Zugänge: { id, code, pinHash, erstelltVon|null, erstelltAm, gueltigBis|null }
+  anzeigeGeraete: [],// per Dashboard-Login angemeldete Anzeigen: { id, zugangId, anzeigeId|null, letzterKontakt }
   welten: [],        // { id, seed }
   typen: [],         // { id, kategorie, variante|null }   – welt-übergreifend
   instanzen: [],     // { id, dimensionId, featureTypeId, x, y|null, z, quelle, angeheftet, erledigt?:{ von, am }|null, von, am, geaendert? }
@@ -105,6 +108,7 @@ export class Daten {
       this.version = speicher.aenderungsNr();
     }
     this.erstellerNachtragen();
+    this.kontenUmstellen();
     this.anzeigenSicherstellen();
   }
 
@@ -142,6 +146,20 @@ export class Daten {
     for (const name of MIT_ERSTELLER) this.inhalt[name].forEach(nachtragen);
     for (const status of Object.values(this.inhalt.sammel)) Object.values(status).forEach(nachtragen);
     if (geaendert) this.speichernVerzoegert();
+  }
+
+  /** Bauplan „Anmeldung“ (L16): Konten von vor der Anmeldung mit Passwort fallen weg, samt Profilen und Geräten.
+      Alle legen sich neu an; was die alten Konten eingetragen haben, bleibt stehen (Ersteller „unbekannt“). */
+  kontenUmstellen() {
+    const alt = this.inhalt.benutzer.filter((b) => !b.passwortHash).map((b) => b.id);
+    this.kontenEntfernen(alt);
+    const bekannt = new Set(this.inhalt.benutzer.map((b) => b.id));
+    const geraete = this.inhalt.geraete.filter((g) => bekannt.has(g.benutzerId));   // auch Geräte ohne Konto
+    if (geraete.length !== this.inhalt.geraete.length) {
+      this.inhalt.geraete = geraete;
+      this.speichernVerzoegert();
+    }
+    if (alt.length) console.log(`  ${alt.length} alte Konten ohne Passwort entfernt – alle legen sich auf der Anmeldeseite neu an.`);
   }
 
   /** Biome kommen nur noch aus dem Welt-Import (regeln.js): alte Biom-Punkte aus Screenshots
@@ -626,50 +644,121 @@ export class Daten {
     return soll.length === ist.length && timingSafeEqual(soll, ist) ? kopie(a) : null;
   }
 
-  // ---------- Identität: Benutzer, Profile, Geräte (B2, Abläufe in identitaet.js) ----------
+  // ---------- Konten und Geräte (Bauplan „Anmeldung“, Abläufe in identitaet.js) ----------
 
-  /** Accounts zum Auswählen beim Beitreten – ohne PIN-Hash */
-  benutzerListe() {
-    return this.inhalt.benutzer.map((b) => ({ id: b.id, name: b.anzeigename }));
+  /** Alle Konten ohne Hashes, mit echtem Namen (sichtbar für alle Konten, L18) */
+  kontenListe() {
+    const name = (id) => this.benutzer(id)?.anzeigename ?? null;
+    return this.inhalt.benutzer.map((b) => ({
+      id: b.id, anzeigename: b.anzeigename, echterName: b.echterName, am: b.am,
+      freigegebenAm: b.freigegebenAm ?? null, freigegebenVon: b.freigegebenVon ? name(b.freigegebenVon) : null,
+    }));
   }
 
   benutzer(id) {
     return this.inhalt.benutzer.find((b) => b.id === id) ?? null;
   }
 
-  /** Account zu einem Namen, ohne Groß-/Kleinschreibung (der Name ist nur Anzeige, aber eindeutig) */
+  /** Konto zu einem Anzeigenamen, ohne Groß-/Kleinschreibung (der Name ist eindeutig) */
   benutzerMitName(name) {
-    const gesucht = String(name).trim().toLocaleLowerCase('de');
+    const gesucht = regeln.anzeigenameSauber(name).toLocaleLowerCase('de');
     return this.inhalt.benutzer.find((b) => b.anzeigename.toLocaleLowerCase('de') === gesucht) ?? null;
   }
 
-  benutzerAnlegen({ anzeigename, pinHash }) {
+  /** Neues Konto. Es wartet auf Freigabe (L19) – außer es ist das erste: dann gibt es niemanden, der freigeben könnte (⚠ AN14). */
+  benutzerAnlegen({ echterName, anzeigename, passwortHash, pinHash, am }) {
     if (this.benutzerMitName(anzeigename)) fehler(409, `Den Namen „${anzeigename}“ gibt es schon`);
-    const b = { id: randomUUID(), anzeigename, pinHash, rolle: 'Besitzer', am: new Date().toISOString() };
+    const erstes = !this.inhalt.benutzer.some((b) => b.freigegebenAm);
+    const b = {
+      id: randomUUID(), echterName, anzeigename, passwortHash, pinHash, pinGeaendertAm: am,
+      freigegebenAm: erstes ? am : null, freigegebenVon: null, rolle: 'Besitzer', am,
+    };
     this.inhalt.benutzer.push(b);
     this.speichernVerzoegert();
     return kopie(b);
   }
 
-  /** Neues freigeschaltetes Gerät für einen Account; ein persönliches Profil entsteht beim ersten Gerät */
-  geraetAnlegen(benutzerId, typ = 'persoenlich') {
+  benutzerAendern(id, felder) {
+    const b = this.benutzer(id) ?? fehler(404, 'Konto unbekannt');
+    Object.assign(b, felder);
+    this.speichernVerzoegert();
+    return kopie(b);
+  }
+
+  /** Wartendes Konto freigeben; ein schon freigegebenes bleibt, wie es ist */
+  kontoFreigeben(id, vonId, am) {
+    const b = this.benutzer(id) ?? fehler(404, 'Konto unbekannt');
+    if (!b.freigegebenAm) {
+      Object.assign(b, { freigegebenAm: am, freigegebenVon: vonId });
+      this.speichernVerzoegert();
+    }
+    return this.kontenListe().find((k) => k.id === id);
+  }
+
+  /** Wartendes Konto ablehnen = löschen (nur solange es wartet) */
+  kontoAblehnen(id) {
+    const b = this.benutzer(id) ?? fehler(404, 'Konto unbekannt');
+    if (b.freigegebenAm) fehler(409, 'Nur wartende Konten lassen sich ablehnen');
+    this.kontenEntfernen([id]);
+  }
+
+  /** Konten samt Profilen und Geräten entfernen. Ihre Einträge bleiben, der Ersteller wird „unbekannt“,
+      der Name in `von` bleibt stehen (wie im Referenzschema: ON DELETE SET NULL). */
+  kontenEntfernen(ids) {
+    if (!ids.length) return;
+    const weg = new Set(ids);
+    const profile = new Set(this.inhalt.profile.filter((p) => weg.has(p.benutzerId)).map((p) => p.id));
+    this.inhalt.benutzer = this.inhalt.benutzer.filter((b) => !weg.has(b.id));
+    this.inhalt.profile = this.inhalt.profile.filter((p) => !profile.has(p.id));
+    this.inhalt.geraete = this.inhalt.geraete.filter((g) => !weg.has(g.benutzerId) && !profile.has(g.profilId));
+    const unbekannt = (e) => { if (e && weg.has(e.erstellerId)) e.erstellerId = ERSTELLER_UNBEKANNT; };
+    for (const name of MIT_ERSTELLER) this.inhalt[name].forEach(unbekannt);
+    this.inhalt.instanzen.forEach((i) => unbekannt(i.erledigt));
+    for (const status of Object.values(this.inhalt.sammel)) Object.values(status).forEach(unbekannt);
+    for (const z of this.inhalt.zugaenge) if (weg.has(z.erstelltVon)) z.erstelltVon = null;
+    this.speichernVerzoegert();
+  }
+
+  /** Neues Gerät bei der ersten Anmeldung mit Passwort; ein persönliches Profil entsteht beim ersten Gerät */
+  geraetAnlegen(benutzerId, am, typ = 'persoenlich') {
     let profil = this.inhalt.profile.find((p) => p.benutzerId === benutzerId && !p.geteilt);
     if (!profil) {
       profil = { id: randomUUID(), benutzerId, geteilt: false };
       this.inhalt.profile.push(profil);
     }
-    const g = { id: randomUUID(), freigeschaltet: true, typ, profilId: profil.id, am: new Date().toISOString() };
+    const g = {
+      id: randomUUID(), benutzerId, freigeschaltet: true, typ, profilId: profil.id,
+      freigeschaltetAm: am, letzterKontakt: am, pinBestaetigtAm: am, am,
+    };
     this.inhalt.geraete.push(g);
     this.speichernVerzoegert();
     return kopie(g);
   }
 
-  /** Account hinter einem freigeschalteten Gerät, sonst null */
+  geraet(id) {
+    const g = this.inhalt.geraete.find((x) => x.id === id);
+    return g ? kopie(g) : null;
+  }
+
+  /** Felder eines Geräts setzen (letzterKontakt, pinBestaetigtAm); unbekanntes Gerät → null */
+  geraetAendern(id, felder) {
+    const g = this.inhalt.geraete.find((x) => x.id === id);
+    if (!g) return null;
+    Object.assign(g, felder);
+    this.speichernVerzoegert();
+    return kopie(g);
+  }
+
+  geraetEntfernen(id) {
+    const vorher = this.inhalt.geraete.length;
+    this.inhalt.geraete = this.inhalt.geraete.filter((g) => g.id !== id);
+    if (this.inhalt.geraete.length !== vorher) this.speichernVerzoegert();
+  }
+
+  /** Konto hinter einem freigeschalteten Gerät, sonst null */
   benutzerVonGeraet(geraetId) {
     const g = this.inhalt.geraete.find((x) => x.id === geraetId);
-    if (!g?.freigeschaltet) return null;
-    const profil = this.inhalt.profile.find((p) => p.id === g.profilId);
-    return profil ? this.benutzer(profil.benutzerId) : null;
+    return g?.freigeschaltet ? this.benutzer(g.benutzerId) : null;
   }
 
   // ---------- Einstellungen der Anzeige ----------
