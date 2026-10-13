@@ -1,5 +1,6 @@
 import type { Block, Dimension, Karte } from "../karte.types";
 import { zahl } from "../lib/zahl";
+import { kennblockDatei } from "../lib/kennbloecke";
 
 const DIM_NAME: Record<Dimension, string> = { oberwelt: "Oberwelt", nether: "Nether", ende: "End" };
 
@@ -53,15 +54,22 @@ export function KarteAnsicht({ karte, gross = false, ohneTitel = false }: {
 }) {
   const bild = karte.bloecke.find((b): b is Extract<Block, { art: "bild" }> => b.art === "bild");
   const uebrige = karte.bloecke.filter((b) => b.art !== "bild");
+  // Kennblock der Struktur (Seed-Map-Typ) neben dem Titel, wie auf der alten Anzeige (Bauplan „Sitzung“, S2)
+  const kennblock = kennblockDatei(karte.typ);
   return (
     <article
       data-testid="karte"
       data-dimension={karte.dimension ?? undefined}
       className={["flex h-full min-h-0 flex-col gap-[0.5em] overflow-hidden", gross ? "text-base sm:text-lg" : "karte-schrift"].join(" ")}
     >
-      <header className="min-w-0">
-        <h3 className={ohneTitel ? "sr-only" : "truncate font-semibold leading-tight"}>{karte.titel}</h3>
-        {karte.unter && <p className="truncate text-[0.8em] text-text-muted">{karte.unter}</p>}
+      <header className="flex min-w-0 items-center gap-[0.5em]">
+        {kennblock && (
+          <img src={kennblock} alt="" className="kennblock h-[2.2em] w-[2.2em] shrink-0 rounded-sm" style={{ imageRendering: "pixelated" }} data-testid="kennblock" />
+        )}
+        <div className="min-w-0">
+          <h3 className={ohneTitel ? "sr-only" : "truncate font-semibold leading-tight"}>{karte.titel}</h3>
+          {karte.unter && <p className="truncate text-[0.8em] text-text-muted">{karte.unter}</p>}
+        </div>
       </header>
       <div className="flex min-h-0 flex-1 gap-[0.7em]">
         {bild && (

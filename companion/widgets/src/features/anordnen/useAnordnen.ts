@@ -71,7 +71,10 @@ export function useAnordnen(anzeigeId: string | null, token: string | null) {
         layer: data.layers.map(({ id, name, instanzen }) => ({ id, name, instanzen })),
         aktiverLayer: data.activeLayerId,
       });
-      zuletzt.current = JSON.stringify(a.layout);
+      // Hat das Board Layer weggelassen (leere Sitzung, Bauplan „Sitzung“), lädt der nächste GET das Layout neu
+      const gesendet = data.layers.map((l) => l.id).join();
+      const bestaetigt = (a.layout?.layer ?? []).map((l) => l.id).join();
+      zuletzt.current = gesendet === bestaetigt ? JSON.stringify(a.layout) : "";
       uebernehmen(a);
       if (!offen.current) setSpeichern("gespeichert");
     } catch (f) {

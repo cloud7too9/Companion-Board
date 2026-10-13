@@ -18,7 +18,7 @@
 - **Umbau Netlify + Pi (`UMBAUPLAN.md`), Phasen 1–5 gebaut** (05.10.2026): Server abgesichert (Anzeige nur mit Link, `HOST`, `CF-Connecting-IP`, CORS, 6-stellige PIN), API-Adresse konfigurierbar (`konfig.js`, `VITE_API_URL`), Texterkennung am Handy (`texterkennung.js`, tesseract.js im Browser), SQLite (`daten.db`, `speicher.js`), Netlify-Build mit PWA (`netlify.toml`, `sw.js`). **Für Max:** neue 6-stellige PIN (QR-Code neu scannen); der Kiosk öffnet die Anzeige über `server/daten/anzeige-link.txt`; der Server braucht Node 22.13+; `daten.json` wird beim ersten Start nach `daten.db` übernommen.
 - **Als Nächstes** (Kapitel 9):
   0. ~~**Umbau**~~ **abgeschlossen (13.10.2026):** Phasen 1–6 sind gebaut und in Betrieb: Pi, Tunnel, Domain `mainhubv1.com`, Probe über Mobilfunk bestanden, Netlify-Probe (H8) bestanden. Aufgeräumt (E18): `netzwerk.js`, Adress-Lernen, Start- und Firewall-Skripte sind entfernt; ohne `OEFFENTLICHE_URL` gilt `localhost`. Die Einrichtung steht in `koordinaten-board/pi/ANLEITUNG.md`. Offen bleibt nur die Startseite der Domain (E20).
-  1. **Bauplan „Sitzung“** (E16) ist abgenommen: [`bauplaene/Bauplan-Sitzung.md`](bauplaene/Bauplan-Sitzung.md) (13.10.2026). Das Dashboard wird die einzige Anzeige. **S1 (Sitzung am Server) ist gebaut** (13.10.2026): `sitzung.js`, `companion/widget-groessen.mjs` gemeinsam für Server und Dashboard, `zeigen` mit Quelle, `portale.verbindung`. Nächster Schritt: **S2** (Handy und Dashboard).
+  1. **Bauplan „Sitzung“** (E16) ist abgenommen: [`bauplaene/Bauplan-Sitzung.md`](bauplaene/Bauplan-Sitzung.md) (13.10.2026). Das Dashboard wird die einzige Anzeige. **S1 und S2 sind gebaut** (13.10.2026): Sitzung am Server (`sitzung.js`, `companion/widget-groessen.mjs` gemeinsam), die Companion schickt für „Aufs Board“ nur noch die Quelle, der Zustand der Knöpfe und die Liste im Board-Sheet kommen aus der Sitzung, das Dashboard zeigt Kennblock und Absender, der Sitzungs-Layer ist gegen Hinzufügen/Löschen/Umbenennen gesperrt. Bis S4 schickt der Server die Karte als Brücke weiter an die alte Anzeige. Nächster Schritt: **S3** (Widgets der Anzeige: Beitreten, Orte, Spieler, Zuletzt), danach ⏸ H9.
   2. **Offline B3–B5**, neu zugeschnitten (13.10.2026): N5 ist hinfällig, HTTPS kommt von Netlify/Cloudflare. B3 = Live-Modus ohne Netz, IndexedDB, Nachladen über `/api/aenderungen` (Nachtrag im Offline-Bauplan).
   3. A7 (Größenstufen je Widget): Planungsrunde mit Max
   4. Inhalte, die noch nicht beschrieben sind (Warteliste, Kapitel 4)
@@ -33,6 +33,7 @@
 | PR | Inhalt |
 |---|---|
 | #13 | Bauplan „Sitzung und eine Anzeige“ (abgenommen), Offline neu zugeschnitten (N5 hinfällig), Checkliste Pi/Cloudflare, Fix „Fertig“ in Anordnen |
+| #15 | S2 Handy und Dashboard: „Aufs Board“ mit Quelle, Sitzung im Board-Sheet, Kennblock und Absender-Chip im Dashboard, Sitzungs-Layer gesperrt, Brücke `gezeigt` bis S4; Playwright-Tests zu „Aufs Board“ laufen live vom Board |
 | #14 | S1 Sitzung am Server: `sitzung.js`, `companion/widget-groessen.mjs` gemeinsam für Server und Dashboard, „Aufs Board“ mit Quelle, `portale.verbindung` |
 | #12 | Umbau abgeschlossen: Netlify-Probe (H8) und Phase 6 abgehakt, Domain `mainhubv1.com` statt Platzhalter, Betrieb vom Laptop aus entfernt (E18: `netzwerk.js`, Adress-Lernen, Start- und Firewall-Skripte), Entscheidungen zu `/app/` (Prototyp = Hauptstand) und Anzeigegerät (offen) festgehalten, E20 (Startseite) neu auf der Warteliste |
 
@@ -219,7 +220,7 @@ Voraussetzungen für die Playwright-Tests:
 ## 9. Nächste Schritte
 
 0. ~~**Umbau auf Netlify + Raspberry Pi**~~ **abgeschlossen (13.10.2026)**, siehe `UMBAUPLAN.md`: Phasen 1–6 in Betrieb unter `mainhubv1.com`, Aufräumen erledigt (E18). Entschieden: `/app/` bekommt den Prototyp, der Prototyp ist der Hauptstand; das Anzeigegerät bleibt offen (technisch egal). Noch zu entscheiden: die Startseite der Domain (E20, Anzeige oder Dashboard).
-1. **Bauplan „Sitzung“ (E16)** ist abgenommen: `bauplaene/Bauplan-Sitzung.md` (13.10.2026, alle fünf Fragen entschieden). S1 ist gebaut (13.10.2026), jetzt S2–S4 je auf eigenem Branch, Haltepunkte H9 und H10. Fest stand vorher:
+1. **Bauplan „Sitzung“ (E16)** ist abgenommen: `bauplaene/Bauplan-Sitzung.md` (13.10.2026, alle fünf Fragen entschieden). S1 und S2 sind gebaut (13.10.2026), jetzt S3 und S4 je auf eigenem Branch, Haltepunkte H9 und H10. Fest stand vorher:
    - Die Sitzung lebt, solange das Board läuft. Ein Neustart beginnt leer; das gespeicherte Layout der Anzeige (A6) bleibt.
    - Inhalte lassen sich während der Laufzeit live ändern.
    - „Aufs Board“ fügt den Inhalt als **Widget an der ersten freien Stelle** ein (Größe aus dem Größen-Vertrag, Passt-Prüfung aus A2). Am Handy lässt er sich in „Anzeige anordnen“ verschieben oder entfernen.

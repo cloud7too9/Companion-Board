@@ -3,6 +3,7 @@ import { WorkspaceGrid } from "../features/workspace/components/WorkspaceGrid";
 import { AddPanelModal } from "../features/workspace/components/AddPanelModal";
 import { LayerSwitcher } from "../features/workspace/components/LayerSwitcher";
 import { selectActiveLayer, useWorkspaceStore } from "../features/workspace/model/workspace.store";
+import { SITZUNG_LAYER } from "../features/workspace/model/widget-struktur";
 import { widgetTyp } from "../features/workspace/model/widget-register";
 import { stufeVon } from "../features/workspace/model/widget-vertrag";
 import { PanelToolbar } from "../features/workspace/components/PanelToolbar";
@@ -44,6 +45,7 @@ export function AnordnenPage({ anzeigeId }: { anzeigeId: string | null }) {
   const { status, speichern, vollbildSetzen } = useAnordnen(anzeigeId, verbindung?.token ?? null);
   const openAddPanel = useWorkspaceStore((s) => s.openAddPanel);
   const instanzen = useWorkspaceStore((s) => selectActiveLayer(s).instanzen);
+  const sitzungAktiv = useWorkspaceStore((s) => selectActiveLayer(s).id === SITZUNG_LAYER);
   const selectedPanelId = useWorkspaceStore((s) => s.selectedPanelId);
 
   // Als Steuerung mit dem Token der Companion: Quellen in der Galerie, „geaendert“ über /ws
@@ -81,7 +83,8 @@ export function AnordnenPage({ anzeigeId }: { anzeigeId: string | null }) {
             {speichern === "gespeichert" ? "Liegt auf der Anzeige" : speichern === "speichert" ? "Speichert …" : `Nicht gespeichert: ${speichern.fehler}`}
           </span>
           <div className="ml-auto flex items-center gap-2">
-            <Button variant="primary" onClick={openAddPanel} disabled={!bereit}>+ Widget</Button>
+            <Button variant="primary" onClick={openAddPanel} disabled={!bereit || sitzungAktiv}
+              title={sitzungAktiv ? "In die Sitzung kommen Inhalte über „Aufs Board“ in der Companion" : undefined}>+ Widget</Button>
           </div>
         </div>
         {vollbildWidget && (

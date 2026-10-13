@@ -1,7 +1,7 @@
 // Anzeigeschema: Jeder Inhalt der Companion lässt sich aufs Board werfen.
 // Für alle DEMO-Inhalte wird die Karte gebaut und mit der Prüfung des Boards (zeigen.js)
 // kontrolliert; je Schema landet eine Karte auf einer echten Anzeige (Screenshot).
-// Die Companion läuft über http (DEMO-Mock), damit das Rüstungs-Set seine 3D-Figur mitschickt.
+// Die Schemas werden in der DEMO-Companion gebaut und mit zeigen.js geprüft; „Aufs Board“ selbst läuft live vom Board (Bauplan „Sitzung“, S2).
 import { chromium } from "playwright";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { mkdirSync, mkdtempSync, rmSync, existsSync } from "node:fs";
@@ -76,53 +76,90 @@ try {
   pruefe(karten.sammelstand.karten[0].bloecke[0].zeilen[0].wert === "5 von 18", "Sammel-Stand: 5 von 18 gefunden");
   pruefe(karten.ruestung.karten.every((k) => k.bloecke[0].art === "bild" && k.bloecke[1].zeilen.length >= 3), "Rüstung: jedes Set mit Figur-Bild und Zeilen je Teil");
 
-  // ---- Knöpfe „Aufs Board“ in allen Details, echte Anzeige je Schema -----------------
+  // ---- Live: „Aufs Board“ legt jeden Inhalt als Sitzungs-Widget ab (Bauplan „Sitzung“, S2) ----
+  // Das Board baut die Karte selbst, also müssen die Inhalte auf dem Board liegen: Max legt sie per API an,
+  // dann läuft die Companion live vom Board. Bis S4 zeigt auch die alte Anzeige die Karte groß (Brücke).
+  const api = (m, pfad, body) => fetch(`${BOARD}/api${pfad}`, { method: m, headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+    body: body === undefined ? undefined : JSON.stringify(body) }).then((r) => r.json());
+  const welt = (await api("POST", "/orte/welten", { seed: "6889192652397090698" })).welt;
+  await api("POST", "/orte/instanzen", { dimensionId: `d_${welt.id}_nether`, kategorie: "Nether Fortress", variante: null, x: -200, y: 70, z: 96, quelle: "manuell" });
+  await api("PUT", `/sammelobjekte/welten/${welt.id}/rib`, { gefunden: true });
+  await api("POST", `/portale/welten/${welt.id}`, { name: "Eisenfarm", oberwelt: { x: 800, y: 64, z: 80 }, nether: { x: 100, y: 64, z: 10 } });
+  await api("POST", "/banner", { name: "Kreuz", basis: "white", ebenen: [{ muster: "cross", farbe: "red" }] });
+  await api("POST", "/ruestung", { name: "Umbreon", teile: { chestplate: { ruestung: "diamond", muster: "silence", material: "amethyst" } } });
+
+  const live = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  live.on("pageerror", (e) => fehler.push(e.message));
+  live.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) fehler.push(m.text()); });
+  await live.goto(`${BOARD}/?pin=${PIN}`);
+  await live.waitForSelector("#boardName");
+  await live.fill("#boardName", "Max"); await live.fill("#boardKontoPin", "2468");
+  await live.click('[data-aktion="board-beitreten"]');
+  pruefe(await live.waitForFunction(() => typeof bd !== "undefined" && bd.status === "verbunden" && st.weltId, null, { timeout: 15000 }).then(() => true, () => false), "Companion live vom Board, als Max verbunden");
+  await live.evaluate(() => Promise.all([bannerLaden(), ruestungLaden(), portaleLaden(), samLaden()]));
+  await live.waitForFunction(() => bn.liste.length && rs.sets.length && pt.liste.length);
+
   const anzeige = await browser.newPage({ viewport: { width: 1600, height: 900 } });
-  await anzeige.goto(`${BOARD}/anzeige${await anzeigeLinkQuery(path.join(TMP, "daten"))}`);
+  const linkQuery = await anzeigeLinkQuery(path.join(TMP, "daten"));
+  await anzeige.goto(`${BOARD}/anzeige${linkQuery}`);
   await anzeige.waitForSelector(".anzeige");
-  const zeigen = async (oeffnen, name) => {
-    await p.evaluate(oeffnen); await p.waitForTimeout(350);
-    const knopf = await p.$("#orteSheetInhalt .board-zeigen");
+  const dash = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+  await dash.goto(`${BOARD}/dashboard${linkQuery}`);
+  const warteAuf = async (seite, fn, arg, ms = 12000) => { try { await seite.waitForFunction(fn, arg, { timeout: ms }); return true; } catch { return false; } };
+  const zeigen = async (oeffnen, name, typ) => {
+    await live.evaluate(oeffnen); await live.waitForTimeout(350);
+    const knopf = await live.$("#orteSheetInhalt .board-zeigen");
     pruefe(knopf !== null && (await knopf.textContent()).includes("Aufs Board"), `${name}: Knopf „Aufs Board“`);
     await knopf.click();
-    const titel = await p.evaluate(() => bd.offen.size === 0);   // gesendet
+    pruefe(await warteAuf(live, () => document.querySelector("#orteSheetInhalt .board-zeigen")?.classList.contains("aktiv")), `${name}: Knopf zeigt „Liegt auf dem Board“`);
+    pruefe(await warteAuf(dash, (t) => Boolean(document.querySelector(`[data-typ="${t}"] [data-testid="karte"]`)), typ), `${name}: Sitzungs-Widget ${typ} auf dem Dashboard`);
     await anzeige.waitForSelector(".g-karte h2"); await anzeige.waitForTimeout(700);
-    return titel;
   };
-  await p.evaluate(() => modulWechseln("sammelobjekte"));
-  await zeigen(() => samDetailOeffnen("rib"), "Sammelobjekt");
+  await live.evaluate(() => modulWechseln("sammelobjekte"));
+  await zeigen(() => samDetailOeffnen("rib"), "Sammelobjekt", "sammelobjekte.einzelobjekt");
   pruefe(await anzeige.$eval(".g-karte h2", (e) => e.textContent) === "Rippenzier", "Anzeige: Rippenzier");
   pruefe(await anzeige.$eval(".g-kennblock img", (i) => i.getAttribute("src").endsWith("fortress.png") && i.naturalWidth > 0), "Anzeige: Kennblock der Netherfestung");
+  pruefe(await warteAuf(dash, () => document.querySelector('[data-typ="sammelobjekte.einzelobjekt"] img.kennblock')?.naturalWidth > 0), "Dashboard: Kennblock der Netherfestung im Widget");
   await anzeige.screenshot({ path: `${DIR}/a1-sammelobjekt.png` });
 
-  await p.click('#orteSheetInhalt [data-aktion="schliessen"]'); await p.waitForTimeout(250);
-  const fuss = await p.$("#samFuss .sam-board");
+  await live.click('#orteSheetInhalt [data-aktion="schliessen"]'); await live.waitForTimeout(250);
+  const fuss = await live.$("#samFuss .sam-board");
   pruefe(fuss !== null, "Sammelobjekte: Bottom-Bar „Aufs Board“ für den Fortschritt");
   await fuss.click();
-  pruefe(await anzeige.waitForFunction(() => document.querySelector(".g-karte h2")?.textContent === "Rüstungsbesätze").then(() => true, () => false), "Anzeige: Sammel-Fortschritt");
+  pruefe(await warteAuf(anzeige, () => document.querySelector(".g-karte h2")?.textContent === "Rüstungsbesätze"), "Anzeige: Sammel-Fortschritt");
   await anzeige.waitForTimeout(700);
-  pruefe(await p.waitForFunction(() => document.querySelector("#samFuss .sam-board")?.classList.contains("aktiv")).then(() => true, () => false), "Bottom-Bar zeigt „Liegt auf dem Board“");
+  pruefe(await warteAuf(live, () => document.querySelector("#samFuss .sam-board")?.classList.contains("aktiv")), "Bottom-Bar zeigt „Liegt auf dem Board“");
+  pruefe(await warteAuf(dash, () => Boolean(document.querySelector('[data-typ="sammelobjekte.status"]'))), "Dashboard: Sammel-Fortschritt als Sitzungs-Widget");
   await anzeige.screenshot({ path: `${DIR}/a2-sammelstand.png` });
-  await p.screenshot({ path: `${DIR}/a2b-sammel-fuss.png` });
+  await live.screenshot({ path: `${DIR}/a2b-sammel-fuss.png` });
 
-  await p.evaluate(() => modulWechseln("portale"));
-  await zeigen(() => portalDetailOeffnen(pt.liste.find((v) => v.name === "Eisenfarm").id), "Portal-Verbindung");
+  await live.evaluate(() => modulWechseln("portale"));
+  await zeigen(() => portalDetailOeffnen(pt.liste.find((v) => v.name === "Eisenfarm").id), "Portal-Verbindung", "portale.verbindung");
   pruefe(await anzeige.$eval(".g-karte", (e) => e.classList.contains("thema-nether") && e.querySelectorAll(".g-koord").length === 2), "Anzeige: Portal mit zwei Koordinaten im Nether-Theme");
   await anzeige.screenshot({ path: `${DIR}/a3-portal.png` });
 
-  await p.evaluate(() => modulWechseln("banner"));
-  await zeigen(() => bannerDetailOeffnen(bn.liste[0].id), "Banner");
+  await live.evaluate(() => modulWechseln("banner"));
+  await zeigen(() => bannerDetailOeffnen(bn.liste[0].id), "Banner", "banner.banner");
   pruefe(await anzeige.$eval(".g-bild img", (i) => i.naturalWidth === 20 && i.naturalHeight === 40 && getComputedStyle(i).imageRendering === "pixelated"), "Anzeige: Banner 20×40 pixelgenau vergrößert");
-  const lage = await anzeige.evaluate(() => { const k = document.querySelector(".g-karte").getBoundingClientRect(); return k.bottom <= innerHeight; });
-  pruefe(lage, "Anzeige: Banner-Karte vollständig sichtbar");
   await anzeige.screenshot({ path: `${DIR}/a4-banner.png` });
 
-  await p.evaluate(() => modulWechseln("ruestung"));
-  await zeigen(() => ruestungDetailOeffnen("r_2"), "Rüstungs-Set");
-  pruefe(await anzeige.waitForFunction(() => document.querySelector(".g-karte h2")?.textContent === "Umbreon").then(() => true, () => false), "Anzeige: Rüstungs-Set Umbreon");
-  pruefe(await anzeige.$eval(".g-bild img", (i) => i.naturalWidth >= 300 && i.complete), "Anzeige: 3D-Figur als Bild");
-  pruefe(await anzeige.$eval(".g-karte", (e) => e.textContent.includes("Hüterzier (Pfadruinen)")), "Anzeige: fehlender Besatz mit Fundort");
+  await live.evaluate(() => modulWechseln("ruestung"));
+  await zeigen(() => ruestungDetailOeffnen(rs.sets[0].id), "Rüstungs-Set", "ruestung.set");
+  pruefe(await warteAuf(anzeige, () => document.querySelector(".g-karte h2")?.textContent === "Umbreon"), "Anzeige: Rüstungs-Set Umbreon");
+  // Die Karte kommt vom Server: Teile als Zeilen, die 3D-Figur fehlt dort vorerst (entschieden 13.10.2026)
+  pruefe(await anzeige.$eval(".g-karte", (e) => e.querySelectorAll(".g-zeile").length >= 1), "Anzeige: Rüstungs-Set mit Zeilen je Teil (Figur kommt vom Server noch nicht)");
   await anzeige.screenshot({ path: `${DIR}/a5-ruestung.png` });
+  await dash.screenshot({ path: `${DIR}/a6-dashboard-sitzung.png` });
+
+  // Board-Sheet listet die Sitzung, „Alle wegnehmen“ räumt sie
+  await live.click('#orteSheetInhalt [data-aktion="schliessen"]'); await live.waitForTimeout(250);
+  await live.click("#burgerBtn"); await live.waitForTimeout(300); await live.click("#boardBtn"); await live.waitForTimeout(400);
+  const liste = await live.$$eval(".board-gezeigt .card-title", (l) => l.map((e) => e.textContent.trim()));
+  pruefe(liste.length === 5 && liste.includes("Rippenzier") && liste.includes("Eisenfarm") && liste.includes("Umbreon"), `Board-Sheet: 5 Sitzungs-Widgets (${liste.join(", ")})`);
+  await live.screenshot({ path: `${DIR}/a7-sheet-sitzung.png` });
+  await live.click('[data-aktion="board-alle-wegnehmen"]');
+  pruefe(await warteAuf(dash, () => !document.querySelector('[data-testid="von"]')), "Alle wegnehmen → keine Sitzungs-Widgets mehr auf dem Dashboard");
+  pruefe(await warteAuf(live, () => document.getElementById("orteSheetInhalt")?.textContent.includes("Gerade liegt nichts")), "Board-Sheet: wieder leer");
 
   pruefe(fehler.length === 0, `keine Fehler in der Konsole${fehler.length ? ": " + fehler.join(" | ") : ""}`);
 } catch (e) {

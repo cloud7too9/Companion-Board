@@ -2898,7 +2898,7 @@ function samFussRendern(){
 }
 document.getElementById("samFuss").addEventListener("click", (e) => {
   const k = e.target.closest("[data-board-quelle]"); if(!k) return;
-  k.dataset.aktion === "board-wegnehmen" ? boardWegnehmen() : boardZeigen(k.dataset.boardQuelle);
+  k.dataset.aktion === "board-wegnehmen" ? boardWegnehmen(k.dataset.instanz) : boardZeigen(k.dataset.boardQuelle);
 });
 
 /* ---- Reiter: Rüstungsbesätze + weitere Arten (Wunsch von Max, 05.10.2026) --------------------
@@ -3682,21 +3682,22 @@ document.getElementById("portalWeltBtn").addEventListener("click", () => weltOef
    für alle Daten. Das Board ist dann immer BOARD_ADRESSE (konfig.js, sonst location.origin) – ohne Scanner, die
    PIN kommt aus dem QR-Code (?pin=…), den die Kamera-App geöffnet hat.
 
-   „Aufs Board“ (Inhalte auf die Anzeige werfen), über dieselbe Verbindung:
-     → { art:"zeigen", karte, anfrage }       ← { art:"ok"|"fehler", anfrage }
-     → { art:"verbergen", id, anfrage }       ← an alle: { art:"gezeigt", karte|null }
-     karte = { titel, unter?, bereich?, quelle?, dimension:"oberwelt"|"nether"|"ende"|null,
-               bloecke:[ { art:"koordinaten", label?, x, y|null, z, dimension? }
-                       | { art:"zeilen", zeilen:[{ label, wert }] } | { art:"text", text } ] }
-       Blöcke außerdem { art:"bild", daten:"data:image/png;base64,…", label?, pixelig? },
-       optional typ (Seed-Map-Typ) → die Anzeige zeigt den Kennblock neben dem Titel.
-   Das Board prüft die Karte (koordinaten-board/server/src/zeigen.js) und zeigt
-   sie groß, bis die nächste kommt oder jemand sie wegnimmt.
-   ANZEIGESCHEMA: Jeder Inhalt, der aufs Board kann, hat in BOARD_KARTEN
-   (board-karten.js) eine Funktion (ctx, id) → Karte; ctx baut boardKontext() aus
-   dem Zustand der Seite. Der Board-Server baut mit denselben Funktionen die Karten
-   der Dashboard-Widgets. Das Board selbst kennt keine Bereiche; ein neuer Bereich
-   trägt dort sein Schema ein und baut boardZeigenKnopf("<art>:<id>") in sein Detail.
+   „Aufs Board“ (Bauplan „Sitzung“, S2): Das Handy schickt nur die Quelle, das Board baut
+   die Karte selbst und legt sie als Widget in die Sitzung der Anzeige (Layer „Sitzung“,
+   nur im Speicher, nach einem Neustart leer):
+     → { art:"zeigen", quelle:"<art>:<id>"|"sammelstand", anzeigeId?, anfrage }
+                                               ← { art:"ok", anfrage, instanzId, titel } | { art:"fehler", anfrage, text }
+     → { art:"verbergen", instanzId, anfrage }  ← { art:"ok", anfrage }
+     Danach an alle: { art:"geaendert", bereich:"layout", anzeigeId }; die Companion lädt
+     GET /anzeigen/:id/layout und kennt so die Sitzungs-Widgets (herkunft = Quelle, titel, von).
+   Karten baut der Server mit den Anzeigeschemas aus board-karten.js (BOARD_KARTEN), geprüft
+   in koordinaten-board/server/src/zeigen.js: { titel, unter?, bereich?, quelle?, typ?, dimension,
+   bloecke:[koordinaten|zeilen|text|bild] }. Am Handy entsteht keine Karte mehr; Biom-Name und
+   Rüstungs-Figur fehlen dem Board vorerst (entschieden 13.10.2026).
+   ANZEIGESCHEMA: Jeder Inhalt, der aufs Board kann, hat in BOARD_KARTEN (board-karten.js)
+   eine Funktion (ctx, id) → Karte und am Server in widgets.js einen Widget-Typ (QUELLE_ZU_TYP).
+   Das Board selbst kennt keine Bereiche; ein neuer Bereich trägt dort sein Schema ein und baut
+   boardZeigenKnopf("<art>:<id>") in sein Detail.
    ========================================================================== */
 const bd = {
   verbindung: lsLesen("board.verbindung"),  // { adresse, token, name } oder null
@@ -3704,7 +3705,7 @@ const bd = {
   teilnehmer: [], orte: null,
   socket: null, timer: null, wartezeit: 500,
   scan: null,                                // { stream } solange die Kamera läuft
-  gezeigt: null,                             // Karte, die gerade auf der Anzeige liegt
+  sitzung: null,                             // { anzeigeId, instanzen:[{ id, typ, herkunft, titel, von, farbe }] } – Widgets von „Aufs Board“ (Bauplan Sitzung)
   einstellungen: null,                       // Live: { titel, qrZeigen, aktiveWelt, aktiv } der Anzeige
   anzeigen: null,                            // Live: Geräte mit Anzeige-Link [{ id, name, link }]
   anzeigeQr: null, anzeigeFrage: null, anzeigeUmbenennen: null,   // offener QR-Code, „Neuer Schlüssel?“, Umbenennen
@@ -3962,7 +3963,8 @@ async function liveAktualisieren({ bereich, weltId }){
   if(bereich === "banner") return bannerLaden();
   if(bereich === "ruestung") return ruestungLaden();
   if(bereich === "einstellungen") return boardEinstellungenLaden();
-  if(bereich === "anzeigen") return boardAnzeigenLaden();
+  if(bereich === "anzeigen"){ await boardAnzeigenLaden(); return boardSitzungLaden(); }   // Liste frisch, danach die Sitzung der ersten Anzeige
+  if(bereich === "layout") return boardSitzungLaden();
   if(bereich === "welten"){ await weltenAuffrischen(); return boardEinstellungenLaden(); }
   if(weltId && weltId !== st.weltId) return weltenAuffrischen();
   if(bereich === "orte") return orteAuffrischen();
@@ -4003,9 +4005,11 @@ function boardVerbinden(){
     }
     if(n.art === "geaendert") return liveAktualisieren(n);
     if(n.art === "teilnehmer") bd.teilnehmer = n.namen || [];
-    else if(n.art === "zustand") bd.orte = n.zustand?.orte?.length ?? null;
-    else if(n.art === "gezeigt") bd.gezeigt = n.karte || null;
-    else return;
+    else if(n.art === "zustand"){
+      bd.orte = n.zustand?.orte?.length ?? null;
+      if(!bd.sitzung) boardSitzungLaden();   // erste Nachricht nach dem Verbinden: das Token gilt → Sitzung der Anzeige laden
+    }
+    else return;                             // „gezeigt“ (alte Anzeige, bis S4) braucht das Handy nicht mehr
     boardAnzeigen();
   };
   ws.onclose = (e) => {
@@ -4031,7 +4035,7 @@ function boardSocketZu(){
 function boardOffeneAbbrechen(){
   for(const w of bd.offen.values()) w.fehler("Verbindung zum Board unterbrochen");
   bd.offen.clear();
-  bd.gezeigt = null;                          // nach dem Neuverbinden schickt das Board den Stand
+  bd.sitzung = null;                          // nach dem Neuverbinden lädt boardSitzungLaden den Stand
 }
 /** Nachricht ans Board, wartet auf dessen „ok“ (sonst Fehlertext) */
 function boardSenden(op){
@@ -4058,17 +4062,44 @@ function boardKontext(){
     biomName:(dim, x, z) => (bm.weltId === st.weltId ? biomAnStelle(dim, x, z)?.name : null) || null,
   };
 }
-async function boardZeigen(quelle){
-  const [art, ...rest] = quelle.split(":");
-  const karte = await BOARD_KARTEN[art]?.karte(boardKontext(), rest.join(":"));   // karte() darf async sein (Rüstung rendert die Figur)
-  if(!karte) return toast("Das lässt sich nicht aufs Board legen", true);
-  try { await boardSenden({ art:"zeigen", karte }); toast("Liegt auf dem Board"); }
-  catch(f){ toast(String(f), true); }
+/** Sitzung der Anzeige laden: die Widgets, die „Aufs Board“ dort abgelegt hat (Layer „sitzung“ im Layout) */
+async function boardSitzungLaden(){
+  if(DEMO.enabled || !bd.verbindung) return;
+  if(!bd.anzeigen){ const r = await api("/anzeigen"); if(!r.ok) return; bd.anzeigen = r.data.anzeigen; }
+  const a = bd.anzeigen[0];
+  if(!a){ bd.sitzung = null; return boardAnzeigen(); }
+  const r = await api(`/anzeigen/${a.id}/layout`); if(!r.ok) return;
+  const layer = r.data.layout?.layer.find((l) => l.id === "sitzung");
+  bd.sitzung = { anzeigeId:a.id, instanzen:layer?.instanzen ?? [] };
+  boardAnzeigen();
 }
-async function boardWegnehmen(){
-  if(!bd.gezeigt) return;
-  try { await boardSenden({ art:"verbergen", id:bd.gezeigt.id }); toast("Vom Board genommen"); }
-  catch(f){ toast(String(f), true); }
+/** Liegt diese Quelle gerade als Widget in der Sitzung? → die Instanz */
+const boardLiegt = (quelle) => bd.sitzung?.instanzen.find((i) => i.herkunft === quelle) || null;
+async function boardZeigen(quelle){
+  const [art] = quelle.split(":");
+  if(!BOARD_KARTEN[art]) return toast("Das lässt sich nicht aufs Board legen", true);
+  try {
+    await boardSenden({ art:"zeigen", quelle, ...(bd.sitzung?.anzeigeId ? { anzeigeId:bd.sitzung.anzeigeId } : {}) });
+    toast("Liegt auf dem Board");
+    boardSitzungLaden();                      // das Board meldet auch „geaendert layout“; so ist der Knopf sofort richtig
+  } catch(f){ toast(String(f), true); }
+}
+async function boardWegnehmen(instanzId){
+  const ziel = instanzId ? bd.sitzung?.instanzen.find((i) => i.id === instanzId) : bd.sitzung?.instanzen[0];
+  if(!ziel) return;
+  try {
+    await boardSenden({ art:"verbergen", instanzId:ziel.id, ...(bd.sitzung?.anzeigeId ? { anzeigeId:bd.sitzung.anzeigeId } : {}) });
+    toast("Vom Board genommen");
+    boardSitzungLaden();
+  } catch(f){ toast(String(f), true); }
+}
+async function boardAlleWegnehmen(){
+  for(const i of [...(bd.sitzung?.instanzen ?? [])]){
+    try { await boardSenden({ art:"verbergen", instanzId:i.id, ...(bd.sitzung?.anzeigeId ? { anzeigeId:bd.sitzung.anzeigeId } : {}) }); }
+    catch(f){ toast(String(f), true); break; }
+  }
+  toast("Board geräumt");
+  boardSitzungLaden();
 }
 const BOARD_ZEIGEN_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4M12 7v6M9.5 10.5 12 13l2.5-2.5"/></svg>';
 /** Knopf „Aufs Board“ für ein Sheet – nur, wenn dieses Gerät mit einem Board verbunden ist */
@@ -4079,15 +4110,16 @@ function boardZeigenKnopf(quelle){
 /** Knöpfe im offenen Sheet an den Stand anpassen (liegt dieser Inhalt gerade auf dem Board?) */
 function boardZeigenKnoepfe(){
   document.querySelectorAll("[data-board-quelle]").forEach((k) => {
-    const liegt = bd.gezeigt?.quelle === k.dataset.boardQuelle;
-    k.classList.toggle("aktiv", liegt);
+    const liegt = boardLiegt(k.dataset.boardQuelle);
+    k.classList.toggle("aktiv", Boolean(liegt));
     k.dataset.aktion = liegt ? "board-wegnehmen" : "board-zeigen";
+    k.dataset.instanz = liegt?.id ?? "";
     k.innerHTML = BOARD_ZEIGEN_ICON + (liegt ? "Liegt auf dem Board · Wegnehmen" : "Aufs Board");
   });
 }
 function boardTrennen(){
   boardSocketZu();
-  Object.assign(bd, { verbindung:null, status:"aus", teilnehmer:[], orte:null, gezeigt:null, einstellungen:null, wartezeit:500 });
+  Object.assign(bd, { verbindung:null, status:"aus", teilnehmer:[], orte:null, sitzung:null, anzeigen:null, einstellungen:null, wartezeit:500 });
   lsSchreiben("board.verbindung", null);
   boardAnzeigen();
 }
@@ -4220,10 +4252,12 @@ function boardSheetRendern(){
       ${boardEinstellungenHtml()}
       ${boardAnzeigenHtml()}
       <div class="field-group"><div class="field-group-label">Auf der Anzeige</div>
-        ${bd.gezeigt ? `<div class="card board-gezeigt" style="flex-direction:row">
-            <span class="text"><span class="card-title">${esc(bd.gezeigt.titel)}</span>
-              <span class="card-meta" style="display:block">${esc([bd.gezeigt.bereich, `von ${bd.gezeigt.von}`].filter(Boolean).join(" · "))}</span></span>
-            <button class="btn-secondary" data-aktion="board-wegnehmen">Wegnehmen</button></div>`
+        ${bd.sitzung?.instanzen.length ? `<div class="list-stack">${bd.sitzung.instanzen.map((i) => `<div class="card board-gezeigt" style="flex-direction:row" data-instanz="${esc(i.id)}">
+            <span class="text"><span class="card-title">${esc(i.titel || BOARD_KARTEN[(i.herkunft || "").split(":")[0]]?.titel || i.typ)}</span>
+              <span class="card-meta" style="display:block">${esc([BOARD_KARTEN[(i.herkunft || "").split(":")[0]]?.titel, i.von ? `von ${i.von}` : ""].filter(Boolean).join(" · "))}</span></span>
+            <button class="btn-secondary" data-aktion="board-wegnehmen" data-instanz="${esc(i.id)}">Wegnehmen</button></div>`).join("")}</div>
+          ${bd.sitzung.instanzen.length > 1 ? `<button class="btn-secondary" data-aktion="board-alle-wegnehmen" style="margin-top:8px">Alle wegnehmen</button>` : ""}
+          <div class="result-hint">Die Sitzung lebt, bis das Board neu startet. Verschieben und Größe: „Anzeige anordnen“, Layer „Sitzung“.</div>`
           : `<div class="banner info">Gerade liegt nichts auf dem Board. Im Detail eines Ortes, Sammelobjekts, Portals oder Banners „Aufs Board“ antippen.</div>`}
       </div>
       <div class="sheet-fuss">
@@ -5257,7 +5291,8 @@ $sheet.addEventListener("click", async (e) => {
       toast(r.data.instanz.angeheftet ? "Liegt groß auf der Anzeige" : "Nicht mehr angeheftet");
       break;
     }
-    case "board-wegnehmen": boardWegnehmen(); break;
+    case "board-wegnehmen": boardWegnehmen(a.dataset.instanz); break;
+    case "board-alle-wegnehmen": boardAlleWegnehmen(); break;
     // Anzeigen (Anzeige-Link für andere Geräte)
     case "anzeige-kopieren": {
       const anz = bd.anzeigen?.find((x) => x.id === id); if(!anz) break;
