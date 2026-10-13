@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 import path from "node:path";
 import { nbtLesen, nbtAlleLesen, levelDatNbt } from "../nbt.js";
-import { fundeSammler, beuteZuordnen, BEUTE, SPAWNER, NAEHE, BANNER_FARBEN, BANNER_MUSTER, RUESTUNG_MATERIAL } from "../welt-funde.js";
+import { fundeSammler, beuteZuordnen, BEUTE, SPAWNER, BEREICHE, NAEHE, BANNER_FARBEN, BANNER_MUSTER, RUESTUNG_MATERIAL } from "../welt-funde.js";
 import { weltLesen } from "../biom-welt.js";
 import { levelDatLesen } from "../biom-dekoder.js";
 import { testweltBauen, fundeweltBauen, nbt, nbtBauen, levelDatBauen, SEED } from "./welt-bauen.mjs";
@@ -87,7 +87,7 @@ test("Testwelt von Max: genau 6 Verliese und 1 vergrabener Schatz, Spieler und W
   assert.deepEqual(funde.spieler, { dim: "overworld", x: 0, y: 74, z: 0, level: 0 });
   assert.deepEqual(funde.info, {
     spielmodus: "survival", schwierigkeit: "normal", tage: 0, spawn: { x: 0, y: null, z: 0 },
-    zuletztGespielt: "2026-09-29T17:12:51.000Z", hardcore: false, cheats: false,
+    zuletztGespielt: "2026-09-29T17:12:51.000Z", hardcore: false, cheats: false, drache: null,
   });
   assert.deepEqual([funde.portale, funde.sammelobjekte, funde.ruestung, funde.banner, funde.andereSpieler], [[], [], [], [], 0]);
   assert.deepEqual(funde.unbekannt, { beute: [], muster: [], ruestung: [] });
@@ -108,25 +108,47 @@ test("ohne Funde: funde: false liest nur Biome", async () => {
 
 test("Fundewelt: Orte je Struktur, Löschen und Überschreiben wie bei den Biomen", async () => {
   const { funde } = await weltLesen(new Blob([fundeweltBauen().zip]));
-  // Anzahl je Ort: Behälter/Spawner/Kies/Tresore/Prüfungs-Spawner
-  const orte = funde.orte.map((o) => `${o.dim} ${o.kategorie} ${o.x} ${o.y} ${o.z} · ${[o.behaelter, o.spawner, o.kies, o.tresore, o.pruefspawner].join("/")}`);
+  // Anzahl je Ort: Behälter/Spawner/Kies/Tresore/Prüfungs-Spawner/Strukturbereiche/Endtransitportale
+  const orte = funde.orte.map((o) => `${o.dim} ${o.kategorie} ${o.x} ${o.y} ${o.z} · ${[o.behaelter, o.spawner, o.kies, o.tresore, o.pruefspawner, o.bereiche, o.tore].join("/")}`);
   assert.deepEqual(orte, [
-    "overworld Desert Temple 165 64 170 · 4/0/0/0/0",
-    "overworld Desert Well 180 60 170 · 0/0/1/0/0",
-    "overworld Mineshaft 300 20 -101 · 1/0/0/0/0",
-    "overworld Shipwreck -310 60 490 · 1/0/0/0/0",
-    "overworld Trial Chamber -150 -20 -150 · 0/0/0/1/1",
-    "overworld Village 320 70 10 · 2/0/0/0/0",
-    "nether Nether Fortress 100 72 88 · 1/1/0/0/0",
-    "nether Ruined Portal -70 40 85 · 1/0/0/0/0",
-    "end End City 970 80 5 · 1/0/0/0/0",
+    "overworld Desert Temple 165 64 170 · 4/0/0/0/0/0/0",
+    "overworld Desert Well 180 60 170 · 0/0/1/0/0/0/0",
+    "overworld Mineshaft 300 20 -101 · 1/0/0/0/0/0/0",
+    "overworld Monument -941 50 669 · 0/0/0/0/0/1/0",
+    "overworld Outpost 487 80 487 · 1/0/0/0/0/1/0",
+    "overworld Shipwreck -310 60 490 · 1/0/0/0/0/0/0",
+    "overworld Trial Chamber -150 -20 -150 · 0/0/0/1/1/0/0",
+    "overworld Village -1970 70 2030 · 0/0/0/0/0/1/0",
+    "overworld Village 360 70 10 · 2/0/0/0/0/1/0",
+    "overworld Witch Hut 603 66 603 · 0/0/0/0/0/1/0",
+    "nether Nether Fortress 100 72 88 · 1/1/0/0/0/1/0",
+    "nether Ruined Portal -70 40 85 · 1/0/0/0/0/0/0",
+    "end End City 970 80 5 · 1/0/0/0/0/0/0",
+    "end End Gateway 96 75 0 · 0/0/0/0/0/0/1",
+    "end End Gateway 1100 60 50 · 0/0/0/0/0/0/1",
   ]);
   assert.deepEqual(funde.orte.find((o) => o.kategorie === "Nether Fortress").mobs, ["blaze"]);
-  assert.deepEqual(funde.orte.map((o) => o.naehe), [48, 16, 96, 48, 96, 96, 96, 16, 96]);
+  assert.deepEqual(funde.orte.map((o) => o.naehe), [48, 16, 96, 96, 48, 48, 96, 96, 96, 32, 96, 16, 96, 8, 8]);
   assert.deepEqual(funde.orte.find((o) => o.kategorie === "Desert Well").beute, ["desert_well_brushable_block"]);
   assert.deepEqual(funde.unbekannt.beute, [{ name: "mod_kiste", anzahl: 2 }]);
   // Nur der kaputte Block-Eintrag zählt; das ~local_player-Füllstück der Standard-Testwelt ersetzt die .log später
   assert.equal(funde.fehler, 1);
+});
+
+test("W3: Strukturbereiche, Dörfer, Endtransitportale und Drache – Mitte des Kastens, Spawner geht vor", async () => {
+  const { funde } = await weltLesen(new Blob([fundeweltBauen().zip]));
+  const ort = (k, x) => funde.orte.find((o) => o.kategorie === k && (x == null || o.x === x));
+  // Außenposten: Mitte des Kastens statt der Truhe; Netherfestung: der Lohenspawner bleibt die Koordinate
+  assert.deepEqual([ort("Outpost").x, ort("Outpost").z, ort("Outpost").beute], [487, 487, ["pillager_outpost"]]);
+  assert.deepEqual([ort("Nether Fortress").x, ort("Nether Fortress").bereiche], [100, 1]);
+  // Dorf: Mitte aus VILLAGE_…_INFO; das dritte Dorf hat die .log gelöscht; Typ 4 und ein Monument im Nether fallen weg
+  assert.equal(funde.orte.filter((o) => o.kategorie === "Village").length, 2);
+  assert.ok(!funde.orte.some((o) => o.x === 5020 || o.x === 611 || (o.dim === "nether" && o.kategorie === "Monument")));
+  assert.equal(funde.info.drache, true);
+  // Kaputter Strukturbereich: nur er fehlt
+  const s = fundeSammler();
+  s.aufnehmen(Uint8Array.of(1, 0, 0, 0, 1, 0, 0, 0, 57), Uint8Array.of(2, 0, 0, 0, 1, 2, 3), false);
+  assert.equal(s.auswerten().fehler, 1);
 });
 
 test("Fundewelt: Portale, Spieler, Welt-Info", async () => {
@@ -139,7 +161,7 @@ test("Fundewelt: Portale, Spieler, Welt-Info", async () => {
   assert.equal(funde.andereSpieler, 1);
   assert.deepEqual(funde.info, {
     spielmodus: "creative", schwierigkeit: "hard", tage: 10, spawn: { x: 5, y: null, z: -7 },
-    zuletztGespielt: "2026-09-29T17:12:51.000Z", hardcore: false, cheats: true,
+    zuletztGespielt: "2026-09-29T17:12:51.000Z", hardcore: false, cheats: true, drache: true,
   });
 });
 
@@ -189,7 +211,8 @@ const vorlage = (id) => ({ Count: nbt.byte(1), Damage: nbt.short(0), WasPickedUp
 
 test("Kategorien, Banner, Rüstung und Vorlagen passen zu regeln.js", () => {
   const { FEATURE_KATEGORIEN, FARBEN, MUSTER, RUESTUNGEN, SAMMELOBJEKTE } = regeln;
-  const kategorien = [...BEUTE.map(([, k, dims]) => [k, dims]), ...Object.values(SPAWNER), ["Trial Chamber", ["overworld"]]];
+  const kategorien = [...BEUTE.map(([, k, dims]) => [k, dims]), ...Object.values(SPAWNER), ...Object.values(BEREICHE),
+    ["Trial Chamber", ["overworld"]], ["Village", ["overworld"]], ["End Gateway", ["end"]]];
   for (const [k, dims] of kategorien) {
     for (const d of dims) assert.ok(FEATURE_KATEGORIEN[d].includes(k), `${k} gibt es nicht in ${d}`);
     assert.ok(NAEHE[k], `Nähe für ${k} fehlt`);

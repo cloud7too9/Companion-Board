@@ -359,12 +359,22 @@ const besatz = (Pattern, Material) => ({ tag: { Trim: { Material, Pattern } } })
 let wesenNr = 0;
 const wesen = (w) => [new Uint8Array([...text("actorprefix"), 0, 0, 0, 1, 0, 0, 0, ++wesenNr]), nbtBauen(w)];
 const pos = (x, y, z) => nbt.liste(nbt.FLOAT, [x, y, z]);
+/** Strukturbereiche eines Chunks (Tag 57): [x1, y1, z1, x2, y2, z2, typ] je Kasten */
+const bereiche = (cx, cz, dim, ...kaesten) => {
+  const p = new Puffer().i32(kaesten.length);
+  for (const [x1, y1, z1, x2, y2, z2, typ] of kaesten) p.i32(x1).i32(y1).i32(z1).i32(x2).i32(y2).i32(z2).u8(typ);
+  return [chunkSchluessel(cx, cz, dim, 57), p.fertig()];
+};
+const dorf = (schluessel, [x0, y0, z0, x1, y1, z1]) => [text(schluessel), nbtBauen({ X0: x0, Y0: y0, Z0: z0, X1: x1, Y1: y1, Z1: z1, Tick: nbt.long(9) })];
 
 /**
  * Testwelt mit allen Arten von Funden (Bauplan „Welt-Funde“): Strukturen aus Truhen, Kies, Spawnern und
  * Tresoren, Lore mit Truhe, Rüstungsständer (auch im alten Format, Chunk-Tag 50), Banner, Schmiedevorlagen
  * in Behältern, ~local_player mit Rüstung, Inventar und Endertruhe, Portal-Liste, ein anderer Spieler,
- * Welt-Info in level.dat. Die .log löscht ein Schiffswrack und öffnet eine Iglu-Truhe; ein kaputter
+ * Welt-Info in level.dat. Dazu W3: Strukturbereiche (Außenposten mit Truhe, Hexenhütte, Ozeanmonument, Netherfestung
+ * beim Lohenspawner, ein Typ 4 und ein Monument im Nether, die wegfallen), zwei Dörfer (eins mit Dimension im Schlüssel)
+ * und ein drittes, das die .log löscht, zwei Endtransitportale, TheEnd mit besiegtem Drachen.
+ * Die .log löscht ein Schiffswrack und öffnet eine Iglu-Truhe; ein kaputter
  * Block-Eintrag kostet nur seinen Fund. Was herauskommen soll, steht in welt-funde.test.mjs.
  */
 export function fundeweltBauen() {
@@ -417,9 +427,23 @@ export function fundeweltBauen() {
     ] } })],
     // Ein kaputter Eintrag kostet nur seinen Fund
     [chunkSchluessel(7, 7, "overworld", 49), Uint8Array.of(10, 0, 0, 8, 5)],
+    // W3: Strukturbereiche (Tag 57) – Außenposten neben seiner Truhe, Hexenhütte, Typ 4 fällt weg; Monument; Festung im Nether
+    bereiche(30, 30, "overworld", [480, 70, 480, 495, 90, 495, 5], [600, 63, 600, 607, 70, 607, 2], [610, 63, 610, 612, 66, 612, 4]),
+    be(30, 30, "overworld", truhe(485, 72, 490, "pillager_outpost")),
+    bereiche(-60, 40, "overworld", [-970, 39, 640, -912, 61, 698, 3]),
+    bereiche(6, 6, "nether", [60, 60, 80, 140, 80, 96, 1], [10, 10, 10, 20, 20, 20, 3]),
+    // Dörfer: Kasten um die Dorftruhen (Mitte X 360 · Z 10) und ein zweites mit Dimension im Schlüssel; ein drittes löscht die .log
+    dorf("VILLAGE_0e3e6c48-1111-4a2b-9c3d-000000000001_INFO", [330, 60, -20, 390, 80, 40]),
+    dorf("VILLAGE_Overworld_0e3e6c48-1111-4a2b-9c3d-000000000002_INFO", [-2000, 50, 2000, -1940, 90, 2060]),
+    dorf("VILLAGE_0e3e6c48-1111-4a2b-9c3d-000000000003_INFO", [5000, 60, 5000, 5040, 80, 5040]),
+    // Endtransitportale (Block-Entity im End) und der Drachenkampf
+    be(6, 0, "end", { id: "EndGateway", x: 96, y: 75, z: 0, Age: nbt.long(100), ExitPortal: [1100, 60, 50] }),
+    be(68, 3, "end", { id: "EndGateway", x: 1100, y: 60, z: 50, Age: nbt.long(100), ExitPortal: [96, 75, 0] }),
+    [text("TheEnd"), nbtBauen({ data: { DragonFight: { DragonKilled: nbt.byte(1), DragonSpawned: nbt.byte(0), PreviouslyKilled: nbt.byte(1) } } })],
   ];
   const log = [
     [chunkSchluessel(-40, 30, "overworld", 49), null],
+    [text("VILLAGE_0e3e6c48-1111-4a2b-9c3d-000000000003_INFO"), null],
     be(4, 4, "overworld", { id: "Chest", x: 70, y: 30, z: 70, Items: nbt.liste(10, []) }),
     [text("~local_player"), nbtBauen({
       identifier: "minecraft:player", DimensionId: 1, Pos: pos(10.5, 71.62, -5.5), PlayerLevel: 30,

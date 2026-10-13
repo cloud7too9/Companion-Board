@@ -1,10 +1,15 @@
 /* ============================================================================
    welt-funde.js  ·  Funde aus der Welt: Strukturen, Portale, Spieler, Banner
    ----------------------------------------------------------------------------
-   Bauplan „Welt-Funde“, Phase W1. Der Sammler sieht im selben Durchlauf wie die
-   Biome (biom-welt.js) jeden LevelDB-Eintrag und behält nur, was er braucht:
+   Bauplan „Welt-Funde“, Phasen W1 und W3. Der Sammler sieht im selben Durchlauf
+   wie die Biome (biom-welt.js) jeden LevelDB-Eintrag und behält nur, was er braucht:
      · Block-Entities (Chunk-Tag 49): Behälter mit Beute-Tabelle, Spawner,
-       Tresore, Prüfungs-Spawner, Seltsamer Kies und Sand, Banner, Inhalte
+       Tresore, Prüfungs-Spawner, Seltsamer Kies und Sand, Banner, Inhalte,
+       Endtransitportale (W3)
+     · Strukturbereiche (Chunk-Tag 57): Netherfestung, Hexenhütte, Ozeanmonument,
+       Außenposten – auch ohne Truhe (W3)
+     · Dörfer (VILLAGE_…_INFO): Mitte aus dem Kasten des Dorfs (W3)
+     · TheEnd: ob der Enderdrache besiegt ist (W3)
      · Lebewesen (actorprefix…, alte Welten Chunk-Tag 50): Loren und Boote mit
        Truhe, Rüstungsständer, alles mit Inhalt
      · ~local_player: Position, Inventar, Endertruhe, getragene Rüstung
@@ -23,7 +28,8 @@
    Lebewesen, Spieler, level.dat. Nur aus der Beschreibung des Formats
    (Minecraft Wiki „Bedrock Edition level format“), an einer echten Welt noch
    zu prüfen (Haltepunkt H12): Portal-Liste, Banner (Farbnummern, Muster-
-   Kürzel), Besatz und Lederfarbe an Rüstungen, Tresor, Kies, Lore mit Truhe.
+   Kürzel), Besatz und Lederfarbe an Rüstungen, Tresor, Kies, Lore mit Truhe,
+   Strukturbereiche, Dörfer, Endtransitportale, TheEnd.
    ========================================================================== */
 import { nbtLesen, nbtAlleLesen, levelDatNbt } from "./nbt.js";
 
@@ -64,11 +70,21 @@ export const SPAWNER = Object.freeze({
   blaze: ["Nether Fortress", NE], magma_cube: ["Bastion", NE],
 });
 
+/* Strukturbereiche (Chunk-Tag 57, „HardcodedSpawnAreas“): Anzahl als Int32, je Bereich ein Kasten aus 2 × 3 Int32
+   (x1, y1, z1, x2, y2, z2) und ein Byte Typ. Typ → Kategorie und Dimension; 4 (Katze der Hexenhütte, entfallen) bleibt weg. */
+export const BEREICHE = Object.freeze({ 1: ["Nether Fortress", NE], 2: ["Witch Hut", OW], 3: ["Monument", OW], 5: ["Outpost", OW] });
+const BEREICH_BYTES = 6 * 4 + 1;
+/* Dörfer: VILLAGE_<uuid>_INFO, in neueren Welten auch mit Dimension davor (VILLAGE_Overworld_<uuid>_INFO) */
+const DORF = /^VILLAGE_(?:(Overworld|Nether|TheEnd)_)?[0-9a-f-]{36}_INFO$/i;
+const DORF_DIM = Object.freeze({ overworld: "overworld", nether: "nether", theend: "end" });
+
 /* Ein Ort je Struktur: Funde derselben Kategorie, die näher als das hier beieinander liegen (X/Z), sind eine Struktur */
 export const NAEHE = Object.freeze({
+  "End Gateway": 8,
   Dungeon: 16, Treasure: 16, Igloo: 16, "Ruined Portal": 16, "Desert Well": 16,
+  "Witch Hut": 32,
   "Desert Temple": 48, "Jungle Temple": 48, Shipwreck: 48, "Ocean Ruins": 48, "Trail Ruins": 48, Outpost: 48,
-  Mineshaft: 96, Village: 96, Mansion: 96, Bastion: 96, "Nether Fortress": 96, "End City": 96, "Trial Chamber": 96,
+  Mineshaft: 96, Village: 96, Mansion: 96, Bastion: 96, "Nether Fortress": 96, "End City": 96, "Trial Chamber": 96, Monument: 96,
   "Ancient City": 160, Stronghold: 160,
 });
 export const PORTAL_NAEHE = 8;
@@ -163,6 +179,31 @@ function ruestungAus(items) {
   return { teile, unbekannt };
 }
 
+/** Strukturbereiche eines Chunks (Tag 57) → [{ art:"bereich", kategorie, dim, x, y, z }] mit der Mitte des Kastens */
+function bereicheLesen(bytes, dim) {
+  if (bytes.length < 4) throw new Error("Strukturbereich ist abgeschnitten");
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const n = dv.getInt32(0, true);
+  if (n < 0 || 4 + n * BEREICH_BYTES > bytes.length) throw new Error("Strukturbereich ist abgeschnitten");
+  const liste = [];
+  for (let i = 0; i < n; i += 1) {
+    const o = 4 + i * BEREICH_BYTES;
+    const [x1, y1, z1, x2, y2, z2] = [0, 1, 2, 3, 4, 5].map((k) => dv.getInt32(o + k * 4, true));
+    const typ = BEREICHE[dv.getUint8(o + 24)];
+    if (typ && typ[1].includes(dim)) liste.push({ art: "bereich", kategorie: typ[0], dim, x: Math.floor((x1 + x2) / 2), y: Math.floor((y1 + y2) / 2), z: Math.floor((z1 + z2) / 2) });
+  }
+  return liste;
+}
+
+/** Dorf (VILLAGE_…_INFO, Kasten X0…Z1) → { art:"bereich", kategorie:"Village", dim, x, y, z } oder null */
+function dorfLesen(w, dimName) {
+  const dim = DORF_DIM[String(dimName ?? "overworld").toLowerCase()];
+  const k = ["X0", "Y0", "Z0", "X1", "Y1", "Z1"].map((f) => ganz(w?.[f]));
+  if (dim !== "overworld" || k.some((v) => v == null)) return null;
+  const [x0, y0, z0, x1, y1, z1] = k;
+  return { art: "bereich", kategorie: "Village", dim, x: Math.floor((x0 + x1) / 2), y: Math.floor((y0 + y1) / 2), z: Math.floor((z0 + z1) / 2) };
+}
+
 /** Funde derselben Kategorie und Dimension zu Strukturen zusammenfassen (Nähe in X/Z, verkettet).
     Ein Verlies hat genau einen Spawner: Dort ist jeder Spawner ein Ort, Truhen gehören zum nächsten
     (in der Testwelt liegen zwei Verliese nur 16 Blöcke auseinander). */
@@ -199,15 +240,16 @@ function zuOrten(kandidaten) {
       cluster = [...spawner, ...verketten(rest, naehe)];
     } else cluster = verketten(liste, naehe);
     for (const teile of cluster) {
-      // Koordinate: der Spawner (Verlies), sonst der Fund, der dem Mittelpunkt am nächsten liegt – eine echte Blockposition
+      // Koordinate: der Spawner (Verlies, Netherfestung), sonst die Mitte eines Strukturbereichs oder Dorfs, sonst der
+      // Fund, der dem Mittelpunkt am nächsten liegt – eine echte Blockposition
       const mx = teile.reduce((s, k) => s + k.x, 0) / teile.length, mz = teile.reduce((s, k) => s + k.z, 0) / teile.length;
-      const mitte = teile.find((k) => k.art === "spawner")
-        ?? teile.reduce((a, b) => (Math.hypot(b.x - mx, b.z - mz) < Math.hypot(a.x - mx, a.z - mz) ? b : a));
+      const naechster = (liste) => (liste.length ? liste.reduce((a, b) => (Math.hypot(b.x - mx, b.z - mz) < Math.hypot(a.x - mx, a.z - mz) ? b : a)) : null);
+      const mitte = teile.find((k) => k.art === "spawner") ?? naechster(teile.filter((k) => k.art === "bereich")) ?? naechster(teile);
       const zaehlen = (art) => teile.filter((k) => k.art === art).length;
       orte.push({
         kategorie: mitte.kategorie, dim: mitte.dim, x: mitte.x, y: mitte.y, z: mitte.z, naehe,
         behaelter: zaehlen("behaelter"), spawner: zaehlen("spawner"), kies: zaehlen("kies"),
-        tresore: zaehlen("tresor"), pruefspawner: zaehlen("pruefspawner"),
+        tresore: zaehlen("tresor"), pruefspawner: zaehlen("pruefspawner"), bereiche: zaehlen("bereich"), tore: zaehlen("tor"),
         mobs: [...new Set(teile.map((k) => k.mob).filter(Boolean))].sort(),
         beute: [...new Set(teile.map((k) => k.beute).filter(Boolean))].sort(),
       });
@@ -238,12 +280,13 @@ export function weltInfo(levelDat) {
 /**
  * Sammler für einen Durchlauf. aufnehmen(keyBytes, value, geloescht) für jeden LevelDB-Eintrag in
  * der Reihenfolge des Lesens; levelDat(bytes) einmal; auswerten() am Ende → Funde:
- *   { orte:[{ kategorie, dim, x, y, z, naehe, behaelter, spawner, kies, tresore, pruefspawner, mobs, beute }],
+ *   { orte:[{ kategorie, dim, x, y, z, naehe, behaelter, spawner, kies, tresore, pruefspawner, bereiche, tore, mobs, beute }],
  *     portale:[{ dim, x, y, z, achse, breite, naehe }],   naehe: ab hier „schon bekannt“ (Companion, W2)
  *     sammelobjekte:[{ id, wo:[Text] }],
  *     ruestung:[{ name, quelle:"spieler"|"staender", x?, z?, teile:{ helmet|chestplate|leggings|boots: { ruestung, muster, material, lederfarbe } | null } }],
  *     banner:[{ name, basis, ebenen:[{ muster, farbe }], dim, x, y, z }],
- *     spieler:{ dim, x, y, z, level } | null, andereSpieler, info,
+ *     spieler:{ dim, x, y, z, level } | null, andereSpieler,
+ *     info:{ …weltInfo, drache:true|false|null },   drache aus TheEnd (W3)
  *     unbekannt:{ beute:[{ name, anzahl }], muster:[Kürzel], ruestung:[Item] },
  *     fehler }   Einträge, deren letzter Stand nicht lesbar ist (ihr Fund fehlt)
  */
@@ -252,8 +295,10 @@ export function fundeSammler() {
   const wesen = new Map();     // Lebewesen-Schlüssel → gefiltertes Lebewesen
   const altWesen = new Map();  // alte Welten: Chunk-Schlüssel (Tag 50) → gefilterte Lebewesen
   const andere = new Set();    // player_… (andere Spieler, nur gezählt – Frage 2)
+  const bereiche = new Map();  // Chunk-Schlüssel (Tag 57) → Strukturbereiche
+  const doerfer = new Map();   // VILLAGE_…_INFO → Dorf
   const kaputt = new Set();    // Schlüssel, deren letzter Stand nicht lesbar ist (ein späterer Eintrag heilt)
-  let spieler = null, portale = null, info = null, levelDatKaputt = false;
+  let spieler = null, portale = null, info = null, drache = null, levelDatKaputt = false;
 
   /** Block-Entity behalten? → gefilterte Form oder null */
   function blockFiltern(b, dim) {
@@ -264,6 +309,7 @@ export function fundeSammler() {
     const vorlagen = vorlagenIn(b.Items);
     if (id === "MobSpawner") return { art: "spawner", ...pos, mob: typeof b.EntityIdentifier === "string" ? tagName(b.EntityIdentifier) : null };
     if (id === "Vault" || id === "TrialSpawner") return { art: id === "Vault" ? "tresor" : "pruefspawner", ...pos };
+    if (id === "EndGateway") return { art: "tor", ...pos };
     if (id === "Banner") {
       return { art: "banner", ...pos, basis: ganz(b.Base), unheilvoll: b.Type === 1,
         ebenen: (Array.isArray(b.Patterns) ? b.Patterns : []).map((p) => ({ kuerzel: String(p?.Pattern ?? ""), farbe: ganz(p?.Color) })) };
@@ -321,6 +367,23 @@ export function fundeSammler() {
       if (liste.length) bloecke.set(s, liste);
       return;
     }
+    if ((c = chunkVon(keyBytes, 57))) {
+      bereiche.delete(s);
+      if (!geloescht) { const liste = bereicheLesen(value, c.dim); if (liste.length) bereiche.set(s, liste); }
+      return;
+    }
+    let m;
+    if ((m = DORF.exec(s))) {
+      doerfer.delete(s);
+      if (!geloescht) { const d = dorfLesen(nbtLesen(value).wert, m[1]); if (d) doerfer.set(s, d); }
+      return;
+    }
+    if (s === "TheEnd") {
+      drache = null;
+      const kampf = geloescht ? null : nbtLesen(value).wert?.data?.DragonFight;
+      if (kampf) drache = kampf.DragonKilled === 1;
+      return;
+    }
     if ((c = chunkVon(keyBytes, 50))) {
       if (geloescht) { altWesen.delete(s); return; }
       altWesen.delete(s);
@@ -365,8 +428,13 @@ export function fundeSammler() {
     const unbekannteBeute = new Map(), unbekannteMuster = new Set(), unbekannteRuestung = new Set();
     const kandidaten = [];
 
-    // Strukturen aus Beute-Tabellen (Behälter, Kies, Loren), Spawnern, Tresoren
+    // Strukturen aus Beute-Tabellen (Behälter, Kies, Loren), Spawnern, Tresoren, Strukturbereichen, Dörfern, Endtransitportalen
+    kandidaten.push(...[...bereiche.values()].flat(), ...doerfer.values());
     for (const b of [...bloeckeAlle, ...wesenAlle.filter((w) => w.art === "behaelter")]) {
+      if (b.art === "tor") {
+        if (b.dim === "end") kandidaten.push({ ...b, kategorie: "End Gateway" });
+        continue;
+      }
       if (b.art === "spawner") {
         const z = SPAWNER[b.mob];
         if (z && z[1].includes(b.dim)) kandidaten.push({ ...b, kategorie: z[0] });
@@ -425,7 +493,7 @@ export function fundeSammler() {
       banner,
       spieler: spieler ? { dim: spieler.dim, x: spieler.x, y: spieler.y, z: spieler.z, level: spieler.level } : null,
       andereSpieler: andere.size,
-      info,
+      info: info && { ...info, drache },
       unbekannt: {
         beute: [...unbekannteBeute].map(([name, anzahl]) => ({ name, anzahl })).sort((a, b) => b.anzahl - a.anzahl || reihenfolge(a.name, b.name)),
         muster: [...unbekannteMuster].sort(reihenfolge),

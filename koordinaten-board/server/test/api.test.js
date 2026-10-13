@@ -140,7 +140,7 @@ test('Welt-Funde (Bauplan „Welt-Funde“, W2): Welt-Info im Import, viele Eint
   const max = await beitreten('Max');
   const welt = (await anfrage('POST', '/api/orte/welten', max, { seed: '1234567' })).daten.welt;
   const info = { spielmodus: 'creative', schwierigkeit: 'hard', tage: 10, spawn: { x: 5, y: null, z: -7 },
-    zuletztGespielt: '2026-09-29T17:12:51.000Z', hardcore: false, cheats: true };
+    zuletztGespielt: '2026-09-29T17:12:51.000Z', hardcore: false, cheats: true, drache: true };
   const daten = Buffer.alloc(2048, 3).toString('base64');
   let r = await anfrage('PUT', `/api/welten/${welt.id}/biome`, max, {
     import: { seed: welt.seed, weltname: 'Funde', dateiname: 'Funde/', info: { ...info, spielmodus: 'gott', fremd: 1 } },

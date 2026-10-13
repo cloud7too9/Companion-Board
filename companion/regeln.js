@@ -353,6 +353,7 @@ function weltInfoSauber(i){
     zuletztGespielt:Number.isNaN(zeit) ? null : new Date(zeit).toISOString(),
     hardcore:i.hardcore === true,
     cheats:i.cheats === true,
+    drache:typeof i.drache === "boolean" ? i.drache : null,   // Enderdrache besiegt (TheEnd), null = unbekannt
   };
 }
 /** Nur bekannte Felder. Wer und wann setzt der Server (bzw. der Mock). */

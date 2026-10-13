@@ -5146,6 +5146,7 @@ function weltInfoZeilen(i){
     i.hardcore ? "Hardcore" : "", i.cheats ? "Cheats an" : ""].filter(Boolean).join(" · ");
   return `${spiel ? `<div class="result-row" data-testid="wi-spiel"><span class="rname">Spiel</span><span>${esc(spiel)}</span></div>` : ""}
     ${i.spawn ? `<div class="result-row"><span class="rname">Weltspawn</span><span class="mono">${esc(kurzKoord(i.spawn))}</span></div>` : ""}
+    ${i.drache != null ? `<div class="result-row" data-testid="wi-drache"><span class="rname">End</span><span>${i.drache ? "Enderdrache besiegt" : "Enderdrache lebt"}</span></div>` : ""}
     ${i.zuletztGespielt ? `<div class="result-row"><span class="rname">Zuletzt gespielt</span><span>${datumLang(i.zuletztGespielt)}</span></div>` : ""}`;
 }
 

@@ -198,7 +198,8 @@ function funde(f) {
   if (i) {
     console.log(`Spielmodus ${R.SPIELMODI[i.spielmodus] ?? "?"} · Schwierigkeit ${R.SCHWIERIGKEITEN[i.schwierigkeit] ?? "?"} · ${zahl(i.tage ?? 0)} Tage`
       + `${i.hardcore ? " · Hardcore" : ""}${i.cheats ? " · Cheats an" : ""}`);
-    console.log(`Weltspawn ${i.spawn ? ortText(i.spawn) : "?"} · zuletzt gespielt ${i.zuletztGespielt ? new Date(i.zuletztGespielt).toLocaleString("de-DE") : "?"}`);
+    console.log(`Weltspawn ${i.spawn ? ortText(i.spawn) : "?"} · zuletzt gespielt ${i.zuletztGespielt ? new Date(i.zuletztGespielt).toLocaleString("de-DE") : "?"}`
+      + `${i.drache != null ? ` · Enderdrache ${i.drache ? "besiegt" : "lebt"}` : ""}`);
   }
   const sp = f.spieler;
   console.log(sp ? `Spieler: ${DIM_NAME[sp.dim] ?? "?"} ${ortText(sp)} · Level ${sp.level ?? "?"}` : "Spieler: nicht in der Welt (~local_player fehlt)");
@@ -208,7 +209,8 @@ function funde(f) {
   for (const o of f.orte) {
     const teile = [o.behaelter ? `${o.behaelter} Behälter` : "", o.spawner ? `${o.spawner} Spawner${o.mobs.length ? ` (${o.mobs.join(", ")})` : ""}` : "",
       o.kies ? `${o.kies} Seltsamer Kies/Sand` : "", o.tresore ? `${o.tresore} Tresor${o.tresore > 1 ? "e" : ""}` : "",
-      o.pruefspawner ? `${o.pruefspawner} Prüfungs-Spawner` : ""].filter(Boolean);
+      o.pruefspawner ? `${o.pruefspawner} Prüfungs-Spawner` : "", o.bereiche ? `${o.bereiche} Strukturbereich${o.bereiche > 1 ? "e" : ""}` : "",
+      o.tore ? `${o.tore} Transittor` : ""].filter(Boolean);
     console.log(`  ${DIM_NAME[o.dim].padEnd(9)} ${R.kategorieName(o.kategorie).padEnd(22)} ${ortText(o).padEnd(30)} ${teile.join(" · ")}`);
   }
 
