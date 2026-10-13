@@ -18,9 +18,9 @@ const BOARD_PORT = 3198, SEITE_PORT = 3196, PIN = "471100";
 const BOARD = `http://127.0.0.1:${BOARD_PORT}`;
 const QR_TEXT = `${BOARD}/?pin=${PIN}`;
 const JSQR = path.join(HIER, "node_modules/jsqr/dist/jsQR.js");
-// Die Anzeige braucht den gebauten Board-Client
-if (!existsSync(path.join(HIER, "../../koordinaten-board/client/dist/index.html"))) {
-  console.log("FEHL Board-Client nicht gebaut: npm --prefix ../../koordinaten-board run installieren && npm --prefix ../../koordinaten-board run build");
+// Die Anzeige ist das Widget-Dashboard (Bauplan „Sitzung“, S4): es muss gebaut sein
+if (!existsSync(path.join(HIER, "../widgets/dist/index.html"))) {
+  console.log("FEHL Dashboard nicht gebaut: npm --prefix ../widgets install && npm --prefix ../widgets run build");
   process.exit(1);
 }
 
@@ -245,27 +245,31 @@ try {
     const timApi = (methode, pfad, body) => fetch(`${BOARD}/api${pfad}`, { method: methode,
       headers: { "content-type": "application/json", authorization: `Bearer ${tim.token}` }, body: JSON.stringify(body) }).then((r) => r.json());
     const timWelt = (await timApi("POST", "/orte/welten", { seed: "6889192652397090698" })).welt;
+    const timOrte = {};
     for (const [kategorie, variante, x, y, z, dim] of [["Eigene Orte", "Hauptbasis", 212, 71, -388, "overworld"], ["Village", null, 1040, 64, 310, "overworld"],
       ["Nether Fortress", null, 180, 70, -95, "nether"], ["End City", null, 1300, 60, -820, "end"], ["Stronghold", null, -1884, 40, -524, "overworld"]]) {   // ohne Variante: neue Varianten entstehen nur aus Screenshots
-      await timApi("POST", "/orte/instanzen", { dimensionId: `d_${timWelt.id}_${dim}`, kategorie, variante, x, y, z, quelle: "manuell" });
+      timOrte[kategorie] = (await timApi("POST", "/orte/instanzen", { dimensionId: `d_${timWelt.id}_${dim}`, kategorie, variante, x, y, z, quelle: "manuell" })).instanz.id;
     }
     await schlafen(300);
+    // Die Anzeige ist das Dashboard (Bauplan „Sitzung“, S4) mit dem Anzeige-Link
     const anzeige = await browser.newPage({ viewport: { width: 1600, height: 900 } });
-    await anzeige.goto(`${BOARD}/anzeige${await anzeigeLinkQuery(path.join(TMP, "daten"))}`);
-    await anzeige.waitForSelector(".anzeige");
-    pruefe(await anzeige.$(".a-gezeigt") === null, "Anzeige: noch keine Karte");
+    await anzeige.goto(`${BOARD}/dashboard${await anzeigeLinkQuery(path.join(TMP, "daten"))}`);
+    await anzeige.waitForSelector('[data-panel-id="w-orte"] [data-ort-id]');
+    pruefe(await anzeige.$('[data-testid="von"]') === null, "Anzeige: noch nichts aufs Board gelegt");
+    // Karte eines Sitzungs-Widgets nach Typ und Absender („von …“-Chip)
+    const sitzungsKarte = (typ, von) => anzeige.locator(`[data-typ="${typ}"]`, { has: anzeige.locator('[data-testid="von"]', { hasText: von }) }).locator('[data-testid="karte"]');
+    const da = (loc, state = "visible") => loc.first().waitFor({ state, timeout: 12000 }).then(() => true, () => false);
+    const bis = async (fn, ms = 8000) => { for (const ende = Date.now() + ms; Date.now() < ende; await schlafen(150)) if (await fn().catch(() => false)) return true; return false; };
 
-    // Kennblöcke: Strukturen mit Bild zeigen es, alle anderen das Linien-Icon der Kategorie
-    const iconsLesen = (seite, sel) => seite.$$eval(sel, (l) => l.map((z) => {
-      const img = z.querySelector(".ort-icon img.kennblock");
-      return `${z.querySelector(".name > span, .ort-name > span").textContent.trim()}=${img ? (img.naturalWidth ? img.getAttribute("src").split("/").pop() : "lädt nicht") : "Linie"}`;
-    }).sort().join(", "));
+    // Kennblöcke im Orte-Widget: Strukturen mit Bild zeigen es, alle anderen das Linien-Icon der Kategorie
     await anzeige.waitForFunction(() => [...document.querySelectorAll("img.kennblock")].every((i) => i.complete));
-    const anzeigeIcons = await iconsLesen(anzeige, ".a-zeile");
+    const anzeigeIcons = await anzeige.$$eval('[data-panel-id="w-orte"] [data-ort-id]', (l) => l.map((z) => {
+      const img = z.querySelector("img.kennblock");
+      return `${z.querySelector('[data-testid="ort-name"]').textContent.trim()}=${img ? (img.naturalWidth ? img.getAttribute("src").split("/").pop() : "lädt nicht") : "Linie"}`;
+    }).sort().join(", "));
     console.log("     Anzeige-Icons:", anzeigeIcons);
     pruefe(anzeigeIcons === "End City=end_city.png, Hauptbasis=Linie, Nether Fortress=fortress.png, Stronghold=stronghold.png, Village=Linie", "Anzeige: Kennblöcke bei Netherfestung, Endsiedlung und Festung, sonst Linien-Icon");
     await anzeige.screenshot({ path: `${DIR}/v7b-anzeige-kennbloecke.png` });
-
 
     // Seit Bauplan „Sitzung“ (S2) baut das Board die Karte aus seinen Daten: Lena macht live vom Board aus weiter
     // (die DEMO-Seite oben kennt Tims Orte nicht). Gleicher Account, gleiche eigene PIN.
@@ -282,51 +286,44 @@ try {
     const ortX = await lena.$eval(".result-coords b", (e) => e.textContent);
     pruefe(await text(lena, ".board-zeigen") === "Aufs Board", `Detail „${ortTitel}“: Knopf „Aufs Board“`);
     await lena.click(".board-zeigen");
-    pruefe(await warteAuf(anzeige, () => document.querySelector(".g-karte h2")), "Anzeige zeigt die Karte");
-    await anzeige.waitForTimeout(600);  // Einblenden abwarten
-    pruefe(await text(anzeige, ".g-karte h2") === ortTitel, `Anzeige: Titel „${ortTitel}“`);
-    const achsen = await anzeige.$$eval(".g-koord", (l) => l.map((k) => k.textContent.replace(/\s+/g, " ").trim()));
-    console.log("     Anzeige:", await text(anzeige, ".g-kopf"), "|", achsen.join(" | "));
-    pruefe(achsen[0].includes("X" + ortX), "Anzeige: X-Koordinate wie in der Companion");
+    // Bauplan „Sitzung“: Der Inhalt liegt als Widget im Layer „Sitzung“ der Anzeige, mit Absender
+    const lenasOrt = sitzungsKarte("karte.einzelkoordinate", "Lena");
+    pruefe(await da(lenasOrt.locator("h3")), "Anzeige zeigt die Karte als Sitzungs-Widget „von Lena“");
+    pruefe(await warteAuf(anzeige, () => document.querySelector('[data-testid="layer-name"]')?.textContent.trim() === "Sitzung"), "Anzeige: Layer „Sitzung“ ist aktiv");
+    pruefe((await lenasOrt.locator("h3").textContent()).trim() === ortTitel, `Anzeige: Titel „${ortTitel}“`);
+    const achsen = await lenasOrt.locator(".karte-koord").evaluateAll((l) => l.map((k) => k.textContent.replace(/\s+/g, " ").trim()));
+    console.log("     Anzeige:", achsen.join(" | "));
+    const ziffern = (t) => t.replace(/[^\d−-]/g, "");
+    pruefe(achsen[0].startsWith("X ") && ziffern(achsen[0].split("·")[0]) === ziffern(ortX), "Anzeige: X-Koordinate wie in der Companion");
     pruefe(achsen.length === 2 && /^Im Nether|^In der Oberwelt/.test(achsen[1]), "Anzeige: umgerechnete Koordinaten");
-    pruefe((await text(anzeige, ".g-von")).startsWith("Lena"), "Anzeige: von Lena");
     pruefe(await warteAuf(lena, () => document.querySelector(".board-zeigen")?.classList.contains("aktiv")), "Detail: Knopf zeigt „Liegt auf dem Board“");
-    // Bauplan „Sitzung“ (S2): Der Inhalt liegt als Widget im Layer „Sitzung“ des Dashboards, mit Absender
-    const dash = await browser.newPage({ viewport: { width: 1600, height: 900 } });
-    await dash.goto(`${BOARD}/dashboard${await anzeigeLinkQuery(path.join(TMP, "daten"))}`);
-    pruefe(await warteAuf(dash, () => document.querySelector('[data-typ="karte.einzelkoordinate"] [data-testid="von"]')?.textContent.trim() === "Lena", null, 15000),
-      "Dashboard: Sitzungs-Widget des Ortes, „von Lena“");
-    pruefe(await warteAuf(dash, () => document.querySelector('[data-testid="layer-name"]')?.textContent.trim() === "Sitzung"), "Dashboard: Layer „Sitzung“ ist aktiv");
-    pruefe(await warteAuf(dash, () => Boolean(document.querySelector('[data-typ="karte.einzelkoordinate"] [data-testid="karte"]'))), "Dashboard: Karte des Ortes geladen");
-    await dash.screenshot({ path: `${DIR}/v8b-dashboard-sitzung.png` });
-    const lage = await anzeige.evaluate(() => {
-      const r = (s) => document.querySelector(s).getBoundingClientRect();
-      const karte = r(".g-karte"), seite = r(".a-seite"), gez = r(".a-gezeigt");
-      return { seiteRechts: seite.left > gez.right - 1, karteGanz: karte.top >= gez.top && karte.bottom <= gez.bottom + 1 && karte.bottom <= innerHeight };
-    });
-    pruefe(lage.seiteRechts, "Anzeige: Seitenleiste mit QR-Code bleibt rechts frei");
-    pruefe(lage.karteGanz, "Anzeige: Karte vollständig sichtbar");
+    pruefe(await anzeige.$eval(`[data-typ="karte.einzelkoordinate"]`, (w) => { const r = w.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight && r.right <= innerWidth; }),
+      "Anzeige: Sitzungs-Widget vollständig sichtbar");
     await anzeige.screenshot({ path: `${DIR}/v8-anzeige-ort.png` });
     await lena.screenshot({ path: `${DIR}/v9-detail-aufs-board.png` });
 
-    // Neu geladene Anzeige bekommt die Karte sofort
+    // Neu geladene Anzeige bekommt die Sitzung sofort
     await anzeige.reload();
-    pruefe(await warteAuf(anzeige, () => document.querySelector(".g-karte h2")), "Anzeige nach Neuladen: Karte wieder da");
+    pruefe(await da(lenasOrt.locator("h3")), "Anzeige nach Neuladen: Sitzungs-Widget wieder da");
 
-    // Tim wirft etwas Neues – Zeilen und Text, im Nether
-    timWs.send(JSON.stringify({ art: "zeigen", anfrage: 1, karte: { titel: "<b>Eisenfarm</b>", unter: "Portal-Verbindung", bereich: "Portale", dimension: "nether",
-      bloecke: [{ art: "zeilen", zeilen: [{ label: "Status", wert: "Einseitig" }, { label: "Abstand", wert: "34 Blöcke" }] }, { art: "text", text: "Nether-Portal genau bei X 37 · Y 80 · Z −53 bauen." }] } }));
-    timWs.send(JSON.stringify({ art: "zeigen", anfrage: 2, karte: { titel: "Kaputt", bloecke: [{ art: "html", inhalt: "<script>" }] } }));
+    // Tim legt die Netherfestung dazu (direkt über den WebSocket, mit Quelle); eine fertige Karte (alter Weg) lehnt das Board ab
+    timWs.send(JSON.stringify({ art: "zeigen", anfrage: 1, quelle: `ort:${timOrte["Nether Fortress"]}` }));
+    timWs.send(JSON.stringify({ art: "zeigen", anfrage: 2, quelle: "unsinn" }));
+    timWs.send(JSON.stringify({ art: "zeigen", anfrage: 3, karte: { titel: "Alt", bloecke: [{ art: "text", text: "fertige Karte" }] } }));
     await schlafen(500);
-    pruefe(antworten.some((n) => n.anfrage === 1 && n.art === "ok"), "Tim: Karte angenommen");
-    pruefe(antworten.some((n) => n.anfrage === 2 && n.art === "fehler" && n.text === "Unbekannter Block"), "Tim: ungültige Karte abgelehnt");
-    pruefe(await warteAuf(anzeige, () => document.querySelector(".g-karte h2")?.textContent === "<b>Eisenfarm</b>"), "Anzeige: neue Karte ersetzt die alte, HTML bleibt Text");
-    await anzeige.waitForTimeout(600);
-    pruefe(await anzeige.$eval(".g-karte", (e) => e.classList.contains("thema-nether")), "Anzeige: Karte im Nether-Theme");
-    pruefe((await anzeige.$$eval(".g-zeile", (l) => l.map((z) => z.textContent).join(" | "))) === "StatusEinseitig | Abstand34 Blöcke", "Anzeige: Zeilen");
-    pruefe((await text(anzeige, ".g-text")).startsWith("Nether-Portal genau"), "Anzeige: Text");
-    await anzeige.screenshot({ path: `${DIR}/v10-anzeige-zeilen.png` });
-    pruefe(await lena.$eval(".board-zeigen", (e) => e.classList.contains("aktiv")), "Detail: Knopf bleibt „Liegt auf dem Board“ (Tims Karte ersetzt nur die große Anzeige, nicht die Sitzung)");
+    const timsWidget = antworten.find((n) => n.anfrage === 1 && n.art === "ok")?.instanzId;
+    pruefe(Boolean(timsWidget), "Tim: Netherfestung angenommen");
+    pruefe(antworten.some((n) => n.anfrage === 2 && n.art === "fehler" && /Unbekannte Quelle/.test(n.text)), "Tim: unbekannte Quelle abgelehnt");
+    pruefe(antworten.some((n) => n.anfrage === 3 && n.art === "fehler" && n.text === "Die Companion ist veraltet – bitte neu laden"), "Tim: fertige Karte (alter Weg) abgelehnt");
+    const timsOrt = sitzungsKarte("karte.einzelkoordinate", "Tim");
+    pruefe(await bis(() => timsOrt.evaluate((k) => k.dataset.dimension === "nether" && k.querySelector("img.kennblock")?.naturalWidth > 0)),
+      "Anzeige: Tims Netherfestung daneben, im Nether, mit Kennblock");
+    pruefe(await anzeige.$$eval('[data-testid="von"]', (l) => l.map((e) => e.textContent.trim()).sort().join()) === "Lena,Tim", "Anzeige: zwei Sitzungs-Widgets, von Lena und von Tim");
+    await anzeige.waitForTimeout(400);
+    await anzeige.screenshot({ path: `${DIR}/v10-anzeige-zwei.png` });
+    pruefe(await lena.$eval(".board-zeigen", (e) => e.classList.contains("aktiv")), "Detail: Lenas Knopf bleibt „Liegt auf dem Board“");
+    timWs.send(JSON.stringify({ art: "verbergen", anfrage: 4, instanzId: timsWidget }));
+    pruefe(await da(timsOrt, "detached"), "Tim nimmt seine Festung wieder weg");
 
     // Wegnehmen über das Board-Sheet: die Sitzung listet Lenas Widget
     await lena.click('[data-aktion="schliessen"]'); await lena.waitForTimeout(250);
@@ -335,27 +332,23 @@ try {
     pruefe(auf.includes(ortTitel) && auf.includes("von Lena"), `Board-Sheet: zeigt Lenas Sitzungs-Widget „${ortTitel}“`);
     await lena.screenshot({ path: `${DIR}/v11-sheet-gezeigt.png` });
     await lena.click('[data-aktion="board-wegnehmen"]');
-    pruefe(await warteAuf(dash, () => !document.querySelector('[data-testid="von"]')), "Wegnehmen → Sitzungs-Widget verschwindet vom Dashboard");
+    pruefe(await warteAuf(anzeige, () => !document.querySelector('[data-testid="von"]')), "Wegnehmen → Sitzungs-Widget verschwindet von der Anzeige");
     pruefe(await warteAuf(lena, () => document.getElementById("orteSheetInhalt")?.textContent.includes("Gerade liegt nichts")), "Board-Sheet: wieder leer");
-    timWs.send(JSON.stringify({ art: "verbergen", anfrage: 3, id: null }));   // Tims große Karte räumen (alter Weg)
-    pruefe(await warteAuf(anzeige, () => !document.querySelector(".a-gezeigt")), "Tim nimmt seine Karte weg → Anzeige wieder frei");
 
-    // Struktur aufs Board → die Anzeige zeigt den Kennblock neben dem Titel
+    // Struktur aufs Board → das Widget zeigt den Kennblock neben dem Titel
     await lena.evaluate(() => detailOeffnen(st.instanzen.find((i) => typVon(i).kategorie === "Stronghold").id)); await lena.waitForTimeout(350);
     await lena.click(".board-zeigen");
-    pruefe(await warteAuf(anzeige, () => document.querySelector(".g-kennblock img.kennblock")?.naturalWidth > 0), "Anzeige: Stronghold mit Kennblock neben dem Titel");
-    await anzeige.waitForTimeout(600);
-    pruefe(await anzeige.$eval(".g-kennblock img", (i) => i.getAttribute("src")) === "/icons/struktur_kennbloecke/stronghold.png", "Anzeige: Kennblock stronghold.png");
-    pruefe(await anzeige.evaluate(() => { const k = document.querySelector(".g-karte").getBoundingClientRect(); return k.bottom <= innerHeight; }), "Anzeige: Karte mit Kennblock vollständig sichtbar");
+    const burg = sitzungsKarte("karte.einzelkoordinate", "Lena");
+    pruefe(await bis(() => burg.evaluate((k) => k.querySelector("img.kennblock")?.getAttribute("src").endsWith("stronghold.png") && k.querySelector("img.kennblock").naturalWidth > 0)),
+      "Anzeige: Stronghold mit Kennblock neben dem Titel");
+    pruefe(await burg.locator("img.kennblock").getAttribute("src") === "/icons/struktur_kennbloecke/stronghold.png", "Anzeige: Kennblock stronghold.png");
+    pruefe(await burg.evaluate((k) => k.getBoundingClientRect().bottom <= innerHeight), "Anzeige: Karte mit Kennblock vollständig sichtbar");
+    await anzeige.waitForTimeout(400);
     await anzeige.screenshot({ path: `${DIR}/v12-anzeige-kennblock.png` });
-    pruefe(await warteAuf(dash, () => document.querySelector('[data-typ="karte.einzelkoordinate"] img.kennblock')?.naturalWidth > 0), "Dashboard: Stronghold-Widget mit Kennblock");
-    await dash.screenshot({ path: `${DIR}/v12b-dashboard-kennblock.png` });
     await lena.evaluate(() => boardAlleWegnehmen());
-    pruefe(await warteAuf(anzeige, () => !document.querySelector(".a-gezeigt")), "Stronghold wieder vom Board genommen");
-    pruefe(await warteAuf(dash, () => !document.querySelector('[data-testid="von"]')), "Dashboard: Sitzung wieder leer");
+    pruefe(await warteAuf(anzeige, () => !document.querySelector('[data-testid="von"]')), "Stronghold wieder vom Board genommen, Sitzung leer");
     timWs.close();
     await anzeige.close();
-    await dash.close();
     await lena.close();
 
     // Die übrigen Bereiche laufen weiter

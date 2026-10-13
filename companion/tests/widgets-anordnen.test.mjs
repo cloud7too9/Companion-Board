@@ -16,10 +16,7 @@ const DIR = path.join(HIER, "bilder");
 mkdirSync(DIR, { recursive: true });
 const pruefe = (ok, text) => { console.log((ok ? "OK   " : "FEHL ") + text); if (!ok) process.exitCode = 1; };
 const schlafen = (ms) => new Promise((r) => setTimeout(r, ms));
-for (const [datei, bauen] of [["../widgets/dist/index.html", "npm --prefix ../widgets run build"],
-  ["../../koordinaten-board/client/dist/index.html", "npm --prefix ../../koordinaten-board run build"]]) {
-  if (!existsSync(path.join(HIER, datei))) { console.log(`FEHL nicht gebaut: ${bauen}`); process.exit(1); }
-}
+if (!existsSync(path.join(HIER, "../widgets/dist/index.html"))) { console.log("FEHL nicht gebaut: npm --prefix ../widgets run build"); process.exit(1); }
 
 const TMP = mkdtempSync(path.join(tmpdir(), "widgets-anordnen-"));
 const PORT = 3185, PIN = "471100", BOARD = `http://127.0.0.1:${PORT}`;

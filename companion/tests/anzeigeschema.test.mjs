@@ -1,7 +1,8 @@
 // Anzeigeschema: Jeder Inhalt der Companion lässt sich aufs Board werfen.
 // Für alle DEMO-Inhalte wird die Karte gebaut und mit der Prüfung des Boards (zeigen.js)
 // kontrolliert; je Schema landet eine Karte auf einer echten Anzeige (Screenshot).
-// Die Schemas werden in der DEMO-Companion gebaut und mit zeigen.js geprüft; „Aufs Board“ selbst läuft live vom Board (Bauplan „Sitzung“, S2).
+// Die Schemas werden in der DEMO-Companion gebaut und mit zeigen.js geprüft; „Aufs Board“ selbst läuft live vom Board
+// und legt ein Sitzungs-Widget auf die Anzeige, das Dashboard (Bauplan „Sitzung“, S2/S4).
 import { chromium } from "playwright";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { mkdirSync, mkdtempSync, rmSync, existsSync } from "node:fs";
@@ -17,8 +18,8 @@ const BOARD_ORDNER = path.join(HIER, "../../koordinaten-board");
 const { kartePruefen } = await import(pathToFileURL(path.join(BOARD_ORDNER, "server/src/zeigen.js")).href);
 const TMP = mkdtempSync(path.join(tmpdir(), "schema-test-"));
 const PORT = 3194, PIN = "471100", BOARD = `http://127.0.0.1:${PORT}`;
-if (!existsSync(path.join(BOARD_ORDNER, "client/dist/index.html"))) {
-  console.log("FEHL Board-Client nicht gebaut: npm --prefix ../../koordinaten-board run build");
+if (!existsSync(path.join(HIER, "../widgets/dist/index.html"))) {
+  console.log("FEHL Dashboard nicht gebaut: npm --prefix ../widgets install && npm --prefix ../widgets run build");
   process.exit(1);
 }
 const pruefe = (ok, text) => { console.log((ok ? "OK   " : "FEHL ") + text); if (!ok) process.exitCode = 1; };
@@ -78,7 +79,7 @@ try {
 
   // ---- Live: „Aufs Board“ legt jeden Inhalt als Sitzungs-Widget ab (Bauplan „Sitzung“, S2) ----
   // Das Board baut die Karte selbst, also müssen die Inhalte auf dem Board liegen: Max legt sie per API an,
-  // dann läuft die Companion live vom Board. Bis S4 zeigt auch die alte Anzeige die Karte groß (Brücke).
+  // dann läuft die Companion live vom Board.
   const api = (m, pfad, body) => fetch(`${BOARD}/api${pfad}`, { method: m, headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
     body: body === undefined ? undefined : JSON.stringify(body) }).then((r) => r.json());
   const welt = (await api("POST", "/orte/welten", { seed: "6889192652397090698" })).welt;
@@ -99,12 +100,11 @@ try {
   await live.evaluate(() => Promise.all([bannerLaden(), ruestungLaden(), portaleLaden(), samLaden()]));
   await live.waitForFunction(() => bn.liste.length && rs.sets.length && pt.liste.length);
 
-  const anzeige = await browser.newPage({ viewport: { width: 1600, height: 900 } });
-  const linkQuery = await anzeigeLinkQuery(path.join(TMP, "daten"));
-  await anzeige.goto(`${BOARD}/anzeige${linkQuery}`);
-  await anzeige.waitForSelector(".anzeige");
   const dash = await browser.newPage({ viewport: { width: 1600, height: 900 } });
-  await dash.goto(`${BOARD}/dashboard${linkQuery}`);
+  await dash.goto(`${BOARD}/dashboard${await anzeigeLinkQuery(path.join(TMP, "daten"))}`);
+  await dash.waitForSelector("[data-panel-id]");
+  // Karte eines Sitzungs-Widgets (nach „Aufs Board“ ist der Sitzungs-Layer aktiv, das Dashboard zeigt nur ihn)
+  const karte = (typ) => `[data-typ="${typ}"] [data-testid="karte"]`;
   const warteAuf = async (seite, fn, arg, ms = 12000) => { try { await seite.waitForFunction(fn, arg, { timeout: ms }); return true; } catch { return false; } };
   const zeigen = async (oeffnen, name, typ) => {
     await live.evaluate(oeffnen); await live.waitForTimeout(350);
@@ -112,44 +112,44 @@ try {
     pruefe(knopf !== null && (await knopf.textContent()).includes("Aufs Board"), `${name}: Knopf „Aufs Board“`);
     await knopf.click();
     pruefe(await warteAuf(live, () => document.querySelector("#orteSheetInhalt .board-zeigen")?.classList.contains("aktiv")), `${name}: Knopf zeigt „Liegt auf dem Board“`);
-    pruefe(await warteAuf(dash, (t) => Boolean(document.querySelector(`[data-typ="${t}"] [data-testid="karte"]`)), typ), `${name}: Sitzungs-Widget ${typ} auf dem Dashboard`);
-    await anzeige.waitForSelector(".g-karte h2"); await anzeige.waitForTimeout(700);
+    pruefe(await warteAuf(dash, (t) => Boolean(document.querySelector(`[data-typ="${t}"] [data-testid="karte"] h3`)), typ), `${name}: Sitzungs-Widget ${typ} auf dem Dashboard`);
+    await dash.waitForTimeout(500);
   };
   await live.evaluate(() => modulWechseln("sammelobjekte"));
   await zeigen(() => samDetailOeffnen("rib"), "Sammelobjekt", "sammelobjekte.einzelobjekt");
-  pruefe(await anzeige.$eval(".g-karte h2", (e) => e.textContent) === "Rippenzier", "Anzeige: Rippenzier");
-  pruefe(await anzeige.$eval(".g-kennblock img", (i) => i.getAttribute("src").endsWith("fortress.png") && i.naturalWidth > 0), "Anzeige: Kennblock der Netherfestung");
-  pruefe(await warteAuf(dash, () => document.querySelector('[data-typ="sammelobjekte.einzelobjekt"] img.kennblock')?.naturalWidth > 0), "Dashboard: Kennblock der Netherfestung im Widget");
-  await anzeige.screenshot({ path: `${DIR}/a1-sammelobjekt.png` });
+  pruefe(await dash.$eval(`${karte("sammelobjekte.einzelobjekt")} h3`, (e) => e.textContent) === "Rippenzier", "Anzeige: Rippenzier");
+  pruefe(await warteAuf(dash, (s) => { const i = document.querySelector(`${s} img.kennblock`); return i?.getAttribute("src").endsWith("fortress.png") && i.naturalWidth > 0; },
+    karte("sammelobjekte.einzelobjekt")), "Anzeige: Kennblock der Netherfestung im Widget");
+  await dash.screenshot({ path: `${DIR}/a1-sammelobjekt.png` });
 
   await live.click('#orteSheetInhalt [data-aktion="schliessen"]'); await live.waitForTimeout(250);
   const fuss = await live.$("#samFuss .sam-board");
   pruefe(fuss !== null, "Sammelobjekte: Bottom-Bar „Aufs Board“ für den Fortschritt");
   await fuss.click();
-  pruefe(await warteAuf(anzeige, () => document.querySelector(".g-karte h2")?.textContent === "Rüstungsbesätze"), "Anzeige: Sammel-Fortschritt");
-  await anzeige.waitForTimeout(700);
+  pruefe(await warteAuf(dash, (s) => document.querySelector(`${s} h3`)?.textContent === "Rüstungsbesätze", karte("sammelobjekte.status")), "Anzeige: Sammel-Fortschritt als Sitzungs-Widget");
   pruefe(await warteAuf(live, () => document.querySelector("#samFuss .sam-board")?.classList.contains("aktiv")), "Bottom-Bar zeigt „Liegt auf dem Board“");
-  pruefe(await warteAuf(dash, () => Boolean(document.querySelector('[data-typ="sammelobjekte.status"]'))), "Dashboard: Sammel-Fortschritt als Sitzungs-Widget");
-  await anzeige.screenshot({ path: `${DIR}/a2-sammelstand.png` });
+  await dash.waitForTimeout(500);
+  await dash.screenshot({ path: `${DIR}/a2-sammelstand.png` });
   await live.screenshot({ path: `${DIR}/a2b-sammel-fuss.png` });
 
   await live.evaluate(() => modulWechseln("portale"));
   await zeigen(() => portalDetailOeffnen(pt.liste.find((v) => v.name === "Eisenfarm").id), "Portal-Verbindung", "portale.verbindung");
-  pruefe(await anzeige.$eval(".g-karte", (e) => e.classList.contains("thema-nether") && e.querySelectorAll(".g-koord").length === 2), "Anzeige: Portal mit zwei Koordinaten im Nether-Theme");
-  await anzeige.screenshot({ path: `${DIR}/a3-portal.png` });
+  pruefe(await dash.$eval(karte("portale.verbindung"), (e) => e.querySelector("h3").textContent === "Eisenfarm" && e.dataset.dimension === "nether" && e.querySelectorAll(".karte-koord").length === 2),
+    "Anzeige: Portal „Eisenfarm“ mit zwei Koordinaten, Nether");
+  await dash.screenshot({ path: `${DIR}/a3-portal.png` });
 
   await live.evaluate(() => modulWechseln("banner"));
   await zeigen(() => bannerDetailOeffnen(bn.liste[0].id), "Banner", "banner.banner");
-  pruefe(await anzeige.$eval(".g-bild img", (i) => i.naturalWidth === 20 && i.naturalHeight === 40 && getComputedStyle(i).imageRendering === "pixelated"), "Anzeige: Banner 20×40 pixelgenau vergrößert");
-  await anzeige.screenshot({ path: `${DIR}/a4-banner.png` });
+  pruefe(await warteAuf(dash, (s) => { const i = document.querySelector(`${s} img:not(.kennblock)`); return i?.complete && i.naturalWidth === 20 && i.naturalHeight === 40 && i.style.imageRendering === "pixelated"; },
+    karte("banner.banner")), "Anzeige: Banner 20×40 pixelgenau vergrößert");
+  await dash.screenshot({ path: `${DIR}/a4-banner.png` });
 
   await live.evaluate(() => modulWechseln("ruestung"));
   await zeigen(() => ruestungDetailOeffnen(rs.sets[0].id), "Rüstungs-Set", "ruestung.set");
-  pruefe(await warteAuf(anzeige, () => document.querySelector(".g-karte h2")?.textContent === "Umbreon"), "Anzeige: Rüstungs-Set Umbreon");
+  pruefe(await warteAuf(dash, (s) => document.querySelector(`${s} h3`)?.textContent === "Umbreon", karte("ruestung.set")), "Anzeige: Rüstungs-Set Umbreon");
   // Die Karte kommt vom Server: Teile als Zeilen, die 3D-Figur fehlt dort vorerst (entschieden 13.10.2026)
-  pruefe(await anzeige.$eval(".g-karte", (e) => e.querySelectorAll(".g-zeile").length >= 1), "Anzeige: Rüstungs-Set mit Zeilen je Teil (Figur kommt vom Server noch nicht)");
-  await anzeige.screenshot({ path: `${DIR}/a5-ruestung.png` });
-  await dash.screenshot({ path: `${DIR}/a6-dashboard-sitzung.png` });
+  pruefe(await dash.$eval(karte("ruestung.set"), (e) => e.querySelectorAll("dl > div").length >= 1), "Anzeige: Rüstungs-Set mit Zeilen je Teil (Figur kommt vom Server noch nicht)");
+  await dash.screenshot({ path: `${DIR}/a5-ruestung.png` });
 
   // Board-Sheet listet die Sitzung, „Alle wegnehmen“ räumt sie
   await live.click('#orteSheetInhalt [data-aktion="schliessen"]'); await live.waitForTimeout(250);

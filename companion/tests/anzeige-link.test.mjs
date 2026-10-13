@@ -1,6 +1,7 @@
 // Anzeige-Link: Im Board-Sheet der Companion stehen die Anzeigen mit Link und QR-Code. Ein anderes Gerät
 // (hier: dieselbe Maschine über ihre Netzwerkadresse, also nicht localhost) wird mit dem Link zur Anzeige,
-// merkt sich den Schlüssel und fliegt raus, wenn jemand einen neuen Schlüssel erzeugt.
+// merkt sich den Schlüssel und fliegt raus, wenn jemand einen neuen Schlüssel erzeugt. Die Anzeige ist das
+// Widget-Dashboard (Bauplan „Sitzung“, S4); alte Links auf /anzeige führen dorthin.
 import { chromium } from "playwright";
 import { fileURLToPath } from "node:url";
 import { mkdirSync, mkdtempSync, rmSync, existsSync } from "node:fs";
@@ -14,8 +15,8 @@ const DIR = path.join(HIER, "bilder");
 mkdirSync(DIR, { recursive: true });
 const pruefe = (ok, text) => { console.log((ok ? "OK   " : "FEHL ") + text); if (!ok) process.exitCode = 1; };
 const schlafen = (ms) => new Promise((r) => setTimeout(r, ms));
-if (!existsSync(path.join(HIER, "../../koordinaten-board/client/dist/index.html"))) {
-  console.log("FEHL Board-Client nicht gebaut: npm --prefix ../../koordinaten-board run build");
+if (!existsSync(path.join(HIER, "../widgets/dist/index.html"))) {
+  console.log("FEHL Dashboard nicht gebaut: npm --prefix ../widgets install && npm --prefix ../widgets run build");
   process.exit(1);
 }
 const AUSSEN = Object.values(networkInterfaces()).flat().find((n) => n && n.family === "IPv4" && !n.internal)?.address;
@@ -41,11 +42,17 @@ async function seite(viewport = { width: 390, height: 844 }) {
 }
 const text = (p, sel) => p.$eval(sel, (e) => e.textContent.replace(/\s+/g, " ").trim()).catch(() => "");
 const warteAuf = (p, fn, arg, ms = 8000) => p.waitForFunction(fn, arg, { timeout: ms }).then(() => true, () => false);
+// Dashboard als Anzeige: läuft (Anzeige „Board“, verbunden, kein Hinweis auf den Link) oder zeigt einen Hinweis in den Widgets
+const laeuft = (p) => warteAuf(p, () => document.querySelector('[data-testid="anzeige-name"]')?.textContent === "Anzeige Board"
+  && document.querySelector('[data-testid="verbunden"]')?.dataset.verbunden === "true"
+  && ![...document.querySelectorAll('[data-testid="widget-leer"]')].some((e) => e.textContent.includes("Anzeige-Link")));
+const hinweis = (p, text, ms) => warteAuf(p, (t) => document.querySelectorAll('[data-testid="widget-leer"]').length > 0
+  && [...document.querySelectorAll('[data-panel-id] [data-testid="widget-leer"]')].every((e) => e.textContent === t), text, ms);
 
 try {
   for (let i = 0; i < 60; i++) { try { if ((await fetch(`${BOARD}/api/server`)).ok) break; } catch {} await schlafen(200); }
   await schlafen(300);
-  pruefe(new RegExp(`Anzeige: http://${AUSSEN.replace(/\./g, "\\.")}:${PORT}/anzeige\\?anzeige=a_\\d+&schluessel=[\\w-]+`).test(konsole),
+  pruefe(new RegExp(`Anzeige: http://${AUSSEN.replace(/\./g, "\\.")}:${PORT}/dashboard\\?anzeige=a_\\d+&schluessel=[\\w-]+`).test(konsole),
     "Konsole nennt den Anzeige-Link beim Start");
   pruefe(/anzeige-link\.txt/.test(konsole) && (await anzeigeLinkQuery(path.join(TMP, "daten"))).startsWith("?anzeige=a_"),
     "Server schreibt den Link nach daten/anzeige-link.txt (für die Startskripte)");
@@ -63,7 +70,7 @@ try {
   await max.click("#boardBtn");
   pruefe(await warteAuf(max, () => bd.anzeigen?.length === 1 && document.querySelector(".anzeige-karte")), "Board-Sheet: Abschnitt „Anzeigen“");
   const board1 = await max.evaluate(() => bd.anzeigen[0]);
-  pruefe(board1.name === "Board" && board1.link.startsWith(`http://${AUSSEN}:${PORT}/anzeige?anzeige=`), `Anzeige „Board“ mit Link (${board1.link.split("&")[0]}…)`);
+  pruefe(board1.name === "Board" && board1.link.startsWith(`http://${AUSSEN}:${PORT}/dashboard?anzeige=`), `Anzeige „Board“ mit Link (${board1.link.split("&")[0]}…)`);
   await max.click('.anzeige-karte [data-aktion="anzeige-qr"]');
   pruefe(await warteAuf(max, () => document.querySelector(".anzeige-qr svg")), "QR-Code zum Abscannen");
   await max.evaluate(() => document.querySelector(".anzeige-qr").scrollIntoView({ block: "center" }));
@@ -71,13 +78,14 @@ try {
 
   // ---- Anzeige „von außen“: ohne Link gesperrt, mit Link erlaubt, merkt sich den Schlüssel ----
   const tv = await seite({ width: 1280, height: 720 });
-  await tv.goto(`http://${AUSSEN}:${PORT}/anzeige`);
-  pruefe(await warteAuf(tv, () => document.querySelector(".a-fehler")?.textContent.includes("braucht die Anzeige ihren Anzeige-Link")),
-    "Anderes Gerät ohne Link: Hinweis auf den Anzeige-Link");
+  await tv.goto(`http://${AUSSEN}:${PORT}/dashboard/`);
+  pruefe(await hinweis(tv, "Diese Anzeige braucht ihren Anzeige-Link"), "Anderes Gerät ohne Link: Hinweis auf den Anzeige-Link");
   await tv.goto(board1.link);
-  pruefe(await warteAuf(tv, () => document.querySelector(".a-kopf") && !document.querySelector(".a-fehler")), "Mit Anzeige-Link läuft die Anzeige");
+  pruefe(await laeuft(tv), "Mit Anzeige-Link läuft die Anzeige");
+  await tv.goto(`http://${AUSSEN}:${PORT}/dashboard/`);
+  pruefe(await laeuft(tv), "Neustart ohne Link: Schlüssel aus dem Browser");
   await tv.goto(`http://${AUSSEN}:${PORT}/anzeige`);
-  pruefe(await warteAuf(tv, () => document.querySelector(".a-kopf") && !document.querySelector(".a-fehler")), "Neustart ohne Link: Schlüssel aus dem Browser");
+  pruefe(new URL(tv.url()).pathname === "/dashboard/" && await laeuft(tv), "Alter Pfad /anzeige führt aufs Dashboard");
   await tv.screenshot({ path: `${DIR}/z2-anzeige-tv.png` });
 
   // ---- Neue Anzeige, umbenennen ----
@@ -96,19 +104,18 @@ try {
   pruefe((await text(max, knopf)) === "Alte Links ungültig?" && (await max.evaluate((l) => bd.anzeigen[0].link === l, board1.link)), "Erstes Tippen fragt nach");
   await max.click(knopf);
   pruefe(await warteAuf(max, (l) => bd.anzeigen[0].link !== l, board1.link), "Neuer Schlüssel erzeugt");
-  pruefe(await warteAuf(tv, () => document.querySelector(".a-fehler")?.textContent.includes("gilt nicht mehr"), null, 15000),
-    "Anzeige mit altem Schlüssel: „Dieser Anzeige-Link gilt nicht mehr.“");
+  pruefe(await hinweis(tv, "Dieser Anzeige-Link gilt nicht mehr", 15000), "Anzeige mit altem Schlüssel: „Dieser Anzeige-Link gilt nicht mehr“");
   await tv.screenshot({ path: `${DIR}/z3-anzeige-ungueltig.png` });
   await tv.goto(await max.evaluate(() => bd.anzeigen[0].link));
-  pruefe(await warteAuf(tv, () => document.querySelector(".a-kopf") && !document.querySelector(".a-fehler")), "Mit dem neuen Link läuft sie wieder");
+  pruefe(await laeuft(tv), "Mit dem neuen Link läuft sie wieder");
   await max.screenshot({ path: `${DIR}/z4-anzeigen-zwei.png` });
 
   // Auch das Board-Gerät selbst (localhost) braucht den Link (Umbau Phase 1)
   const lokal = await seite({ width: 1280, height: 720 });
-  await lokal.goto(`${BOARD}/anzeige`);
-  pruefe(await warteAuf(lokal, () => document.querySelector(".a-fehler")?.textContent.includes("Anzeige-Link")), "localhost ohne Link: gesperrt");
-  await lokal.goto(`${BOARD}/anzeige${await anzeigeLinkQuery(path.join(TMP, "daten"))}`);
-  pruefe(await warteAuf(lokal, () => document.querySelector(".a-kopf") && !document.querySelector(".a-fehler")), "localhost mit Link: Anzeige läuft");
+  await lokal.goto(`${BOARD}/dashboard/`);
+  pruefe(await hinweis(lokal, "Diese Anzeige braucht ihren Anzeige-Link"), "localhost ohne Link: gesperrt");
+  await lokal.goto(`${BOARD}/dashboard${await anzeigeLinkQuery(path.join(TMP, "daten"))}`);
+  pruefe(await laeuft(lokal), "localhost mit Link: Anzeige läuft");
 } catch (f) {
   pruefe(false, `Abbruch: ${f.stack || f}`);
 } finally {

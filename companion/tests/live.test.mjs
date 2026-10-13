@@ -14,8 +14,8 @@ mkdirSync(DIR, { recursive: true });
 const TMP = mkdtempSync(path.join(tmpdir(), "live-test-"));
 const PORT = 3195, PIN = "471100";
 const BOARD = `http://127.0.0.1:${PORT}`;
-if (!existsSync(path.join(HIER, "../../koordinaten-board/client/dist/index.html"))) {
-  console.log("FEHL Board-Client nicht gebaut: npm --prefix ../../koordinaten-board run build");
+if (!existsSync(path.join(HIER, "../widgets/dist/index.html"))) {
+  console.log("FEHL Dashboard nicht gebaut: npm --prefix ../widgets install && npm --prefix ../widgets run build");
   process.exit(1);
 }
 const pruefe = (ok, text) => { console.log((ok ? "OK   " : "FEHL ") + text); if (!ok) process.exitCode = 1; };
@@ -203,28 +203,29 @@ try {
   await max.click('#orteSheetInhalt [data-aktion="schliessen"]');
   await max.evaluate(() => { st.importe = []; });
 
-  // === Anzeige im Zimmer zeigt die aktive Welt ===================================
+  // === Anzeige im Zimmer (das Dashboard, Bauplan „Sitzung“) zeigt die aktive Welt ===
   const anzeige = await (await browser.newContext({ viewport: { width: 1600, height: 900 } })).newPage();
   anzeige.on("pageerror", (e) => fehler.push("Anzeige: " + e.message));
-  await anzeige.goto(`${BOARD}/anzeige${await anzeigeLinkQuery(path.join(TMP, "daten"))}`);
-  await anzeige.waitForSelector(".anzeige");
-  const anzeigeOrte = () => anzeige.$$eval(".a-zeile", (l) => l.map((z) => {
+  await anzeige.goto(`${BOARD}/dashboard${await anzeigeLinkQuery(path.join(TMP, "daten"))}`);
+  await anzeige.waitForSelector('[data-panel-id="w-orte"]');
+  const ORTE = '[data-panel-id="w-orte"] [data-ort-id]';   // angeheftet oben und in den Spalten je Dimension
+  const anzeigeOrte = () => anzeige.$$eval(ORTE, (l) => l.map((z) => {
     const img = z.querySelector("img.kennblock");
-    return z.querySelector(".name > span").textContent.trim() + (img ? ` [${img.getAttribute("src").split("/").pop()}]` : "");
+    return z.querySelector('[data-testid="ort-name"]').textContent.trim() + (img ? ` [${img.getAttribute("src").split("/").pop()}]` : "");
   }).sort().join(", "));
-  pruefe(await warteAuf(anzeige, () => document.querySelectorAll(".a-zeile").length === 3), "Anzeige: Orte der ersten Welt");
+  pruefe(await warteAuf(anzeige, (s) => document.querySelectorAll(s).length === 3, ORTE), "Anzeige: Orte der ersten Welt");
   await anzeige.waitForFunction(() => [...document.querySelectorAll("img.kennblock")].every((i) => i.complete));
   const orteWelt1 = await anzeigeOrte();
   console.log("     Anzeige:", orteWelt1);
   pruefe(orteWelt1 === "Hauptbasis, Stronghold (Stairway) [stronghold.png], Village", "Anzeige: Hauptbasis, Stronghold (Stairway) mit Kennblock, Village");
-  pruefe((await text(anzeige, ".subtitle")).includes("Welt 68891…0698"), "Anzeige nennt die Welt");
+  pruefe((await text(anzeige, '[data-testid="anzeige-welt"]')).includes("Seed 68891…0698"), "Anzeige nennt die Welt");
   await anzeige.screenshot({ path: `${DIR}/l6-anzeige-welt1.png` });
 
   // Anheften: Ort groß oben auf der Anzeige (früher in der Board-Steuerung)
   await max.evaluate(() => { modulWechseln("karte"); detailOeffnen(st.instanzen.find((i) => typVon(i).kategorie === "Stronghold").id); });
   await max.waitForSelector('[data-aktion="anheften"]');
   await max.click('[data-aktion="anheften"]');
-  pruefe(await warteAuf(anzeige, () => document.querySelector(".a-gross .name")?.textContent === "Stronghold (Stairway)"), "Angeheftet → groß oben auf der Anzeige");
+  pruefe(await warteAuf(anzeige, () => document.querySelector('[data-testid="angeheftet"] [data-testid="ort-name"]')?.textContent === "Stronghold (Stairway)"), "Angeheftet → groß oben auf der Anzeige");
   pruefe(await warteAuf(max, () => document.querySelector('[data-aktion="anheften"]')?.classList.contains("aktiv")), "Knopf im Detail zeigt „Lösen“");
   await anzeige.waitForTimeout(500);
   await anzeige.screenshot({ path: `${DIR}/l6b-anzeige-angeheftet.png` });
@@ -243,13 +244,14 @@ try {
   pruefe(await warteAuf(max, () => document.getElementById("boardWelt")?.options.length === 2), "Board-Sheet: Auswahl mit beiden Welten");
   await max.screenshot({ path: `${DIR}/l7-board-einstellungen.png` });
   await max.selectOption("#boardWelt", welt2);
-  pruefe(await warteAuf(anzeige, () => document.querySelectorAll(".a-zeile").length === 1 && document.querySelector(".a-zeile .name > span").textContent === "End City"), "Aktive Welt umgestellt → Anzeige zeigt End City");
-  pruefe((await text(anzeige, ".subtitle")).includes("Welt -4719…3210"), "Anzeige nennt die neue Welt");
+  pruefe(await warteAuf(anzeige, (s) => document.querySelectorAll(s).length === 1 && document.querySelector(`${s} [data-testid="ort-name"]`).textContent === "End City", ORTE),
+    "Aktive Welt umgestellt → Anzeige zeigt End City");
+  pruefe((await text(anzeige, '[data-testid="anzeige-welt"]')).includes("Seed -4719…3210"), "Anzeige nennt die neue Welt");
   await max.fill("#boardTitel", "Server-Welt"); await max.press("#boardTitel", "Enter"); await max.$eval("#boardTitel", (e) => e.blur());
-  pruefe(await warteAuf(anzeige, () => document.querySelector("h1")?.textContent === "Server-Welt"), "Titel der Anzeige geändert");
-  pruefe(await anzeige.$(".qr") !== null, "QR-Code sichtbar");
+  pruefe(await warteAuf(anzeige, () => document.querySelector('[data-testid="anzeige-titel"]')?.textContent === "Server-Welt"), "Titel der Anzeige geändert");
+  pruefe(await anzeige.$('[data-panel-id="w-beitreten"] [data-testid="qr"] svg') !== null, "QR-Code sichtbar");
   await max.click('[data-aktion="board-qr"]');
-  pruefe(await warteAuf(anzeige, () => !document.querySelector(".qr")), "QR-Code ausgeblendet");
+  pruefe(await warteAuf(anzeige, () => !document.querySelector('[data-testid="qr"]') && document.querySelector('[data-testid="qr-aus"]')), "QR-Code ausgeblendet");
   pruefe(await warteAuf(max, () => bd.einstellungen?.qrZeigen === false && document.querySelector('[data-aktion="board-qr"]')?.getAttribute("aria-checked") === "false"), "Schalter zeigt „aus“");
   await max.click('[data-aktion="board-qr"]');
   await anzeige.waitForTimeout(600);
@@ -270,8 +272,9 @@ try {
   await max.evaluate(() => modulWechseln("sammelobjekte"));
   pruefe(await warteAuf(max, () => st.instanzen?.length === 3 && sam.status.rib && pt.liste.length === 1), "Nach dem Neustart: Orte, Sammelobjekt, Portal noch da");
   pruefe((await max.evaluate(() => api("/ruestung"))).data.sets[0]?.name === "Rippen-Set", "… und das Rüstungs-Set");
-  pruefe(await warteAuf(anzeige, () => document.querySelector("h1")?.textContent === "Server-Welt" && document.querySelector(".a-zeile .name > span")?.textContent === "End City", null, 12000),
-    "Anzeige nach dem Neustart: weiter Welt 2 mit Titel");
+  pruefe(await warteAuf(anzeige, (s) => document.querySelector('[data-testid="anzeige-titel"]')?.textContent === "Server-Welt"
+    && document.querySelector(`${s} [data-testid="ort-name"]`)?.textContent === "End City" && document.querySelector('[data-testid="verbunden"]')?.dataset.verbunden === "true", ORTE, 20000),
+    "Anzeige nach dem Neustart: verbindet neu, weiter Welt 2 mit Titel");
 
   // === Abmelden, abgelaufene Anmeldung ==========================================
   await lena.evaluate(() => { bd.verbindung.token = "kaputt.token"; lsSchreiben("board.verbindung", bd.verbindung); });
