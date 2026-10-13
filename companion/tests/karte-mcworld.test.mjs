@@ -266,11 +266,15 @@ try {
   pruefe(await warteAuf(p, () => wi.schritt === "pruefliste" && wi.funde?.gruppen), "Funde eingeordnet");
   const fundZeilen = async (q) => q.$$eval(".wi-fund", (z) => z.map((e) =>
     `${e.querySelector(".card-title").textContent}: ${e.querySelector(".card-meta").textContent}${e.querySelector(".switch") ? (e.querySelector(".switch").getAttribute("aria-checked") === "true" ? " [an]" : " [aus]") : ""}`));
-  const STRUKTUREN_NEU = ["Dorf", "Endsiedlung", "Mine", "Netherfestung", "Prüfungskammern", "Schiffswrack", "Wüstenbrunnen", "Wüstentempel", "Zerstörtes Portal"];
-  pruefe(JSON.stringify(await fundZeilen(p)) === JSON.stringify([...STRUKTUREN_NEU.map((n) => `${n}: 1 neu [an]`), "Portal-Verbindung: 1 neu [an]",
+  // Strukturen nach deutschem Namen; das Endtransitportal bei X 96 · Z 0 hat der Mock schon, die Wächterzier auch
+  const STRUKTUREN = ["Dorf: 2 neu", "Endsiedlung: 1 neu", "Endtransitportal: 1 neu · 1 schon bekannt", "Hexenhütte: 1 neu", "Mine: 1 neu",
+    "Netherfestung: 1 neu", "Ozeanmonument: 1 neu", "Plünderer-Außenposten: 1 neu", "Prüfungskammern: 1 neu", "Schiffswrack: 1 neu",
+    "Wüstenbrunnen: 1 neu", "Wüstentempel: 1 neu", "Zerstörtes Portal: 1 neu"];
+  pruefe(JSON.stringify(await fundZeilen(p)) === JSON.stringify([...STRUKTUREN.map((z) => `${z} [an]`), "Portal-Verbindung: 1 neu [an]",
     "Schmiedevorlage: 3 neu · 1 schon bekannt [an]", "Rüstungs-Set: 3 neu [an]", "Banner: 2 neu [an]"]),
-    `Je Art eine Zeile mit Anzahl, alle an (Strukturen nach Name, Portal-Paar, Wächterzier ist im Mock schon gefunden): ${(await fundZeilen(p)).join(" | ")}`);
+    `Je Art eine Zeile mit Anzahl, alle an (auch Strukturbereiche, Dörfer und Transittore aus W3): ${(await fundZeilen(p)).join(" | ")}`);
   pruefe((await text(p, '[data-testid="wi-spiel"]')) === "SpielKreativ · Schwer · 10 Tage · Cheats an", "Welt-Info aus level.dat in der Prüfliste");
+  pruefe((await text(p, '[data-testid="wi-drache"]')) === "EndEnderdrache besiegt", "Enderdrache besiegt (TheEnd)");
   await p.$eval('[data-testid="wi-funde"]', (k) => k.scrollIntoView({ block: "start" })); await schlafen(150);
   await p.screenshot({ path: `${DIR}/m12-funde.png` });
   await p.click('[data-gruppe="banner"] .switch'); await schlafen(150);
@@ -285,9 +289,10 @@ try {
     sammel: ["sentry", "spire", "wild", "netherite"].map((id) => MOCK.sammel.w_1[id]?.von), sentry: MOCK.sammel.w_1.sentry.am,
     banner: MOCK.banner.length - v.banner, sets: MOCK.ruestung.length - v.sets,
     leder: MOCK.ruestung.find((x) => x.name === "Getragene Rüstung (29.9.)")?.teile.helmet, info: bm.import.info }), vorher);
-  pruefe(funde.toast === "Biome übernommen · 1 305 Chunks · 16 Funde", `Toast: ${funde.toast}`);
-  pruefe(funde.orte === 9 && funde.neu === 9 && funde.karte.length === 9 && funde.karte.includes("Desert Temple 165 170"),
-    `9 Orte mit Herkunft Welt-Import, gleich auf der Karte (${funde.karte.join(", ")})`);
+  pruefe(funde.toast === "Biome übernommen · 1 305 Chunks · 21 Funde", `Toast: ${funde.toast}`);
+  pruefe(funde.orte === 14 && funde.neu === 14 && funde.karte.length === 14 && funde.karte.includes("Desert Temple 165 170")
+    && funde.karte.includes("Outpost 487 487") && funde.karte.includes("End Gateway 1100 50"),
+    `14 Orte mit Herkunft Welt-Import, gleich auf der Karte (${funde.karte.join(", ")})`);
   pruefe(funde.portal?.oberwelt.x === 100 && funde.portal.nether.x === 12 && funde.portale, "Portal-Paar als Verbindung");
   pruefe(funde.sammel.join() === "Lena,Max,Max,Max" && funde.sentry === "2026-09-20", `Vorlagen gefunden, die schon gefundene bleibt bei Lena (${funde.sammel.join()}, ${funde.sentry})`);
   pruefe(funde.banner === 0 && funde.sets === 3 && funde.leder?.ruestung === "leather" && funde.leder.farbe === "red",
@@ -304,7 +309,8 @@ try {
   await warteAuf(p, () => wi.schritt === "bestaetigen"); await p.click('[data-aktion="wi-lesen"]');
   await warteAuf(p, () => wi.schritt === "pruefliste" && wi.funde?.gruppen);
   const zweiter = await fundZeilen(p);
-  pruefe(zweiter.slice(0, 9).every((z) => z.endsWith(": nichts Neues · 1 schon bekannt")) && zweiter.slice(9).join(" | ")
+  pruefe(zweiter.slice(0, 13).every((z) => /: nichts Neues · \d schon bekannt$/.test(z)) && zweiter[0] === "Dorf: nichts Neues · 2 schon bekannt"
+    && zweiter[2] === "Endtransitportal: nichts Neues · 2 schon bekannt" && zweiter.slice(13).join(" | ")
     === "Portal-Verbindung: nichts Neues · 1 schon bekannt | Schmiedevorlage: nichts Neues · 4 schon bekannt | Rüstungs-Set: nichts Neues · 3 schon bekannt | Banner: 2 neu [an]",
     `Zweiter Import legt nichts doppelt an: ${zweiter.slice(9).join(" | ")}`);
   await p.click('[data-aktion="wi-verwerfen"]'); await schlafen(200);
@@ -393,10 +399,10 @@ try {
   await importOeffnen(max);
   await hochladen(max, DATEIEN.funde);
   await warteAuf(max, () => wi.schritt === "bestaetigen"); await max.click('[data-aktion="wi-lesen"]');
-  pruefe(await warteAuf(max, () => wi.schritt === "pruefliste" && wi.funde?.gruppen?.length === 13), "Live: Funde eingeordnet");
+  pruefe(await warteAuf(max, () => wi.schritt === "pruefliste" && wi.funde?.gruppen?.length === 17), "Live: Funde eingeordnet");
   await max.click('[data-aktion="wi-uebernehmen"]');
   pruefe(await warteAuf(max, () => bm.import?.dateiname === "Funde.zip"), "Live: Funde übernommen");
-  pruefe(await warteAuf(lena, () => st.instanzen.filter((i) => i.quelle === "welt").length === 9), "Live: Lena bekommt die Orte aus dem Import sofort");
+  pruefe(await warteAuf(lena, () => st.instanzen.filter((i) => i.quelle === "welt").length === 15), "Live: Lena bekommt die Orte aus dem Import sofort");
   const kopf = { headers: { authorization: `Bearer ${token}` } };
   const imBoard = {
     orte: (await (await fetch(`${BOARD}/api/orte/welten/${welt.id}`, kopf)).json()).instanzen.filter((i) => i.quelle === "welt" && i.von === "Max").length,
@@ -405,7 +411,7 @@ try {
     banner: (await (await fetch(`${BOARD}/api/banner`, kopf)).json()).liste.length,
     info: (await (await fetch(`${BOARD}/api/welten/${welt.id}/biome`, kopf)).json()).import.info?.schwierigkeit,
   };
-  pruefe(imBoard.orte === 9 && imBoard.portale.join() === "Portal bei X 100 · Z 200" && imBoard.sammel.join() === "netherite,sentry,spire,wild"
+  pruefe(imBoard.orte === 15 && imBoard.portale.join() === "Portal bei X 100 · Z 200" && imBoard.sammel.join() === "netherite,sentry,spire,wild"
     && imBoard.banner === 2 && imBoard.info === "hard", `Live: Board hat Orte, Verbindung, Vorlagen, Banner und Welt-Info (${JSON.stringify(imBoard)})`);
   // Lena löscht, Max sieht es
   await importOeffnen(lena);

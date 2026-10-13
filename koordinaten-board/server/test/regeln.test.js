@@ -48,7 +48,7 @@ test('Welt-Import: Seed, Dimension, Kachelgröße, Grenzen, Dubletten', () => {
   const info = JSON.parse(JSON.stringify(regeln.biomImportSauber({ import: { ...imp, info: {
     spielmodus: 'survival', schwierigkeit: 'leicht', tage: -1, spawn: { x: 5, y: 32767, z: 'z' }, zuletztGespielt: '2026-09-29T17:12:51Z', hardcore: 1, cheats: true, extra: 1,
   } }, kacheln: [] }))).import.info;
-  assert.deepEqual(info, { spielmodus: 'survival', schwierigkeit: null, tage: null, spawn: null, zuletztGespielt: '2026-09-29T17:12:51.000Z', hardcore: false, cheats: true });
+  assert.deepEqual(info, { spielmodus: 'survival', schwierigkeit: null, tage: null, spawn: null, zuletztGespielt: '2026-09-29T17:12:51.000Z', hardcore: false, cheats: true, drache: null });
 });
 
 test('Welt-Funde: Form der Anfrage (jeder Eintrag prüft seine eigene Regel)', () => {
