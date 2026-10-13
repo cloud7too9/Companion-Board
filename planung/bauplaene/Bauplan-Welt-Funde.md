@@ -2,14 +2,14 @@
 
 Stand: 13.10.2026 · Grundlage: Frage von Max („Was kann man aus dem .mcworld-Upload alles bekommen?“, 13.10.2026) und Auswertung der Testwelt `companion/tests/daten/fixture-seed.mcworld` · Setzt voraus: Welt-Import (Strang C, im Archiv: `docs/bauplaene/Bauplan-Welt-Import.md`, `docs/plaene/PLAN-welt-import-biome.md`)
 
-> **Status: W0 und W1 gebaut (13.10.2026), W2 und W3 Entwurf.** Auf Wunsch von Max kam zuerst W0: den Weltordner direkt wählen oder hineinziehen, nur die gebrauchten Dateien behalten. Danach W1 („mergen und weiter“, Max 13.10.2026): Die Funde werden gelesen, die Companion zeigt sie noch nicht. Für W1 gelten bei Frage 2 und 3 vorläufig die Vorschläge; Frage 1, 4 und 5 betreffen erst W2 und W3.
+> **Status: W0 und W1 gebaut (13.10.2026), W2 und W3 Entwurf.** Auf Wunsch von Max kam zuerst W0: den Weltordner direkt wählen oder hineinziehen, nur die gebrauchten Dateien behalten. Danach W1 („mergen und weiter“, Max 13.10.2026): Die Funde werden gelesen, die Companion zeigt sie noch nicht. **Max hat Frage 1, 4 und 5 beantwortet (13.10.2026, Abschnitt „Entscheidungen“):** automatisch übernehmen mit einem Schalter je Art, Portale ohne Gegenstück auf die Karte, kein Bild der Welt. Frage 2 und 3 gelten weiter nach Vorschlag.
 
 Dieser Bauplan beschreibt die technischen Entscheidungen. Er baut auf dem auf, was im Repo liegt (Stand `main` vom 13.10.2026).
 
 ## Ziel
 
 1. **Mehr aus derselben Datei.** Der Welt-Import liest heute nur Seed, Name, Version und je Chunk das Biom. Dieselbe Datei verrät auch, wo Verliese, Schätze und Strukturen liegen, welche Netherportale es gibt, was der Spieler trägt und besitzt und welche Banner aufgestellt sind.
-2. **Funde statt Abtippen.** Was der Import findet, landet in einer Prüfliste. Max hakt an, was übernommen wird; daraus werden Orte, Portal-Verbindungen, gefundene Sammelobjekte, Rüstungs-Sets und Banner, über dieselbe API wie bei der Eingabe von Hand.
+2. **Funde statt Abtippen.** Was der Import findet, wird automatisch übernommen (Entscheidung 13.10.2026, statt einzeln abzuhaken): daraus werden Orte, Portal-Verbindungen, gefundene Sammelobjekte, Rüstungs-Sets und Banner, geprüft mit denselben Regeln wie bei der Eingabe von Hand.
 3. **Nichts geht verloren.** Funde kommen nur dazu. Der Import löscht und überschreibt nichts außer den Biomen, wie heute.
 
 ## Ausgangslage
@@ -76,7 +76,7 @@ Max (13.10.2026): „Als erstes ein Upload-Feld, in das man den ganzen Ordner vo
 | Strukturbereiche (Tag 57, `HardcodedSpawners`) | **Orte** „Nether Fortress“, „Witch Hut“, „Monument“, „Outpost“ ohne Truhe | nein | W3 |
 | Dörfer (`VILLAGE_<id>_INFO`) | **Ort** „Village“ mit Mittelpunkt | nein | W3 |
 | Das End (`TheEnd`): Drache besiegt, Transittore | **Orte** „End Gateway“, Hinweis im Welt-Sheet | nein | W3 |
-| `world_icon.jpeg` | **Bild der Welt** (Frage 5) | nein | W3 |
+| `world_icon.jpeg` | ~~Bild der Welt~~ entfällt (Frage 5, Max 13.10.2026) | nein | – |
 
 Nicht gelesen werden: jeder einzelne Block (SubChunks, zu teuer am iPhone), Lebewesen außer Loren und Rüstungsständern, Karten-Items, Daten anderer Spieler (Frage 2).
 
@@ -116,7 +116,7 @@ Die Beute-Tabelle steht nur in **ungeöffneten** Behältern (`loot_tables/chests
 - **Herkunft.** Orte aus dem Import tragen `quelle:"welt"`. Der Server nimmt den Wert an (heute nur `manuell` und `screenshot`); `instanzPruefen` lässt ihn wie `manuell` zu, also ohne neue Varianten. Die Companion zeigt im Ort-Detail „aus dem Welt-Import“.
 - **Wem gehört der Fund.** `von` und `erstellerId` setzt der Server wie immer aus dem Token, also für den Account, der importiert.
 - **Sammelobjekte nur dazu.** Liegt eine Schmiedevorlage (`minecraft:<id>_armor_trim_smithing_template`, `minecraft:netherite_upgrade_smithing_template`) im Inventar, in der Endertruhe oder in einem Behälter (Frage 3), wird das Sammelobjekt als gefunden angeboten. Ein Import setzt nie etwas auf „offen“ zurück.
-- **Portale als Paare.** Aus der Portal-Liste werden Verbindungen nur dort, wo ein Oberwelt- und ein Netherportal sich nach der Prüf-Logik der Portal-Verwaltung gegenseitig treffen (±128, Bedrock). Name: „Portal bei X · Z“ der Oberwelt. Ein Portal ohne Gegenstück erscheint nur als Hinweis (Frage 4).
+- **Portale als Paare.** Aus der Portal-Liste werden Verbindungen nur dort, wo ein Oberwelt- und ein Netherportal sich nach der Prüf-Logik der Portal-Verwaltung gegenseitig treffen (±128, Bedrock). Name: „Portal bei X · Z“ der Oberwelt. Ein Portal ohne Gegenstück wird ein Ort „Eigene Orte · Netherportal“ (Frage 4, Max 13.10.2026).
 - **Rüstung.** Die getragene Rüstung wird ein Set „Getragene Rüstung (<Datum>)“, wenn mindestens ein Teil eine bekannte Rüstung ist; Besatz und Material über die IDs aus `regeln.js` (`besatzMuster`, `besatzMaterial`), gefärbtes Leder auf die nächste Farbe aus `FARBEN`. Geprüft mit `ruestungPruefen`, was nicht passt, fällt mit Meldung weg.
 - **Banner.** Jedes aufgestellte Banner wird ein Vorschlag „Banner bei X · Z“, geprüft mit `bannerPruefen`. Das Unheilvolle Banner der Plünderer (`Type` 1) wird übersprungen. Muster-Kürzel und Farbcodes des Formats werden über eine Tabelle in `welt-funde.js` auf `MUSTER` und `FARBEN` abgebildet.
 - **Welt passt.** Funde gelten nur für die Welt, deren Seed passt, wie die Biome (`biomImportPruefen`). Banner und Rüstungs-Sets sind weltübergreifend, wie heute.
@@ -128,8 +128,17 @@ Die Beute-Tabelle steht nur in **ungeöffneten** Behältern (`loot_tables/chests
 - **`companion/welt-funde.js`** (neu, ES-Modul): `fundeSammler()` bekommt im selben Durchlauf wie die Biome jeden Eintrag (`aufnehmen` in `biom-welt.js`) und behält nur, was er braucht: Tag 49 nach `id` gefiltert, `portals`, `~local_player`, `actorprefix…` nur Loren mit Truhe und Rüstungsständer, später Tag 57, `VILLAGE_…_INFO`, `TheEnd`. Am Ende `fundeAuswerten()` → `{ orte, portale, sammelobjekte, ruestung, banner, info, unbekannt }`. Die Zuordnungstabellen (Beute-Tabelle, Nähe, Muster-Kürzel, Farbcodes) stehen hier.
 - **`biom-welt.js`** reicht jeden Eintrag zusätzlich an den Sammler; Ergebnis `{ meta, kacheln, funde }`. Speicher: nur gefilterte Funde, kein Rohwert bleibt liegen.
 - **Worker** schickt `funde` mit `fertig` zurück. **`tools/welt-pruefen.mjs`** druckt die Funde aus, damit eine echte Welt am PC geprüft werden kann, ohne die Companion.
-- **Companion:** Die Prüfliste des Welt-Imports bekommt unter den Biomen Abschnitte „Orte“, „Portale“, „Sammelobjekte“, „Rüstung“, „Banner“ und „Welt“, jeweils mit Haken, Anzahl und „schon bekannt“. „Übernehmen“ schickt erst die Biome (wie heute), dann die angehakten Funde über die bestehende API (`POST /orte/instanzen`, `POST /portale/welten/:id`, `PUT /sammelobjekte/welten/:id/:objekt`, `POST /ruestung`, `POST /banner`), mit IDs vom Handy (B1). Fortschritt und Fehler je Fund in der Liste. Der DEMO-Mock kann dasselbe.
-- **Server:** `quelle:"welt"` annehmen; Welt-Info (`spielmodus`, `schwierigkeit`, `tag`, `spawn`, `zuletztGespielt`, `hardcore`, `cheats`) als Teil von `import` speichern und in `GET /welten/:id/biome` zurückgeben (`biomImportPruefen` und `biomImportSauber` erweitern). Keine neuen Routen.
+- **Companion** (überholt durch die Entscheidungen vom 13.10.2026: Schalter je Art statt Haken je Fund, eine Route `POST /welten/:id/funde`)**:** Die Prüfliste des Welt-Imports bekommt unter den Biomen Abschnitte „Orte“, „Portale“, „Sammelobjekte“, „Rüstung“, „Banner“ und „Welt“, jeweils mit Haken, Anzahl und „schon bekannt“. „Übernehmen“ schickt erst die Biome (wie heute), dann die angehakten Funde über die bestehende API (`POST /orte/instanzen`, `POST /portale/welten/:id`, `PUT /sammelobjekte/welten/:id/:objekt`, `POST /ruestung`, `POST /banner`), mit IDs vom Handy (B1). Fortschritt und Fehler je Fund in der Liste. Der DEMO-Mock kann dasselbe.
+- **Server:** `quelle:"welt"` annehmen; Welt-Info (`spielmodus`, `schwierigkeit`, `tag`, `spawn`, `zuletztGespielt`, `hardcore`, `cheats`) als Teil von `import` speichern und in `GET /welten/:id/biome` zurückgeben (`biomImportPruefen` und `biomImportSauber` erweitern). Keine neuen Routen (überholt: `POST /welten/:id/funde`, siehe „Entscheidungen“).
+
+## Entscheidungen von Max (13.10.2026) und was sich für W2 ändert
+
+- **Frage 1 → automatisch übernehmen, mit einem Schalter je Art.** In einer großen Welt stehen auch Strukturen, die der Spieler nie gesehen hat (das Spiel erzeugt die Chunks rund um ihn samt Verliesen und Minen), also leicht hunderte Verliese. Max wählte deshalb: Die Prüfliste zeigt unter den Biomen je Art eine Zeile mit Anzahl und Schalter (z. B. „Verlies 412“, „Wüstentempel 3“, „Portal-Verbindung 2“, „Schmiedevorlage 4“), alle an. Kein Abhaken einzelner Funde. „Übernehmen“ legt die Biome und alles Eingeschaltete an; schon Bekanntes wird gezählt und übersprungen.
+- **Frage 4 → ein Portal ohne Gegenstück wird ein Ort.** Eine Portal-Verbindung braucht beide Seiten (`verbindungRegelPruefen`). Ein einzelnes Portal wird deshalb ein Ort „Eigene Orte · Netherportal“ in seiner Dimension, mit eigenem Schalter.
+- **Frage 5 → kein Bild der Welt.** `world_icon.jpeg` bleibt liegen, W3 ohne diesen Punkt.
+- **Eine Route statt vieler Anfragen:** Hunderte Funde einzeln über `POST /orte/instanzen` usw. hießen hunderte Anfragen und je eine `geaendert`-Meldung an alle Geräte. Neu ist deshalb `POST /welten/:id/funde { orte, verbindungen, sammelobjekte, ruestung, banner }`: Der Server prüft jeden Eintrag mit denselben Regeln und Funktionen wie die einzelnen Routen, legt alles in einem Rutsch an und meldet je Bereich einmal. Was eine Regel ablehnt, kommt mit Meldung zurück, der Rest wird angelegt. Der DEMO-Mock kann dasselbe.
+- **„Schon bekannt“ prüft die Companion** mit dem, was sie geladen hat (Orte, Verbindungen, Sammelstand, Banner, Sets), und schickt nur Neues. Zwei Geräte, die gleichzeitig dieselbe Welt importieren, könnten doppelt anlegen; das bleibt in Kauf genommen.
+- **Welt-Info** wird Teil des Imports (`import.info`, `biomImportSauber`) und steht im Welt-Sheet.
 
 ## Phasen, Haltepunkte, Branches
 
@@ -137,8 +146,8 @@ Die Beute-Tabelle steht nur in **ungeöffneten** Behältern (`loot_tables/chests
 |---|---|---|
 | **W0** Weltordner statt ZIP · **gebaut 13.10.2026** | Ordner wählen oder hineinziehen, nur gebrauchte Dateien, Auswahl bei mehreren Welten, ZIP bleibt als Rückweg | `node --test` (Ordner = ZIP, auch Testwelt von Max; Ablage rekursiv), Playwright `karte-mcworld`. ⏸ **H11:** Max wählt am iPhone den Weltordner (und probiert das Hineinziehen aus der Dateien-App) |
 | **W1** Funde lesen · **gebaut 13.10.2026** | `nbt.js`, `welt-funde.js`, Sammler im Durchlauf von `biom-welt.js`, Worker und `welt-pruefen.mjs` geben Funde aus. Truhen, Spawner, Loren, Kies, Tresore, Portale, Spieler, Behälter-Inhalte, Banner, Rüstungsständer, Welt-Info | `node --test welt-funde.test.mjs`: NBT-Leser; Testwelt ergibt genau 6 Verliese und 1 Schatz an den bekannten Koordinaten; `fundeweltBauen` mit Portalen, Bannern, Rüstung und Vorlagen; unbekannte Beute-Tabelle wird gemeldet. ⏸ **H12:** Max lässt `welt-pruefen.mjs` (oder Claude mit seiner Datei) über seine echte Welt laufen und vergleicht die Liste mit dem Spiel |
-| **W2** Prüfliste und Übernehmen | Abschnitte in der Prüfliste, „schon bekannt“, Portal-Paare (`zielSuchen` aus `board-karten.js`), Lederfarbe → `FARBEN`, Übernehmen über die API, `quelle:"welt"` und Welt-Info am Server, Welt-Info im Welt-Sheet | Playwright `karte-mcworld` (DEMO) und live gegen das Board: Funde erscheinen, schon bekannte sind ausgegraut, Übernehmen legt Orte, Verbindung, Sammelobjekt, Set und Banner an, zweiter Import legt nichts doppelt an. ⏸ **H13:** Max importiert am iPhone und schaut Prüfliste und Karte an |
-| **W3** Strukturen ohne Truhe | Strukturbereiche (Tag 57), Dörfer, End-Transittore, Bild der Welt (je nach Frage 5) | wie W1, an einer Welt von Max mit diesen Strukturen |
+| **W2** Übersicht und automatisch Übernehmen | Je Art eine Zeile mit Anzahl und Schalter (Entscheidungen 13.10.2026), „schon bekannt“, Portal-Paare (`zielSuchen` aus `board-karten.js`), Portale ohne Gegenstück als „Eigene Orte · Netherportal“, Lederfarbe → `FARBEN`, Übernehmen über `POST /welten/:id/funde`, `quelle:"welt"` und Welt-Info am Server, Welt-Info im Welt-Sheet | Playwright `karte-mcworld` (DEMO) und live gegen das Board: Funde erscheinen, schon bekannte sind ausgegraut, Übernehmen legt Orte, Verbindung, Sammelobjekt, Set und Banner an, zweiter Import legt nichts doppelt an. ⏸ **H13:** Max importiert am iPhone und schaut Prüfliste und Karte an |
+| **W3** Strukturen ohne Truhe | Strukturbereiche (Tag 57), Dörfer, End-Transittore (Bild der Welt entfällt, Frage 5) | wie W1, an einer Welt von Max mit diesen Strukturen |
 
 Jede Phase ein PR gegen `main`, gemergt nach Rückfrage. Branch: der Branch der Sitzung (`claude/…`), wie bei Bauplan „Sitzung“.
 
@@ -152,16 +161,16 @@ Jede Phase ein PR gegen `main`, gemergt nach Rückfrage. Branch: der Branch der 
 
 ## Zu entscheiden (Max)
 
-1. **Übernehmen:** Prüfliste mit Haken, alles Neue vorausgewählt (Vorschlag) – oder alles ohne Rückfrage übernehmen?
+1. ~~**Übernehmen:** Prüfliste mit Haken, alles Neue vorausgewählt (Vorschlag) – oder alles ohne Rückfrage übernehmen?~~ **Max (13.10.2026): automatisch übernehmen**, mit einem Schalter je Art (siehe „Entscheidungen“).
 2. **Spielerdaten** (in W1 vorläufig nach Vorschlag)**:** Nur der eigene Spieler der Welt (`~local_player`, Vorschlag) – oder auch die anderen Spieler einer Mehrspieler-Welt? Deren Inventar und Position wären dann für alle am Board sichtbar, und welcher Account zu welchem Spieler gehört, steht nicht in der Welt. Nachtrag W1: In einer heruntergeladenen Realm-Welt steht vermutlich auch der eigene Spieler nicht als `~local_player`, sondern wie alle als `player_server_…`. Dann käme nach dem Vorschlag aus einer Realm-Welt gar keine Rüstung und kein Inventar. `welt-pruefen.mjs` zeigt „Andere Spieler: N“, H12 klärt es.
 3. **Sammelobjekte** (in W1 vorläufig nach Vorschlag)**:** Gefunden, sobald die Vorlage irgendwo in der Welt liegt, auch in einer Truhe (Vorschlag) – oder nur, wenn der Spieler sie bei sich oder in der Endertruhe hat?
-4. **Portal ohne Gegenstück:** Nur als Hinweis in der Prüfliste (Vorschlag) – oder als eigener Ort, damit man es auf der Karte sieht?
-5. **Bild der Welt:** `world_icon.jpeg` mit hochladen und als Bild der Welt in Companion und Dashboard zeigen (etwa 50–150 KB je Welt) – ja oder nein?
+4. ~~**Portal ohne Gegenstück:** Nur als Hinweis in der Prüfliste (Vorschlag) – oder als eigener Ort, damit man es auf der Karte sieht?~~ **Max (13.10.2026): auch auf der Karte zeigen** → „Eigene Orte · Netherportal“.
+5. ~~**Bild der Welt:** `world_icon.jpeg` mit hochladen und als Bild der Welt in Companion und Dashboard zeigen (etwa 50–150 KB je Welt) – ja oder nein?~~ **Max (13.10.2026): nein.**
 
 ## Reihenfolge und Git
 
 1. ~~W0 Weltordner statt ZIP~~ gebaut 13.10.2026, ⏸ H11
-2. Fragen 1–5 beantworten (2 und 3 vorläufig nach Vorschlag gebaut, 1, 4 und 5 vor W2)
+2. ~~Fragen 1, 4 und 5 beantworten~~ Max 13.10.2026; 2 und 3 gelten nach Vorschlag
 3. ~~W1 Funde lesen~~ gebaut 13.10.2026, ⏸ H12
 4. W2 → Commits „Prüfliste mit Funden“, „Funde übernehmen“, „Welt-Info am Server“, PR, ⏸ H13
 5. W3 → PR
