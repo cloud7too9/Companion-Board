@@ -2,7 +2,7 @@
 
 Stand: 05.10.2026 · Max
 
-> **Umsetzung:** Seit dem 05.10.2026 läuft der Umbau im Repo `cloud7too9/Companion-Board` (Start ohne Verlauf, der alte Verlauf liegt in `flexibel-visionboard`). Die Haken in den Phasen werden hier gesetzt; den Stand je Phase führt [`UEBERGABE.md`](UEBERGABE.md), Kapitel 1 und 9. Phasen 1–5 sind gebaut, gemergt (PRs #1–#7) und seit der Netlify-Probe am 13.10.2026 abgeschlossen; Phase 6 läuft seit dem 13.10.2026 (Pi, Tunnel, Domain, Probe über Mobilfunk bestanden); offen ist nur noch das Aufräumen (E18). Die Schritte stehen in [`koordinaten-board/pi/ANLEITUNG.md`](../koordinaten-board/pi/ANLEITUNG.md).
+> **Umsetzung:** Seit dem 05.10.2026 läuft der Umbau im Repo `cloud7too9/Companion-Board` (Start ohne Verlauf, der alte Verlauf liegt in `flexibel-visionboard`). Die Haken in den Phasen werden hier gesetzt; den Stand je Phase führt [`UEBERGABE.md`](UEBERGABE.md), Kapitel 1 und 9. Phasen 1–5 sind gebaut, gemergt (PRs #1–#7) und seit der Netlify-Probe am 13.10.2026 abgeschlossen; **Phase 6 ist seit dem 13.10.2026 abgeschlossen** (Pi, Tunnel, Domain `mainhubv1.com`, Probe über Mobilfunk, Aufräumen). Die Einrichtung steht in [`koordinaten-board/pi/ANLEITUNG.md`](../koordinaten-board/pi/ANLEITUNG.md).
 
 ## Zielbild
 
@@ -133,7 +133,7 @@ Git: Push löst bei Netlify einen Vorschau-Build für den PR aus, dort testen, d
 - [x] `cloudflared` installieren, benannten Tunnel anlegen, `api.mainhubv1.com` zuordnen, ebenfalls als Dienst *(13.10.2026: läuft bei Max. Vorbereitet war: `pi/cloudflared-config.yml`, Befehle in `pi/ANLEITUNG.md`)*
 - [x] Domain auf Cloudflare-DNS umstellen und Netlify zuordnen (Abschnitt „Eine Domain, drei Adressen“) *(13.10.2026: `mainhubv1.com` liegt bei Cloudflare, Netlify liefert `/`, `/app/` und `/dashboard/` mit Zertifikat; `app/konfig.js` zeigt `apiAdresse: "https://api.mainhubv1.com"`, `pwa: true`. Schritte in `pi/ANLEITUNG.md`, Abschnitt 3)*
 - [x] Probe über Mobilfunk statt WLAN: QR scannen, beitreten, Ort anlegen, Board aktualisiert sich *(13.10.2026: bestanden. Beitreten über `https://mainhubv1.com/app/` ohne CORS-Fehler, QR-Code zeigt auf `/app/?pin=…`, Anzeige aktualisiert sich live)*
-- [ ] Aufräumen nach der Probe: `netzwerk.js`, Adress-Lernen und Firewall-Skripte braucht der Pi nicht mehr; sie bleiben für den Betrieb im Heimnetz vom Laptop aus (`pi/ANLEITUNG.md`, letzter Abschnitt). Entscheiden, ob dieser Betrieb noch gebraucht wird, sonst entfernen
+- [x] Aufräumen nach der Probe: `netzwerk.js`, Adress-Lernen und Firewall-Skripte braucht der Pi nicht mehr *(13.10.2026, E18 entschieden „raus damit“: entfernt sind `server/src/netzwerk.js` samt Test, das Adress-Lernen (`adresse.txt`), `start.bat`, `start.sh`, `anzeige-oeffnen.bat`, `firewall-freigeben.bat` und `werkzeuge/firewall-freigeben.ps1`; `/api/anzeige` liefert keine `weitere` Adressen mehr, die Anzeige zeigt den Block „Andere Adressen“ nicht mehr. Ohne `OEFFENTLICHE_URL` gilt `http://localhost:<PORT>`; lokal fürs WLAN setzt man sie von Hand)*
 
 Git: Dienstdateien (`*.service`) und eine kurze Anleitung ins Repo, damit der Pi jederzeit neu aufsetzbar ist.
 
@@ -160,12 +160,12 @@ Auf dem Pi bleiben genau zwei Dienste: die API (Fastify mit WebSocket, dazu SQLi
 
 ## Offene Entscheidungen und Risiken
 
-Vier Fragen sind noch offen, bevor Phase 6 abgeschlossen ist (die fünfte, Node-Version am Pi, ist geklärt).
+Stand 13.10.2026: Phase 6 ist abgeschlossen. Von den fünf Fragen ist nur noch die Startseite der Domain offen (auch auf der Warteliste als E20); sie blockiert nichts.
 
 - [x] Welche Domain, und lässt der Registrar das Umstellen der Nameserver zu? *(Entschieden: `mainhubv1.com`; die API antwortet seit dem 13.10.2026 unter `https://api.mainhubv1.com/api/server` über den Tunnel.)*
-- [ ] Welches Gerät zeigt das Board an (TV-Browser, Tablet, Laptop)? Der Pi fällt aus, Raspberry OS Lite hat keinen Desktop. *(Max; technisch egal, jedes Gerät mit Browser und Anzeige-Link)*
+- [x] Welches Gerät zeigt das Board an (TV-Browser, Tablet, Laptop)? Der Pi fällt aus, Raspberry OS Lite hat keinen Desktop. *(Max, 13.10.2026: nicht festgelegt, bleibt offen; technisch egal, jedes Gerät mit Browser und Anzeige-Link)*
 - [ ] Startseite der Domain: heutige Anzeige oder gleich das Widget-Dashboard, das sie später ersetzen soll? *(Max; gebaut ist: `/` = Anzeige, `/dashboard/` = Dashboard. Soll das Dashboard auf `/`, reicht eine Zeile in `netlify/_redirects`.)*
-- [ ] Kommt nach `/app/` der Prototyp oder deine eigene `modul-a-live-karte.html`, die nicht im Repo liegt? *(Max; gebaut ist der Prototyp. Die eigene Datei müsste ins Repo und in `netlify/bauen.sh` statt `companion-prototyp.html` kopiert werden.)*
+- [x] Kommt nach `/app/` der Prototyp oder deine eigene `modul-a-live-karte.html`, die nicht im Repo liegt? *(Max, 13.10.2026: **der Prototyp, so wie jetzt. Der aktuelle Prototyp ist der Hauptstand.** `modul-a-live-karte.html` bleibt nur die Herkunft der Optik.)*
 - [x] Welche Node-Version läuft auf dem Pi (`node -v`)? Ab 22.13 reicht `node:sqlite`. *(Entfällt: Der Pi bekommt laut Anleitung Node 22 LTS von NodeSource, `package.json` verlangt `>=22.13`.)*
 
 | Risiko | Folge | Gegenmittel |

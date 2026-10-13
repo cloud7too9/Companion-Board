@@ -13,15 +13,17 @@ import { identitaet, AnmeldeFehler, BOARD_PIN } from './identitaet.js';
 import { companionApi } from './companion-api.js';
 import { anzeigeSicht } from './sicht.js';
 import { COMPANION_ORDNER } from './regeln.js';
-import { besteAdresse } from './netzwerk.js';
 import { kartePruefen } from './zeigen.js';
 import { widgetKarte, widgetQuellen } from './widgets.js';
 
 const HIER = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT ?? 3000);
-// Lausch-Adresse: 0.0.0.0 fürs Heimnetz (Handys im WLAN). Auf dem Pi hinter cloudflared HOST=127.0.0.1,
-// dann erreicht den Server nur noch der Tunnel (Umbau Phase 6).
+// Lausch-Adresse: 0.0.0.0 lokal (Handys im WLAN erreichen den Server direkt). Auf dem Pi hinter cloudflared
+// HOST=127.0.0.1, dann erreicht den Server nur noch der Tunnel (Umbau Phase 6).
 const HOST = process.env.HOST ?? '0.0.0.0';
+// Öffentliche Adresse für QR-Code, Anzeige-Link und Konsole (Umbau Phase 6: auf dem Pi die Netlify-Adresse).
+// Ohne OEFFENTLICHE_URL gilt localhost; die LAN-Erkennung mit Adress-Lernen ist mit Phase 6 entfallen (E18).
+const OEFFENTLICHE_URL = (process.env.OEFFENTLICHE_URL ?? `http://localhost:${PORT}`).replace(/\/$/, '');
 // Pfad der Companion unter OEFFENTLICHE_URL (Umbau Phase 5): lokal liefert der Server sie unter / aus, auf Netlify liegt sie unter /app/
 const COMPANION_PFAD = `/${(process.env.COMPANION_PFAD ?? '/').replace(/^\/+|\/+$/g, '')}/`.replace('//', '/');
 const DATEN = path.resolve(process.env.DATEN_ORDNER ?? path.join(HIER, '..', 'daten'));
@@ -78,38 +80,8 @@ const anzeigeZugang = (req) => {
   return { erlaubt: Boolean(mitLink), anzeige: mitLink };
 };
 
-// Netzwerkadresse für QR-Code und Konsole – regelmäßig neu bestimmen (WLAN-Wechsel)
-let netz = await besteAdresse();
-setInterval(async () => { netz = await besteAdresse(); }, 60_000).unref();
-
-// Bewährte Adresse: die IP, über die zuletzt ein Handy wirklich hereingekommen ist.
-// Die ist nachweislich erreichbar und schlägt jede Vermutung.
-const ADRESS_DATEI = path.join(DATEN, 'adresse.txt');
-let bewaehrt = (await readFile(ADRESS_DATEI, 'utf8').catch(() => '')).trim() || null;
-
-/** Adresse für QR-Code: bewährt (falls das Gerät sie noch hat), sonst beste Vermutung */
-function qrIp() {
-  if (bewaehrt && netz.kandidaten.some((k) => k.adresse === bewaehrt)) return bewaehrt;
-  return netz.beste;
-}
-
-function lanAdresse(ip = qrIp()) {
-  if (process.env.OEFFENTLICHE_URL) return process.env.OEFFENTLICHE_URL.replace(/\/$/, '');
-  return `http://${ip}:${PORT}`;
-}
-
 /** Anzeige-Link – dieselbe Adresse wie im QR-Code der Handys; ohne ihn ist kein Gerät Anzeige, auch das Board-Gerät nicht */
-const anzeigeLink = (a) => `${lanAdresse()}/anzeige?anzeige=${encodeURIComponent(a.id)}&schluessel=${encodeURIComponent(a.schluessel)}`;
-
-/** Merkt sich die IP, die ein anderes Gerät in der Adresszeile benutzt hat. */
-function adresseLernen(req) {
-  if (istLokal(req)) return;   // auch hinter dem Tunnel: dort nennt OEFFENTLICHE_URL die Adresse
-  const host = (req.headers.host ?? '').replace(/:\d+$/, '');
-  if (!host || host === bewaehrt || !netz.kandidaten.some((k) => k.adresse === host)) return;
-  bewaehrt = host;
-  writeFile(ADRESS_DATEI, host).catch(() => {});
-  console.log(`  QR-Code nutzt jetzt ${lanAdresse()} – darüber hat sich gerade ein Gerät verbunden.`);
-}
+const anzeigeLink = (a) => `${OEFFENTLICHE_URL}/anzeige?anzeige=${encodeURIComponent(a.id)}&schluessel=${encodeURIComponent(a.schluessel)}`;
 
 // ---------- Daten ----------
 
@@ -122,7 +94,6 @@ const ident = identitaet({ daten, geheim: GEHEIM, boardPin: PIN });
 // ---------- Server ----------
 
 const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'warn' } });
-app.addHook('onRequest', async (req) => adresseLernen(req));
 
 // ---------- CORS (Umbau Phase 1): Seiten und API kommen künftig von verschiedenen Ursprüngen ----------
 // (Netlify ↔ api.<domain>). Für /api und /ws gelten nur Ursprünge aus ERLAUBTE_URSPRUENGE (kommagetrennt;
@@ -204,11 +175,9 @@ app.get('/api/anzeige', async (req, reply) => {
   if (!zugang.erlaubt) return reply.code(403).send({ fehler: 'Anzeige nur mit Anzeige-Link' });
   return {
     anzeige: zugang.anzeige && { id: zugang.anzeige.id, name: zugang.anzeige.name },
-    beitrittsUrl: `${lanAdresse()}${COMPANION_PFAD}?pin=${PIN}`,
-    adresse: lanAdresse(),
+    beitrittsUrl: `${OEFFENTLICHE_URL}${COMPANION_PFAD}?pin=${PIN}`,
+    adresse: OEFFENTLICHE_URL,
     pin: PIN,
-    // Falls der QR-Code nicht klappt: andere Adressen dieses Geräts zum Ausprobieren
-    weitere: netz.kandidaten.filter((k) => k.adresse !== qrIp()).map((k) => ({ name: k.name, url: lanAdresse(k.adresse) })),
   };
 });
 
@@ -416,7 +385,7 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
   });
 }
 
-// Link der ersten Anzeige („Board“) für die Startskripte (start.bat, start.sh öffnen ihn im Kiosk)
+// Link der ersten Anzeige („Board“) in eine Datei, damit das Gerät mit dem Server ihn ohne Konsole findet
 const ANZEIGE_LINK_DATEI = path.join(DATEN, 'anzeige-link.txt');
 function anzeigeLinkMerken() {
   const [erste] = daten.anzeigenListe();   // enthält den Schlüssel (anders als /api/anzeigen)
@@ -426,15 +395,14 @@ function anzeigeLinkMerken() {
 await app.listen({ port: PORT, host: HOST });
 anzeigeLinkMerken();
 console.log(`\n  Koordinaten-Board läuft (lauscht auf ${HOST}:${PORT})`);
-console.log(`  Companion (Handys):      ${lanAdresse()}${COMPANION_PFAD === '/' ? '' : COMPANION_PFAD}   PIN ${PIN}`);
+console.log(`  Companion (Handys):      ${OEFFENTLICHE_URL}${COMPANION_PFAD === '/' ? '' : COMPANION_PFAD}   PIN ${PIN}`);
 const anzeigen = daten.anzeigenListe();
 for (const a of anzeigen) {
   console.log(`  Anzeige${anzeigen.length > 1 ? ` „${a.name}“` : ''}: ${anzeigeLink(a)}`);
   if (existsSync(DASHBOARD_DIST)) console.log(`  Widget-Dashboard${anzeigen.length > 1 ? ` „${a.name}“` : ''}: ${anzeigeLink(a).replace('/anzeige?', '/dashboard?')}`);
 }
 console.log(`  (Auch das Board-Gerät selbst braucht den Anzeige-Link; er steht in ${ANZEIGE_LINK_DATEI})`);
-if (netz.kandidaten.length > 1) {
-  console.log('\n  Weitere Adressen dieses Geräts (falls die obere vom Handy nicht erreichbar ist):');
-  for (const k of netz.kandidaten) if (k.adresse !== qrIp()) console.log(`    ${lanAdresse(k.adresse).padEnd(28)} ${k.name}`);
+if (!process.env.OEFFENTLICHE_URL) {
+  console.log('  (QR-Code und Anzeige-Link zeigen auf localhost. Sollen andere Geräte beitreten: OEFFENTLICHE_URL setzen, z. B. https://mainhubv1.com)');
 }
 console.log('');

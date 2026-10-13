@@ -17,7 +17,7 @@
   - **Nur Bedrock (E15):** Java gibt es nirgendwo mehr, auch nicht bei den Portalen
 - **Umbau Netlify + Pi (`UMBAUPLAN.md`), Phasen 1–5 gebaut** (05.10.2026): Server abgesichert (Anzeige nur mit Link, `HOST`, `CF-Connecting-IP`, CORS, 6-stellige PIN), API-Adresse konfigurierbar (`konfig.js`, `VITE_API_URL`), Texterkennung am Handy (`texterkennung.js`, tesseract.js im Browser), SQLite (`daten.db`, `speicher.js`), Netlify-Build mit PWA (`netlify.toml`, `sw.js`). **Für Max:** neue 6-stellige PIN (QR-Code neu scannen); der Kiosk öffnet die Anzeige über `server/daten/anzeige-link.txt`; der Server braucht Node 22.13+; `daten.json` wird beim ersten Start nach `daten.db` übernommen.
 - **Als Nächstes** (Kapitel 9):
-  0. **Umbau:** Phasen 1–5 sind gebaut (PRs #1–#5) und abgeschlossen; die Netlify-Probe (H8) hat Max am 13.10.2026 bestanden. Phase 6 ist seit dem 13.10.2026 in Betrieb: Pi, Tunnel, Domain `mainhubv1.com`, Probe über Mobilfunk bestanden. Offen ist nur noch das Aufräumen (letzter Haken, hängt an E18). Die Einrichtung steht in alles, was Max tun muss, steht in `koordinaten-board/pi/ANLEITUNG.md`. Offen im Code: nach der Probe `netzwerk.js`, Adress-Lernen und Firewall-Skripte für den Pi aufräumen (Phase 6, letzter Punkt).
+  0. ~~**Umbau**~~ **abgeschlossen (13.10.2026):** Phasen 1–6 sind gebaut und in Betrieb: Pi, Tunnel, Domain `mainhubv1.com`, Probe über Mobilfunk bestanden, Netlify-Probe (H8) bestanden. Aufgeräumt (E18): `netzwerk.js`, Adress-Lernen, Start- und Firewall-Skripte sind entfernt; ohne `OEFFENTLICHE_URL` gilt `localhost`. Die Einrichtung steht in `koordinaten-board/pi/ANLEITUNG.md`. Offen bleibt nur die Startseite der Domain (E20).
   1. **Bauplan „Sitzung“** (E16) schreiben und mit Max abnicken
   2. **Offline B3–B5** mit HTTPS am Board (N5 ist entschieden: eigenes Zertifikat)
   3. A7 (Größenstufen je Widget): Planungsrunde mit Max
@@ -138,7 +138,7 @@ Board → Anzeigen → anordnen     ──▶  PUT /api/anzeigen/:id/layout, /vo
 cd koordinaten-board
 npm run installieren && npm run build                  # Server + alte Anzeige
 npm run dashboard:installieren && npm run dashboard:build   # Widget-Dashboard (companion/widgets → dist)
-npm start                                              # Windows: start.bat (baut das Dashboard noch nicht mit)
+npm start                                              # lokal; Betrieb auf dem Pi, siehe koordinaten-board/pi/ANLEITUNG.md
 ```
 
 - **Handy:** QR-Code der Anzeige scannen → „Beitreten“. Dort die Board-PIN eingeben, einen Account antippen oder einen neuen Namen tippen, dazu die eigene PIN.
@@ -188,7 +188,6 @@ Voraussetzungen für die Playwright-Tests:
 - **Portal-Regeln:** Es gibt nur Bedrock (E15). Handy und Board rechnen mit ±128 in beiden Dimensionen.
 - **Platzhalter-Größen:** Kleine Widgets schneiden ihre Karte ab, zum Beispiel der Sammel-Fortschritt mit 4×3 Zellen. Das ist bekannt und wird mit A7 gelöst.
 - **`SQLITE_CANTOPEN` oder `ENOENT`** in den Server-Tests ist harmlos. Ein verzögertes Speichern trifft auf den schon gelöschten Testordner.
-- **Die Startskripte** (`start.bat`, `start.sh`) bauen das Dashboard noch nicht mit. Das kommt mit E16, wenn `/dashboard` die Anzeige wird.
 - **GitHub und Git:**
   - Gestapelte PRs lassen sich auf GitHub nicht auf eine andere Basis umstellen („part of a stack“). Lieber keine Stapel mehr, sondern einen PR je abgeschlossenem Schritt direkt gegen `main`.
   - Haben zwei Stränge sich vorher schon gekreuzt (zwei Merge-Basen), meldet GitHub einen Konflikt, den `git` lokal ohne Konflikt löst. Abhilfe: `main` in den Branch mergen und pushen.
@@ -211,7 +210,7 @@ Voraussetzungen für die Playwright-Tests:
 
 ## 9. Nächste Schritte
 
-0. **Umbau auf Netlify + Raspberry Pi** nach `UMBAUPLAN.md`: Phasen 1–5 sind gebaut und abgeschlossen (Netlify-Probe am 13.10.2026). Phase 6 ist seit dem 13.10.2026 in Betrieb (Pi, Tunnel, Domain `mainhubv1.com`, Probe über Mobilfunk bestanden; Einrichtung in `koordinaten-board/pi/ANLEITUNG.md`); offen sind drei Entscheidungen im Umbauplan (Board-Gerät, Startseite, `/app/`-Inhalt; die Domain ist entschieden). Danach der letzte Punkt von Phase 6 (Aufräumen von `netzwerk.js` und Co., falls der Heimnetz-Betrieb vom Laptop aus nicht mehr gebraucht wird).
+0. ~~**Umbau auf Netlify + Raspberry Pi**~~ **abgeschlossen (13.10.2026)**, siehe `UMBAUPLAN.md`: Phasen 1–6 in Betrieb unter `mainhubv1.com`, Aufräumen erledigt (E18). Entschieden: `/app/` bekommt den Prototyp, der Prototyp ist der Hauptstand; das Anzeigegerät bleibt offen (technisch egal). Noch zu entscheiden: die Startseite der Domain (E20, Anzeige oder Dashboard).
 1. **Bauplan „Sitzung“ (E16)** als `planung/bauplaene/Bauplan-Sitzung.md`, dann Max fragen. Fest steht:
    - Die Sitzung lebt, solange das Board läuft. Ein Neustart beginnt leer; das gespeicherte Layout der Anzeige (A6) bleibt.
    - Inhalte lassen sich während der Laufzeit live ändern.

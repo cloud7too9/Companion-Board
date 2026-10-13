@@ -4,7 +4,7 @@ Stand: 13.10.2026 · Einstieg für einen neuen Chat
 
 > **Repo-Umzug (05.10.2026):** Dieses Repo `Companion-Board` hat mit dem Stand von `flexibel-visionboard` (`main` 9d5be46) als einem Start-Commit begonnen. Der alte Verlauf, die alten Branches und die alten PR-Nummern liegen weiter in [`flexibel-visionboard`](https://github.com/cloud7too9/flexibel-visionboard). Mitgenommen wurde nur `bereich/karte-mcworld` als eigener Stand ohne Eltern (nicht mergen, nur nachschlagen).
 >
-> **Umbau auf Netlify + Raspberry Pi:** Plan und Haken in [`planung/UMBAUPLAN.md`](planung/UMBAUPLAN.md), Stand der Phasen in [`planung/UEBERGABE.md`](planung/UEBERGABE.md). Phasen 1–5 sind abgeschlossen, Phase 6 ist seit dem 13.10.2026 in Betrieb (Pi, Tunnel, Domain `mainhubv1.com`; offen ist nur das Aufräumen, E18). Die Einrichtung steht in [`koordinaten-board/pi/ANLEITUNG.md`](koordinaten-board/pi/ANLEITUNG.md).
+> **Umbau auf Netlify + Raspberry Pi:** Plan und Haken in [`planung/UMBAUPLAN.md`](planung/UMBAUPLAN.md), Stand der Phasen in [`planung/UEBERGABE.md`](planung/UEBERGABE.md). **Der Umbau ist seit dem 13.10.2026 abgeschlossen:** Seiten von Netlify unter `mainhubv1.com`, Server auf dem Pi hinter dem Tunnel `api.mainhubv1.com`, Betrieb vom Laptop aus entfernt (E18). Die Einrichtung steht in [`koordinaten-board/pi/ANLEITUNG.md`](koordinaten-board/pi/ANLEITUNG.md).
 
 > **Stand der Umsetzung von `planung/PLAN.md`** (Widget-Dashboard, Welt-Import, Accounts): [`planung/UEBERGABE.md`](planung/UEBERGABE.md) – was gebaut ist, Branches, Starten, Tests, nächste Schritte. Was auf Max wartet: [`planung/WARTELISTE.md`](planung/WARTELISTE.md).
 
@@ -20,7 +20,7 @@ Diese Datei enthält, was **für beide Projekte** gilt: Arbeitsweise, Zusammensp
 **Anhängen oder Repo verbinden:**
 
 1. Dieses Repo (enthält Companion, Board, Referenz und den ganzen Git-Verlauf)
-2. **`modul-a-live-karte.html`**: die aktuelle Hauptdatei der Companion-PWA (Stilvorlage und Ziel für den späteren Einbau). Sie liegt bewusst nicht im Repo, weil Max sie selbst weiterpflegt.
+2. ~~`modul-a-live-karte.html`~~ braucht es nicht mehr: **Der Prototyp im Repo (`companion/companion-prototyp.html`) ist der Hauptstand** (Entscheidung von Max, 13.10.2026) und läuft unter `mainhubv1.com/app/`. `modul-a-live-karte.html` war die Herkunft der Optik und bleibt bei Max.
 
 **Erste Nachricht, zum Beispiel:**
 
@@ -28,9 +28,9 @@ Diese Datei enthält, was **für beide Projekte** gilt: Arbeitsweise, Zusammensp
 
 Geht es ums Raum-Board, statt der Companion-Übergabe `koordinaten-board/UEBERGABE.md` lesen.
 
-Geht es mit dem Umbau weiter (Netlify, Pi, Tunnel), zum Beispiel:
+Geht es um den Betrieb (Netlify, Pi, Tunnel), zum Beispiel:
 
-> Lies `UEBERGABE.md`, danach `planung/UMBAUPLAN.md` und `planung/UEBERGABE.md`. Phasen 1–5 sind abgeschlossen; ich habe den Pi nach `koordinaten-board/pi/ANLEITUNG.md` eingerichtet, hier das Ergebnis der Probe über Mobilfunk: …
+> Lies `UEBERGABE.md`, danach `koordinaten-board/pi/ANLEITUNG.md`. Der Pi meldet im Journal: …
 
 Geht es mit dem Plan weiter (Widget-Dashboard, Offline, Accounts), zum Beispiel:
 

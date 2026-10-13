@@ -128,6 +128,6 @@ Der Tunnel baut die Verbindung vom Pi nach außen auf: Am Router (bei deiner Mut
 3. Ort anlegen oder Screenshot auslesen (die Texterkennung lädt beim ersten Mal etwa 7 MB) → die Anzeige aktualisiert sich live.
 4. Flugmodus an, App vom Home-Bildschirm öffnen: Die Seite geht auf (App-Shell aus dem Cache); Daten gibt es erst wieder mit Netz (Offline-Warteschlange kommt mit B3–B5).
 
-## Aufräumen nach der Probe (Phase 6, Umbauplan)
+## Aufräumen nach der Probe (Phase 6, Umbauplan): erledigt
 
-`netzwerk.js`, das Adress-Lernen (`adresse.txt`) und die Firewall-Skripte braucht der Pi nicht mehr; sie bleiben für den Betrieb im Heimnetz vom Laptop aus erhalten. Für den Pi ist `OEFFENTLICHE_URL` gesetzt, dann wird die LAN-Adresse nicht mehr benutzt.
+Am 13.10.2026 entfernt (E18): `netzwerk.js`, das Adress-Lernen (`adresse.txt`), `start.bat`, `start.sh`, `anzeige-oeffnen.bat` und die Firewall-Skripte. Der Server nimmt die Adresse für QR-Code und Anzeige-Link nur noch aus `OEFFENTLICHE_URL` (auf dem Pi gesetzt); ohne sie gilt `http://localhost:<PORT>` für die Entwicklung.
