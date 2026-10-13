@@ -8,6 +8,7 @@ PR-Nummern bis #26 meinen das alte Repo `flexibel-visionboard`, ab dem Repo-Umzu
 
 | PR | Inhalt |
 |---|---|
+| #19 | Bauplan „Welt-Funde“ (erweiterter Welt-Import) zum Abnicken, E21 auf der Warteliste |
 | #18 | Aufräumen: Erledigtes aus `planung/` ins Archiv `docs/` (Pläne, Baupläne, Ideen, Verlauf, erledigte Haltepunkte und Entscheidungen), Test-Cache aus dem Repo, `.gitignore` im Hauptordner |
 | #17 | S4 Umschalten: Anzeige-Link aufs Dashboard, `/` und `/anzeige` leiten um (E20), `koordinaten-board/client/` und `gezeigt` entfernt, Hinweis „Dieser Anzeige-Link gilt nicht mehr“, Tests auf das Dashboard umgeschrieben; ⏸ H10 wartet auf Max |
 | #16 | S3 Widgets der Anzeige: Orte, Beitreten (QR-Code vom Server), Spieler, Zuletzt, Kopf der Anzeige, neues Standard-Layout; ⏸ H9 wartet auf Max |
