@@ -8,7 +8,8 @@
     "biom-ids": "node biom-ids-bauen.mjs",
     "pruefen": "node welt-pruefen.mjs",
     "test": "node --test gegenprobe.test.mjs",
-    "tesseract": "node tesseract-kopieren.mjs"
+    "tesseract": "node tesseract-kopieren.mjs",
+    "inhalte": "node welt-inhalte.mjs"
   },
   "devDependencies": {
     "@tesseract.js-data/eng": "1.0.0",

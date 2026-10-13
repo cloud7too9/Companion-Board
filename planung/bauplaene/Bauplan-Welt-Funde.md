@@ -162,6 +162,46 @@ Max (13.10.2026): „mergen und weiter mit W3“.
 - **Tests**: `welt-funde.test.mjs` (Fundewelt mit Bereichen, zwei Dörfern, einem gelöschten Dorf, zwei Transittoren, Drache; kaputter Strukturbereich), `karte-mcworld` (Zeilen der neuen Arten, das Transittor bei X 96 · Z 0 kennt der Mock schon, Drache in der Prüfliste, live 15 Orte).
 - **Nur aus der Beschreibung des Formats**: Tag 57, die Dorf-Schlüssel, `EndGateway` und `TheEnd` kommen in der Testwelt von Max nicht vor. H12 zeigt, ob eine echte Welt sie so schreibt.
 
+## H12: Ergebnis an Max' Welt (13.10.2026)
+
+Welt „letztes mal – Kopie“ von Max (Bedrock **1.26.52**, `Archiv.zip` aus der Dateien-App, 13 833 / 5 683 / 830 Chunks), ausgewertet von Claude mit `welt-pruefen.mjs` (Streaming, 15 s, 168 MB) und zum Gegenprüfen mit `tools/welt-inhalte.mjs`. Den Vergleich mit dem Spiel macht Max.
+
+**Passt:**
+
+- **Welt-Info:** Überleben, Schwer, 270 Tage, Weltspawn X 0 · Z 0, Enderdrache besiegt. `SpawnY` ist 32767 („keine feste Höhe“) und wird richtig weggelassen.
+- **Portale:** 20 aus `portals` → `data.PortalRecords` mit `DimId`, `TpX/TpY/TpZ`, `Span`, `Xa/Za` – das Format aus der Beschreibung stimmt. Daraus 7 Paare, 4 einseitig, 5 ohne Gegenstück.
+- **Dörfer:** 9 Einträge `VILLAGE_Overworld_<uuid>_INFO` mit `X0…Z1` (dazu 1 Dorf aus einer Truhe). Die Glocken stehen **nicht** in `…_POI` (dort nur Betten und Arbeitsplätze), sondern als Block-Entity `Bell`; 2 Dörfer haben 2 Glocken.
+- **End:** 6 Endtransitportale, 1 Endsiedlung, Drache besiegt.
+- **Spieler:** `~local_player` vorhanden (X 148 · Y 63 · Z −74); dazu 11 andere Spieler (`player_…`), nicht gelesen (Frage 2).
+- **Schmiedevorlagen:** Turmzier und Mündelzier in Shulkerkisten bzw. einer Truhe. **Rüstung:** getragenes Set (Diamant/Netherit).
+- **Banner:** 195 gelesen, Farbnummern und Muster-Kürzel werden aufgelöst. 193 davon sind dieselbe Deko einer Endsiedlung (Magenta mit zwei schwarzen Spitzen); W2 zählt gleiche Banner einmal.
+
+**Fehlt oder falsch:**
+
+1. **Tag 57 (`HardcodedSpawners`) gibt es in 1.26.52 nicht.** W3 findet deshalb keine Strukturbereiche. Die Bereiche stehen in **Chunk-Tag 0x77 (119, AABBVolumes)** – mit Namen:
+   `u32 Version (1)`, `u32 Anzahl Strukturen`, je Struktur `u32`, Name als `u16`-Länge + Text (`minecraft:fortress`), `u32 Anzahl Teile`, je Teil `u32 Nr.` + 6 × `i32` (min X, Y, Z, max X, Y, Z); danach weitere Daten, die es zum Lesen nicht braucht. Teile derselben Struktur liegen bis zu ~100 Blöcke auseinander, zusammenfassen mit 96 Blöcken Abstand (X/Z). 13 von 2 382 Einträgen haben 2 Strukturen; dort ist nur die erste sicher gelesen. Umsetzung zum Nachschlagen: `aabbLesen` in `tools/welt-inhalte.mjs`.
+2. **Vergleich Truhen-Weg (W1) ↔ 0x77:**
+
+   | Struktur | aus Truhen, Spawnern, Tresoren | in 0x77 |
+   |---|---|---|
+   | Ozeanmonument | 0 | **7** |
+   | Lager | 0 (Beute-Tabelle unbekannt) | **8** (5 Varianten `abandoned_camp_*`) |
+   | Iglu | 0 | 1 |
+   | Plünderer-Außenposten | 3 | 4 |
+   | Dschungeltempel | 3 | 4 |
+   | Wüstentempel | 4 | 4 |
+   | Pfadruinen | 3 | 3 |
+   | Prüfungskammern | 52 | 52 |
+   | Netherfestung | 6 | 4–5 (Teile mit Lücken) |
+   | Hexenhütte | 0 | 0 (in der Welt keine) |
+
+   Nicht in 0x77, nur über Truhen: Verlies (707), Mine (113), Schatz (78), Ozeanruinen (34), Zerstörtes Portal (36), Schiffswrack (15), Antike Stätte (7), Wüstenbrunnen (6), Bastion (6), Festung (1).
+3. **Unbekannte Beute-Tabellen:** `abandoned_camp_common_chest`, `abandoned_camp_secret_chest`, `barrels/abandoned_camp_barrel` (→ Lager), `pots/trial_chambers/corridor` (1 692) und `dispensers/trial_chambers/…` (1 460, → Prüfungskammer oder still übergehen).
+4. **179 nicht lesbare Einträge:** alles Lebewesen (`actorprefix…`); auch ein zweiter, unabhängiger NBT-Leser scheitert an genau diesen 179. Neues Format oder kaputte Einträge – klären, bevor Loren/Rüstungsständer darauf bauen.
+5. **Handelsangebote** (nicht Teil des Bauplans): 33 von 84 Dorfbewohnern haben `Offers` (294 Angebote), offenbar nur die, mit denen gehandelt wurde.
+
+**Vorschlag W4** (nicht gebaut, wartet auf Max): 0x77 statt Tag 57 lesen (Arten nach Bedrock-ID, Zuordnung wie im Referenzschema `planung/schema/`, Tabelle `struktur_ids`), Lager-Beute-Tabellen zuordnen, Topf/Spender der Prüfungskammern still übergehen, Tag 57 als Rückweg für ältere Welten behalten.
+
 ## Phasen, Haltepunkte, Branches
 
 | Phase | Inhalt | Tests |
@@ -169,7 +209,8 @@ Max (13.10.2026): „mergen und weiter mit W3“.
 | **W0** Weltordner statt ZIP · **gebaut 13.10.2026** | Ordner wählen oder hineinziehen, nur gebrauchte Dateien, Auswahl bei mehreren Welten, ZIP bleibt als Rückweg | `node --test` (Ordner = ZIP, auch Testwelt von Max; Ablage rekursiv), Playwright `karte-mcworld`. ⏸ **H11:** Max wählt am iPhone den Weltordner (und probiert das Hineinziehen aus der Dateien-App) |
 | **W1** Funde lesen · **gebaut 13.10.2026** | `nbt.js`, `welt-funde.js`, Sammler im Durchlauf von `biom-welt.js`, Worker und `welt-pruefen.mjs` geben Funde aus. Truhen, Spawner, Loren, Kies, Tresore, Portale, Spieler, Behälter-Inhalte, Banner, Rüstungsständer, Welt-Info | `node --test welt-funde.test.mjs`: NBT-Leser; Testwelt ergibt genau 6 Verliese und 1 Schatz an den bekannten Koordinaten; `fundeweltBauen` mit Portalen, Bannern, Rüstung und Vorlagen; unbekannte Beute-Tabelle wird gemeldet. ⏸ **H12:** Max lässt `welt-pruefen.mjs` (oder Claude mit seiner Datei) über seine echte Welt laufen und vergleicht die Liste mit dem Spiel |
 | **W2** Übersicht und automatisch Übernehmen · **gebaut 13.10.2026** | Je Art eine Zeile mit Anzahl und Schalter (Entscheidungen 13.10.2026), „schon bekannt“, Portal-Paare (`zielSuchen` aus `board-karten.js`), Portale ohne Gegenstück als „Eigene Orte · Netherportal“, Lederfarbe → `FARBEN`, Übernehmen über `POST /welten/:id/funde`, `quelle:"welt"` und Welt-Info am Server, Welt-Info im Welt-Sheet | Playwright `karte-mcworld` (DEMO) und live gegen das Board: Funde erscheinen, schon bekannte sind ausgegraut, Übernehmen legt Orte, Verbindung, Sammelobjekt, Set und Banner an, zweiter Import legt nichts doppelt an. ⏸ **H13:** Max importiert am iPhone und schaut Prüfliste und Karte an |
-| **W3** Strukturen ohne Truhe · **gebaut 13.10.2026** | Strukturbereiche (Tag 57), Dörfer, End-Transittore, Enderdrache (Bild der Welt entfällt, Frage 5) | wie W1, an einer Welt von Max mit diesen Strukturen |
+| **W3** Strukturen ohne Truhe · **gebaut 13.10.2026** | Strukturbereiche (Tag 57), Dörfer, End-Transittore, Enderdrache (Bild der Welt entfällt, Frage 5) | wie W1, an einer Welt von Max mit diesen Strukturen. **H12 (13.10.2026): Tag 57 gibt es in 1.26.52 nicht, siehe „H12: Ergebnis“** |
+| **W4** Strukturbereiche aus 0x77 · **Vorschlag** | 0x77 lesen, Lager und Prüfungskammer-Tabellen zuordnen (Abschnitt „H12: Ergebnis“) | Fundewelt mit 0x77-Einträgen, Max' Welt: 7 Ozeanmonumente, 8 Lager, 4 Außenposten |
 
 Jede Phase ein PR gegen `main`, gemergt nach Rückfrage. Branch: der Branch der Sitzung (`claude/…`), wie bei Bauplan „Sitzung“.
 
