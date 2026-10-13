@@ -6,6 +6,7 @@ import { DEFAULT_LAYOUT } from "./default-layout";
 import { instanzRect, instanzRects, schonDa, widgetTyp } from "./widget-register";
 import { clampItemToGrid } from "../lib/layout-utils";
 import { passt } from "../lib/collision-utils";
+import { ersteFreieStelle } from "../../../../../widget-groessen.mjs";
 import { SCHEMA_VERSION, loadWorkspaceFromStorage, parsePersistedWorkspace, saveWorkspaceToStorage } from "../lib/storage";
 import { RASTER_SPALTEN, STANDARD_REIHEN } from "../lib/raster";
 import { stufeVon, type Groessenstufe } from "./widget-vertrag";
@@ -110,15 +111,8 @@ function findSlot(
   reihen: number,
   stufen: Groessenstufe[],
 ): { x: number; y: number; stufe: string } | null {
-  const belegt = instanzRects(layout.instanzen);
-  for (const s of stufen) {
-    for (let y = 0; y + s.hoehe <= reihen; y++) {
-      for (let x = 0; x + s.breite <= RASTER_SPALTEN; x++) {
-        if (passt({ x, y, w: s.breite, h: s.hoehe }, belegt, reihen).passt) return { x, y, stufe: s.name };
-      }
-    }
-  }
-  return null;
+  // dieselbe Suche wie am Server für „Aufs Board“ (companion/widget-groessen.mjs)
+  return ersteFreieStelle(instanzRects(layout.instanzen), reihen, stufen);
 }
 
 /** Stufen ab der gewünschten, danach die übrigen in Vertragsreihenfolge */

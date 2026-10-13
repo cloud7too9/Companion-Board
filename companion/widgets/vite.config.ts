@@ -13,6 +13,8 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    // widget-groessen.mjs liegt eine Ebene höher in companion/ (gemeinsam mit dem Server)
+    fs: { allow: [path.resolve(__dirname, "..")] },
     // Karten und Live-Änderungen vom Board-Server (npm start in koordinaten-board, Port 3000).
     // Läuft keiner, zeigen die Widgets Beispielkarten.
     proxy: {
