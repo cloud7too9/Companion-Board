@@ -79,7 +79,7 @@ try {
   const flaeche = await max.$eval('[data-testid="raster-flaeche"]', (f) => ({ grid: f.dataset.grid, b: f.getBoundingClientRect().width, h: f.getBoundingClientRect().height }));
   pruefe(flaeche.grid === `32x${tvReihen}` && Math.abs(flaeche.b / flaeche.h - 32 / tvReihen) < 0.02,
     `Fläche der Anzeige im richtigen Seitenverhältnis (${flaeche.grid}, ${Math.round(flaeche.b)}×${Math.round(flaeche.h)} px)`);
-  pruefe(await max.$$eval("[data-panel-id]", (l) => l.length) === 4 && await max.$$eval('[data-testid="karte"]', (l) => l.length) === 0
+  pruefe(await max.$$eval("[data-panel-id]", (l) => l.length) === 6 && await max.$$eval('[data-testid="karte"]', (l) => l.length) === 0
     && (await max.textContent('[data-panel-id="w-portale"] [data-testid="leer-titel"]')) === "Portalverbindungen"
     && (await max.$eval('[data-panel-id="w-portale"] [data-testid="gehaeuse"]', (g) => g.dataset.theme)) === "portale",
     "Leere Widgets: Rahmen, Titel und Theme, ohne Inhalt");
@@ -140,8 +140,8 @@ try {
     null, { timeout: 8000 }).then(() => true, () => false), "Neuer Layer am Handy → Anzeige wechselt auf den leeren „Layer 2“");
   if (!(await max.$('[aria-label="Layer"]'))) await max.click('[aria-label^="Layer wechseln"]');
   await max.click('[aria-label="Layer"] button:has-text("Start")');
-  pruefe(await tv.waitForFunction(() => document.querySelector('[data-testid="layer-name"]')?.textContent === "Start" && document.querySelectorAll("[data-panel-id]").length === 5,
-    null, { timeout: 8000 }).then(() => true, () => false), "Zurück auf „Start“ → Anzeige zeigt wieder alle 5 Widgets");
+  pruefe(await tv.waitForFunction(() => document.querySelector('[data-testid="layer-name"]')?.textContent === "Start" && document.querySelectorAll("[data-panel-id]").length === 7,
+    null, { timeout: 8000 }).then(() => true, () => false), "Zurück auf „Start“ → Anzeige zeigt wieder alle 7 Widgets");
 
   // ---- Ein zweites Handy ändert gleichzeitig → kommt beim ersten an ----
   const layout = await layoutAmBoard();

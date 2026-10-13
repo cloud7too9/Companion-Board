@@ -3,6 +3,8 @@ import type { QuellenAntwort, WidgetAntwort } from "../karte.types";
 import { mockKarte, mockQuellen } from "../lib/mock-karten";
 import { zugangHolen, zugangParameter, type Zugang } from "../lib/zugang";
 import { apiUrl, wsUrl } from "../lib/api";
+import type { Beitritt, BoardZustand } from "../../anzeige/anzeige.types";
+import { BEISPIEL_BEITRITT, BEISPIEL_QR, BEISPIEL_TEILNEHMER, beispielZustand } from "../../anzeige/lib/beispiel-zustand";
 
 /**
  * Verbindung des Dashboards zum Board-Server.
@@ -10,6 +12,8 @@ import { apiUrl, wsUrl } from "../lib/api";
  * - „beispiel“: kein Board erreichbar (z. B. `npm run dev` allein) → feste Beispielkarten.
  * Zwei Rollen: die **Anzeige** (nur mit Anzeige-Link; liest ihr Layout, meldet ihre Reihen)
  * und die **Steuerung** am Handy („Anzeige anordnen“, angemeldet mit dem Token der Companion).
+ * Für die Widgets der Anzeige (Bauplan „Sitzung“, S3) hält der Store außerdem `zustand` und
+ * `teilnehmer` vom /ws sowie Beitritt und QR-Code (GET /api/anzeige, /api/anzeige/qr).
  */
 export type BoardModus = "pruefen" | "board" | "beispiel";
 
@@ -34,6 +38,16 @@ interface BoardState {
   token: string | null;
   /** Steuerung: steigt, wenn sich ein Layout oder eine Anzeige ändert – „Anordnen“ lädt dann neu */
   layoutVersion: number;
+  /** Orte und Einstellungen der aktiven Welt (`zustand` über /ws); null, bis die erste Nachricht da ist */
+  zustand: BoardZustand | null;
+  /** Wer gerade mit dem Handy verbunden ist (`teilnehmer` über /ws) */
+  teilnehmer: string[];
+  /** Steht die Verbindung zum Board (/ws offen)? */
+  verbunden: boolean;
+  /** Anzeige: Adresse und PIN zum Beitreten; null, bis geladen */
+  beitritt: Beitritt | null;
+  /** Anzeige: QR-Code zum Beitreten als SVG */
+  qrSvg: string;
   /** Ohne Token als Anzeige, mit Token als Steuerung */
   starten: (optionen?: { token?: string }) => () => void;
   /** Reihen der eigenen Fläche ans Board melden (nur am Board) */
@@ -79,6 +93,11 @@ export const useBoardStore = create<BoardState>((set, get) => ({
   vollbild: null,
   token: null,
   layoutVersion: 0,
+  zustand: null,
+  teilnehmer: [],
+  verbunden: false,
+  beitritt: null,
+  qrSvg: "",
 
   starten: (optionen = {}) => {
     let aus = false;
@@ -104,18 +123,33 @@ export const useBoardStore = create<BoardState>((set, get) => ({
       set({ anzeige: antwort?.anzeige ?? null, layout: antwort?.layout ?? null, vollbild: antwort?.vollbild ?? null });
     };
 
+    // Anzeige: Beitreten (Adresse, PIN) und QR-Code; ändern sich nur mit dem Neustart des Boards
+    const beitrittLaden = async () => {
+      if (token) return;
+      const parameter = zugangParameter(zugang);
+      const [beitritt, qr] = await Promise.all([
+        jsonLaden<Beitritt | null>(adresse("/api/anzeige", parameter), () => null),
+        jsonLaden<{ svg: string } | null>(adresse("/api/anzeige/qr", parameter), () => null),
+      ]);
+      if (aus) return;
+      set({ beitritt: beitritt && { beitrittsUrl: beitritt.beitrittsUrl, adresse: beitritt.adresse, pin: beitritt.pin }, qrSvg: qr?.svg ?? "" });
+    };
+
     const verbinden = (versuch = 0) => {
       if (aus) return;
       const parameter: Record<string, string> = token ? { token } : { rolle: "anzeige", ...zugangParameter(zugang) };
       socket = new WebSocket(wsUrl(parameter));
       socket.onopen = () => {
-        // Was während der Trennung passiert ist, kam nicht an → neu laden
-        if (versuch > 0) { geaendert(); void layoutLaden(); }
+        set({ verbunden: true });
+        // Was während der Trennung passiert ist, kam nicht an → neu laden (`zustand` schickt der Server selbst)
+        if (versuch > 0) { geaendert(); void layoutLaden(); if (!get().beitritt) void beitrittLaden(); }
         versuch = 0;
       };
       socket.onmessage = (e) => {
         try {
           const n = JSON.parse(String(e.data));
+          if (n?.art === "zustand" && n.zustand) return set({ zustand: n.zustand as BoardZustand });
+          if (n?.art === "teilnehmer" && Array.isArray(n.namen)) return set({ teilnehmer: n.namen as string[] });
           if (n?.art !== "geaendert") return;
           // Layout und Anzeigen betreffen keine Karte
           if (n.bereich === "layout" || n.bereich === "anzeigen") void layoutLaden();
@@ -124,6 +158,7 @@ export const useBoardStore = create<BoardState>((set, get) => ({
       };
       socket.onclose = (e) => {
         if (aus) return;
+        set({ verbunden: false });
         // 4003: kein oder ein alter Anzeige-Link, 4001: Anmeldung abgelaufen – neu verbinden hilft nicht
         if (e.code === 4003 || e.code === 4001) return geaendert();
         warten = setTimeout(() => verbinden(versuch + 1), Math.min(10_000, 1000 * 2 ** versuch));
@@ -133,8 +168,13 @@ export const useBoardStore = create<BoardState>((set, get) => ({
     void boardDa().then(async (da) => {
       if (aus) return;
       if (da && !token) await layoutLaden();   // erst das Layout, dann den Modus – kein Aufblitzen des lokalen Layouts
-      set({ modus: da ? "board" : "beispiel" });
-      if (da) verbinden();
+      if (!da) {
+        set({ modus: "beispiel", zustand: beispielZustand(), teilnehmer: BEISPIEL_TEILNEHMER, beitritt: BEISPIEL_BEITRITT, qrSvg: BEISPIEL_QR });
+        return;
+      }
+      set({ modus: "board" });
+      void beitrittLaden();
+      verbinden();
     });
 
     return () => {
@@ -142,6 +182,7 @@ export const useBoardStore = create<BoardState>((set, get) => ({
       clearTimeout(warten);
       clearTimeout(neuLaden);
       socket?.close();
+      set({ verbunden: false });
     };
   },
 

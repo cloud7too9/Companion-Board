@@ -7,6 +7,7 @@ import { WidgetInhalt } from "./WidgetInhalt";
 import { PanelToolbar } from "./PanelToolbar";
 import { WidgetGehaeuse } from "./WidgetGehaeuse";
 import { useKarte } from "../../karten/hooks/useKarte";
+import { LokalesWidget, istLokalesWidget } from "../../anzeige/lokale-widgets";
 
 interface Props {
   instanz: WidgetInstanz;
@@ -38,7 +39,8 @@ export function WorkspacePanel({
 }: Props) {
   const typ = widgetTyp(item.typ);
   const stufe = typ && stufeVon(typ.vertrag, item.stufe);
-  const antwort = useKarte(leer ? "" : item.typ, item.quelle);   // leer: keine Karte laden
+  const lokal = istLokalesWidget(item.typ);   // Widgets der Anzeige rendern aus dem Zustand, ohne Karte vom Server (S3)
+  const antwort = useKarte(leer || lokal ? "" : item.typ, item.quelle);   // leer: keine Karte laden
   return (
     <div
       data-panel-id={item.id}
@@ -89,7 +91,7 @@ export function WorkspacePanel({
           </>
         )}
       >
-        {leer ? undefined : <WidgetInhalt instanz={item} antwort={antwort} />}
+        {leer ? undefined : lokal ? <LokalesWidget typ={item.typ} /> : <WidgetInhalt instanz={item} antwort={antwort} />}
       </WidgetGehaeuse>
       {arrangeable && (
         <div
