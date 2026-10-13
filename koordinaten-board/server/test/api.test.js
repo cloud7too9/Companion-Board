@@ -387,12 +387,70 @@ test('Rüstungs-Baukasten wird ausgeliefert (Texturen, Module, Manifest)', async
   }
 });
 
-test('Änderungen gehen live an alle, Daten überstehen einen Neustart', async () => {
+test('Aufs Board als Sitzungs-Widget (Bauplan Sitzung, S1): zeigen mit Quelle, Layout, verbergen, Fehler', async () => {
+  const max = await beitreten('Max');
+  const [board] = (await anfrage('GET', '/api/anzeigen', max)).daten.anzeigen;
+  const q = new URL(board.link).search;
+  const welt = (await anfrage('POST', '/api/orte/welten', max, { seed: '99' })).daten.welt;
+  await anfrage('PUT', '/api/board/einstellungen', max, { aktiveWelt: welt.id });
+  const portal = (await anfrage('POST', `/api/portale/welten/${welt.id}`, max, { name: 'Hof', oberwelt: { x: 80, y: 64, z: 8 }, nether: { x: 10, y: 64, z: 1 } })).daten.verbindung;
+  const ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws?token=${encodeURIComponent(max)}`);
+  const nachrichten = [];
+  ws.onmessage = (e) => nachrichten.push(JSON.parse(e.data));
+  await new Promise((r) => { ws.onopen = r; });
+  const antwort = (anfrageNr) => new Promise((ok) => {
+    const t = setInterval(() => {
+      const a = nachrichten.find((n) => n.anfrage === anfrageNr && (n.art === 'ok' || n.art === 'fehler'));
+      if (a) { clearInterval(t); ok(a); }
+    }, 20);
+  });
+
+  ws.send(JSON.stringify({ art: 'zeigen', quelle: `portal:${portal.id}`, anfrage: 1 }));
+  let a = await antwort(1);
+  assert.equal(a.art, 'ok');
+  assert.ok(typeof a.instanzId === 'string' && a.instanzId.length > 10, 'ok nennt die Instanz');
+  let l = (await anfrage('GET', `/api/anzeige/layout${q}`)).daten.layout;
+  assert.deepEqual([l.aktiverLayer, l.layer[0].id, l.layer[0].instanzen.map((i) => [i.typ, i.quelle, i.x, i.y, i.von])],
+    ['sitzung', 'sitzung', [['portale.verbindung', portal.id, 0, 0, 'Max']]]);
+  assert.ok(nachrichten.some((n) => n.art === 'geaendert' && n.bereich === 'layout' && n.anzeigeId === board.id), 'geaendert layout mit Anzeige-ID');
+  assert.equal((await anfrage('GET', `/api/widgets/portale.verbindung${q}&quelle=${portal.id}`)).daten.karte.titel, 'Hof', 'das Widget hat seine Karte');
+  // Dieselbe Quelle noch einmal: dieselbe Instanz. Zweite Quelle: daneben.
+  ws.send(JSON.stringify({ art: 'zeigen', quelle: `portal:${portal.id}`, anfrage: 2 }));
+  assert.equal((await antwort(2)).instanzId, a.instanzId);
+  ws.send(JSON.stringify({ art: 'zeigen', quelle: 'sammelstand', anfrage: 3 }));
+  const b = await antwort(3);
+  l = (await anfrage('GET', `/api/anzeige/layout${q}`)).daten.layout;
+  assert.deepEqual(l.layer[0].instanzen.map((i) => [i.id === b.instanzId, i.x, i.y]), [[false, 0, 0], [true, 6, 0]]);
+  // Fehler: unbekannte Quelle, gelöschte Quelle, unbekannte Anzeige
+  ws.send(JSON.stringify({ art: 'zeigen', quelle: 'unsinn', anfrage: 4 }));
+  assert.match((await antwort(4)).text, /Unbekannte Quelle/);
+  ws.send(JSON.stringify({ art: 'zeigen', quelle: 'portal:p_999', anfrage: 5 }));
+  assert.equal((await antwort(5)).text, 'Die Quelle gibt es nicht mehr');
+  ws.send(JSON.stringify({ art: 'zeigen', quelle: 'sammelstand', anzeigeId: 'a_999', anfrage: 6 }));
+  assert.equal((await antwort(6)).text, 'Anzeige nicht gefunden');
+  // Wegnehmen
+  ws.send(JSON.stringify({ art: 'verbergen', instanzId: a.instanzId, anfrage: 7 }));
+  assert.equal((await antwort(7)).art, 'ok');
+  l = (await anfrage('GET', `/api/anzeige/layout${q}`)).daten.layout;
+  assert.deepEqual(l.layer[0].instanzen.map((i) => i.typ), ['sammelobjekte.status']);
+  // Der alte Weg (fertige Karte → gezeigt) läuft bis S4 weiter
+  ws.send(JSON.stringify({ art: 'zeigen', karte: { titel: 'Alt', dimension: null, bloecke: [{ art: 'text', text: 'noch da' }] }, anfrage: 8 }));
+  assert.equal((await antwort(8)).art, 'ok');
+  assert.ok(nachrichten.some((n) => n.art === 'gezeigt' && n.karte?.titel === 'Alt'));
+  ws.close();
+  await anfrage('PUT', '/api/board/einstellungen', max, { aktiveWelt: null });
+});
+
+test('Änderungen gehen live an alle, Daten überstehen einen Neustart; die Sitzung nicht', async () => {
   const max = await beitreten('Max');
   const ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws?token=${encodeURIComponent(max)}`);
   const nachrichten = [];
   ws.onmessage = (e) => nachrichten.push(JSON.parse(e.data));
   await new Promise((r) => { ws.onopen = r; });
+  const [board] = (await anfrage('GET', '/api/anzeigen', max)).daten.anzeigen;
+  ws.send(JSON.stringify({ art: 'zeigen', quelle: 'sammelstand', anfrage: 'neustart' }));
+  await new Promise((r) => setTimeout(r, 150));
+  assert.ok((await anfrage('GET', `/api/anzeigen/${board.id}/layout`, max)).daten.layout.layer.some((l) => l.id === 'sitzung'), 'vor dem Neustart liegt die Sitzung im Layout');
   const welt = (await anfrage('POST', '/api/orte/welten', max, { seed: '-42' })).daten.welt;
   await anfrage('PUT', '/api/board/einstellungen', max, { aktiveWelt: welt.id, titel: 'Neustart-Welt' });
   await anfrage('POST', '/api/orte/instanzen', max, { dimensionId: `d_${welt.id}_end`, kategorie: 'End City', x: 1300, y: 60, z: -820, quelle: 'manuell' });
@@ -407,5 +465,7 @@ test('Änderungen gehen live an alle, Daten überstehen einen Neustart', async (
   await starten();
   const nachher = await anfrage('GET', `/api/orte/welten/${welt.id}`, max);
   assert.equal(nachher.daten.instanzen.length, 1);
+  const layoutNachher = (await anfrage('GET', `/api/anzeigen/${board.id}/layout`, max)).daten.layout;
+  assert.ok(!layoutNachher?.layer?.some((l) => l.id === 'sitzung'), 'nach dem Neustart ist die Sitzung leer');
   assert.equal((await anfrage('GET', '/api/board/einstellungen', max)).daten.aktiv, welt.id);
 });
