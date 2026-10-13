@@ -12,8 +12,9 @@ import { verbindungLesen } from "../features/anordnen/anmeldung";
 import { useAnordnen } from "../features/anordnen/useAnordnen";
 import { Button } from "../shared/ui/Button";
 
-/** Zurück zur Companion, die das Board unter / ausliefert */
-const ZUR_COMPANION = "/";
+/** Zurück zur Companion: lokal liefert das Board sie unter / aus, auf Netlify liegt sie unter /app/
+ *  (VITE_COMPANION_PFAD aus netlify/bauen.sh, Umbau Phase 5) */
+const ZUR_COMPANION = import.meta.env.VITE_COMPANION_PFAD || "/";
 
 function Hinweis({ titel, text }: { titel: string; text: string }) {
   return (

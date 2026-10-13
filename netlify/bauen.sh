@@ -23,7 +23,8 @@ mkdir -p "$ZIEL"
 cp -r "$ZIEL/.anzeige/." "$ZIEL/" && rm -rf "$ZIEL/.anzeige"
 
 # Widget-Dashboard unter /dashboard/
-( cd companion/widgets && [ -n "${OHNE_INSTALL:-}" ] || npm ci --no-audit --no-fund; VITE_API_URL="$API_URL" npm run build -- --outDir "$ZIEL/dashboard" --emptyOutDir )
+# VITE_COMPANION_PFAD: wohin „Fertig“ in /dashboard/anordnen zurückführt (die Companion liegt hier unter /app/)
+( cd companion/widgets && [ -n "${OHNE_INSTALL:-}" ] || npm ci --no-audit --no-fund; VITE_API_URL="$API_URL" VITE_COMPANION_PFAD="/app/" npm run build -- --outDir "$ZIEL/dashboard" --emptyOutDir )
 
 # Companion unter /app/: Seite als index.html, dazu Regeln, Texterkennung, Welt-Import, Icons, Baukasten, Bibliotheken
 mkdir -p "$ZIEL/app"
