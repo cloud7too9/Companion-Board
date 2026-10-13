@@ -2,7 +2,7 @@
 
 Stand: 13.10.2026 · Grundlage: Frage von Max („Was kann man aus dem .mcworld-Upload alles bekommen?“, 13.10.2026) und Auswertung der Testwelt `companion/tests/daten/fixture-seed.mcworld` · Setzt voraus: Welt-Import (Strang C, im Archiv: `docs/bauplaene/Bauplan-Welt-Import.md`, `docs/plaene/PLAN-welt-import-biome.md`)
 
-> **Status: W0 und W1 gebaut (13.10.2026), W2 und W3 Entwurf.** Auf Wunsch von Max kam zuerst W0: den Weltordner direkt wählen oder hineinziehen, nur die gebrauchten Dateien behalten. Danach W1 („mergen und weiter“, Max 13.10.2026): Die Funde werden gelesen, die Companion zeigt sie noch nicht. **Max hat Frage 1, 4 und 5 beantwortet (13.10.2026, Abschnitt „Entscheidungen“):** automatisch übernehmen mit einem Schalter je Art, Portale ohne Gegenstück auf die Karte, kein Bild der Welt. Frage 2 und 3 gelten weiter nach Vorschlag.
+> **Status: W0, W1 und W2 gebaut (13.10.2026), W3 Entwurf.** Auf Wunsch von Max kam zuerst W0: den Weltordner direkt wählen oder hineinziehen, nur die gebrauchten Dateien behalten. Danach W1 („mergen und weiter“, Max 13.10.2026): Die Funde werden gelesen, die Companion zeigt sie noch nicht. **Max hat Frage 1, 4 und 5 beantwortet (13.10.2026, Abschnitt „Entscheidungen“):** automatisch übernehmen mit einem Schalter je Art, Portale ohne Gegenstück auf die Karte, kein Bild der Welt. Frage 2 und 3 gelten weiter nach Vorschlag.
 
 Dieser Bauplan beschreibt die technischen Entscheidungen. Er baut auf dem auf, was im Repo liegt (Stand `main` vom 13.10.2026).
 
@@ -140,13 +140,22 @@ Die Beute-Tabelle steht nur in **ungeöffneten** Behältern (`loot_tables/chests
 - **„Schon bekannt“ prüft die Companion** mit dem, was sie geladen hat (Orte, Verbindungen, Sammelstand, Banner, Sets), und schickt nur Neues. Zwei Geräte, die gleichzeitig dieselbe Welt importieren, könnten doppelt anlegen; das bleibt in Kauf genommen.
 - **Welt-Info** wird Teil des Imports (`import.info`, `biomImportSauber`) und steht im Welt-Sheet.
 
+## W2: Übersicht je Art und automatisch übernehmen (gebaut 13.10.2026)
+
+- **Prüfliste** (Sheet „Welt prüfen“): oben die Welt-Info aus `level.dat` (Spiel, Weltspawn, zuletzt gespielt), unter den Biomen die Karte „Aus der Welt“ mit einer Zeile je Art: Strukturen nach deutschem Namen, dann Portal-Verbindung, Netherportal ohne Gegenstück, Schmiedevorlage, Rüstungs-Set, Banner. Jede Zeile nennt „N neu · N schon bekannt · N passt nicht“ und hat einen Schalter, alle an. Screenshot `m12-funde.png`.
+- **Einordnen** (`wiFundeEinordnen` in `companion-prototyp.html`, Regeln aus `regeln.js`, Paare aus `board-karten.js`): „schon bekannt“ heißt: Ort derselben Kategorie in derselben Dimension innerhalb der Nähe des Funds (`naehe` liefert `welt-funde.js` mit), Portal innerhalb von 8 Blöcken an einer vorhandenen Verbindung oder einem Netherportal-Ort, Vorlage schon gefunden, gleicher Aufbau aller vier Rüstungsteile, gleiches Banner (`bannerSchluessel`). Gleiche Sets oder Banner im selben Import zählen einmal. Die vorhandenen Orte werden einmal nach Dimension und Kategorie geordnet, damit hunderte Funde schnell gehen.
+- **Übernehmen**: erst `PUT /welten/:id/biome` (jetzt mit `info`), dann `POST /welten/:id/funde` mit IDs vom Handy. Toast z. B. „Biome übernommen · 1 305 Chunks · 16 Funde“; Abgelehntes steht in Klammern und in der Konsole. Danach lädt die Companion die betroffenen Bereiche (im DEMO und ohne WebSocket sofort richtig).
+- **Server** (`daten.fundeAnlegen`, Route in `companion-api.js`): Jeder Eintrag geht durch `instanzAnlegen` (`quelle:"welt"`, Dimension muss zur Welt gehören), `portalAnlegen`, `sammelSetzen` (schon gefundene bleiben bei `von`/`am`), `ruestungAnlegen`, `bannerAnlegen`; je Bereich eine `geaendert`-Meldung; höchstens 5 000 Einträge je Liste (`fundePruefen`), `bodyLimit` 16 MB. Der DEMO-Mock macht dasselbe über seine eigenen Routen.
+- **Ort-Detail**: „Herkunft · aus dem Welt-Import“.
+- **Tests**: Server `api.test.js` (Welt-Info, Funde in einem Rutsch, Abgelehntes, je Bereich eine Meldung, Grenzen) und `regeln.test.js`; Playwright `karte-mcworld` mit der Fundewelt im DEMO (Zeilen, Schalter, Übernehmen, zweiter Import, Portale ohne Gegenstück) und live (Lena sieht die Orte sofort, Board hat alles).
+
 ## Phasen, Haltepunkte, Branches
 
 | Phase | Inhalt | Tests |
 |---|---|---|
 | **W0** Weltordner statt ZIP · **gebaut 13.10.2026** | Ordner wählen oder hineinziehen, nur gebrauchte Dateien, Auswahl bei mehreren Welten, ZIP bleibt als Rückweg | `node --test` (Ordner = ZIP, auch Testwelt von Max; Ablage rekursiv), Playwright `karte-mcworld`. ⏸ **H11:** Max wählt am iPhone den Weltordner (und probiert das Hineinziehen aus der Dateien-App) |
 | **W1** Funde lesen · **gebaut 13.10.2026** | `nbt.js`, `welt-funde.js`, Sammler im Durchlauf von `biom-welt.js`, Worker und `welt-pruefen.mjs` geben Funde aus. Truhen, Spawner, Loren, Kies, Tresore, Portale, Spieler, Behälter-Inhalte, Banner, Rüstungsständer, Welt-Info | `node --test welt-funde.test.mjs`: NBT-Leser; Testwelt ergibt genau 6 Verliese und 1 Schatz an den bekannten Koordinaten; `fundeweltBauen` mit Portalen, Bannern, Rüstung und Vorlagen; unbekannte Beute-Tabelle wird gemeldet. ⏸ **H12:** Max lässt `welt-pruefen.mjs` (oder Claude mit seiner Datei) über seine echte Welt laufen und vergleicht die Liste mit dem Spiel |
-| **W2** Übersicht und automatisch Übernehmen | Je Art eine Zeile mit Anzahl und Schalter (Entscheidungen 13.10.2026), „schon bekannt“, Portal-Paare (`zielSuchen` aus `board-karten.js`), Portale ohne Gegenstück als „Eigene Orte · Netherportal“, Lederfarbe → `FARBEN`, Übernehmen über `POST /welten/:id/funde`, `quelle:"welt"` und Welt-Info am Server, Welt-Info im Welt-Sheet | Playwright `karte-mcworld` (DEMO) und live gegen das Board: Funde erscheinen, schon bekannte sind ausgegraut, Übernehmen legt Orte, Verbindung, Sammelobjekt, Set und Banner an, zweiter Import legt nichts doppelt an. ⏸ **H13:** Max importiert am iPhone und schaut Prüfliste und Karte an |
+| **W2** Übersicht und automatisch Übernehmen · **gebaut 13.10.2026** | Je Art eine Zeile mit Anzahl und Schalter (Entscheidungen 13.10.2026), „schon bekannt“, Portal-Paare (`zielSuchen` aus `board-karten.js`), Portale ohne Gegenstück als „Eigene Orte · Netherportal“, Lederfarbe → `FARBEN`, Übernehmen über `POST /welten/:id/funde`, `quelle:"welt"` und Welt-Info am Server, Welt-Info im Welt-Sheet | Playwright `karte-mcworld` (DEMO) und live gegen das Board: Funde erscheinen, schon bekannte sind ausgegraut, Übernehmen legt Orte, Verbindung, Sammelobjekt, Set und Banner an, zweiter Import legt nichts doppelt an. ⏸ **H13:** Max importiert am iPhone und schaut Prüfliste und Karte an |
 | **W3** Strukturen ohne Truhe | Strukturbereiche (Tag 57), Dörfer, End-Transittore (Bild der Welt entfällt, Frage 5) | wie W1, an einer Welt von Max mit diesen Strukturen |
 
 Jede Phase ein PR gegen `main`, gemergt nach Rückfrage. Branch: der Branch der Sitzung (`claude/…`), wie bei Bauplan „Sitzung“.
@@ -172,6 +181,6 @@ Jede Phase ein PR gegen `main`, gemergt nach Rückfrage. Branch: der Branch der 
 1. ~~W0 Weltordner statt ZIP~~ gebaut 13.10.2026, ⏸ H11
 2. ~~Fragen 1, 4 und 5 beantworten~~ Max 13.10.2026; 2 und 3 gelten nach Vorschlag
 3. ~~W1 Funde lesen~~ gebaut 13.10.2026, ⏸ H12
-4. W2 → Commits „Prüfliste mit Funden“, „Funde übernehmen“, „Welt-Info am Server“, PR, ⏸ H13
+4. ~~W2 Übersicht und automatisch übernehmen~~ gebaut 13.10.2026, ⏸ H13
 5. W3 → PR
 6. Danach zieht der Bauplan ins Archiv (`docs/bauplaene/`).
