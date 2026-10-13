@@ -8,6 +8,7 @@ PR-Nummern bis #26 meinen das alte Repo `flexibel-visionboard`, ab dem Repo-Umzu
 
 | PR | Inhalt |
 |---|---|
+| #22 | Offline B3: live ohne Netz aus dem Spiegel in IndexedDB, `GET /api/aenderungen` mit `nr`/`lauf` in `geaendert`, Nachladen nach Unterbrechung (⏸ H14) |
 | #21 | Welt-Funde W3: Strukturbereiche (Chunk-Tag 57), Dörfer, Endtransitportale, Enderdrache; Bauplan „Welt-Funde“ ganz gebaut, offen nur H11–H13 |
 | #20 | Welt-Funde lesen (W1) und automatisch übernehmen (W2): NBT-Leser, Sammler, `welt-pruefen.mjs` mit Funden und Weltordner (⏸ H12); Prüfliste mit Schalter je Art, `POST /welten/:id/funde`, Portale ohne Gegenstück als Ort (Antworten von Max zu Frage 1, 4, 5; ⏸ H13) |
 | #19 | Welt-Import: Weltordner wählen oder hineinziehen, nur gebrauchte Dateien (W0, ⏸ H11); Bauplan „Welt-Funde“ (erweiterter Welt-Import) zum Abnicken, E21 auf der Warteliste |
