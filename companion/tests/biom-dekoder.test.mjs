@@ -10,6 +10,8 @@ import {
   hoehenIndex, oberflaecheY,
 } from "../biom-dekoder.js";
 import { weltLesen, weltPruefen, WeltFehler, FEHLER } from "../biom-welt.js";
+import { gebraucht, weltenFinden, ausAblage } from "../welt-ordner.js";
+import { ZipReader, BlobReader, Uint8ArrayWriter } from "../vendor/mcbe-leveldb.js";
 import "../biom-ids.js";
 import {
   chunkSchluessel, data3dBauen, levelDatBauen, testweltBauen, zipBauen, ID, SEED,
@@ -291,4 +293,69 @@ test("Fixture-Welt: Höhenkarte an der Stelle von Max, Reihenfolge z*16+x", asyn
   };
   const richtig = sprung(hoehenIndex), falsch = sprung((x, z) => x * 16 + z);
   assert.ok(richtig < 2 && falsch > 5, `Sprung z*16+x ${richtig.toFixed(2)}, x*16+z ${falsch.toFixed(2)}`);
+});
+
+// ---------- Weltordner statt ZIP (welt-ordner.js) ----------
+
+/** [[pfad, bytes]] → Ordner-Liste wie aus <input webkitdirectory>: pfad mit dem gewählten Ordner davor */
+const alsOrdner = (dateien, oben = "") => dateien.map(([pfad, bytes]) => ({ pfad: oben + pfad, datei: new File([bytes], pfad.split("/").pop()) }));
+const kachelnText = (r) => r.kacheln.map((k) => [k.dim, k.kx, k.kz, kachelZuBase64(k.daten)]);
+
+test("Weltordner: nur level.dat, levelname.txt und db/ (CURRENT, MANIFEST, .ldb, .log) bleiben", async () => {
+  assert.deepEqual(["level.dat", "levelname.txt", "db/CURRENT", "db/MANIFEST-000002", "db/000003.log", "db/000011.ldb"].filter(gebraucht).length, 6);
+  for (const p of ["level.dat_old", "world_icon.jpeg", "world_behavior_packs.json", "resource_packs/x/manifest.json", "db/LOCK", "db/LOG", "db/LOG.old", "db/sub/000001.ldb"])
+    assert.equal(gebraucht(p), false, p);
+  const { dateien } = testweltBauen({ beiwerk: true, levelname: "Unsere Welt" });
+  const [welt] = await weltenFinden(alsOrdner(dateien, "z2l2cn0rmkA=/"));
+  assert.equal(welt.name, "Unsere Welt");
+  assert.equal(welt.ordnername, "z2l2cn0rmkA=");
+  assert.deepEqual(welt.dateien.map((e) => e.pfad).sort(),
+    ["db/000008.ldb", "db/000011.ldb", "db/000013.ldb", "db/000014.log", "db/CURRENT", "db/MANIFEST-000015", "level.dat", "levelname.txt"]);
+  assert.equal(welt.alle.anzahl, dateien.length);
+  assert.ok(welt.behalten.bytes < welt.alle.bytes);
+});
+
+test("Weltordner: liefert dieselben Biome wie die ZIP – auch mit Beiwerk und für die Welt von Max", async () => {
+  const { zip, dateien } = testweltBauen({ beiwerk: true });
+  const [welt] = await weltenFinden(alsOrdner(dateien));
+  const ausZip = await weltLesen(blob(zip), { biomIds: BEKANNT }), ausOrdner = await weltLesen(welt.dateien, { biomIds: BEKANNT });
+  assert.deepEqual(ausOrdner.meta, ausZip.meta);
+  assert.deepEqual(kachelnText(ausOrdner), kachelnText(ausZip));
+  assert.deepEqual(await weltPruefen(welt.dateien), await weltPruefen(blob(zip)));
+
+  // Fixture-Welt: aus der .mcworld ausgepackt, als Ordner gelesen
+  const zipLeser = new ZipReader(new BlobReader(await openAsBlob(FIXTURE)));
+  const ausgepackt = [];
+  for (const e of await zipLeser.getEntries()) if (!e.directory) ausgepackt.push([e.filename, await e.getData(new Uint8ArrayWriter())]);
+  await zipLeser.close();
+  const [max] = await weltenFinden(alsOrdner(ausgepackt, "fixture-seed/"));
+  assert.ok(max.alle.anzahl > max.behalten.anzahl, "level.dat_old bleibt liegen");
+  assert.deepEqual(kachelnText(await weltLesen(max.dateien)), kachelnText(await weltLesen(await openAsBlob(FIXTURE))));
+});
+
+test("Weltordner: minecraftWorlds mit zwei Welten, ein Ordner ohne Welt", async () => {
+  const a = testweltBauen({ levelname: "Zweite" }).dateien, b = testweltBauen({ levelname: "Erste", seed: "-5" }).dateien;
+  const welten = await weltenFinden([...alsOrdner(a, "minecraftWorlds/AAAA=/"), ...alsOrdner(b, "minecraftWorlds/BBBB=/"),
+    ...alsOrdner([["notiz.txt", new Uint8Array(3)]], "minecraftWorlds/")]);
+  assert.deepEqual(welten.map((w) => [w.name, w.ordnername, w.dateien.length]), [["Erste", "BBBB=", 8], ["Zweite", "AAAA=", 8]]);
+  assert.equal((await weltPruefen(welten[0].dateien)).seed, "-5");
+  // nur db/ gewählt oder ganz etwas anderes: keine Welt
+  assert.deepEqual(await weltenFinden(alsOrdner(a.filter(([p]) => p.startsWith("db/")), "db/")), []);
+  await assert.rejects(weltLesen(alsOrdner(a.filter(([p]) => p !== "db/CURRENT"))), (f) => f.message === FEHLER.KEIN_WELTORDNER);
+});
+
+test("Ablage: Ordner rekursiv (Safari liefert höchstens 100 Einträge je readEntries), Datei ohne Eintrag direkt", async () => {
+  const datei = (name) => ({ isFile: true, isDirectory: false, name, file: (ok) => ok(new File([name], name)) });
+  const ordner = (name, kinder) => ({
+    isFile: false, isDirectory: true, name,
+    createReader: () => { let rest = [...kinder]; return { readEntries: (ok) => ok(rest.splice(0, 100)) }; },
+  });
+  const viele = Array.from({ length: 150 }, (_, i) => datei(`${String(i).padStart(6, "0")}.ldb`));
+  const welt = ordner("z2l2cn0rmkA=", [datei("level.dat"), ordner("db", [datei("CURRENT"), ...viele])]);
+  const zip = new File(["PK"], "Archiv.zip");
+  const liste = await ausAblage({ eintraege: [{ eintrag: welt, datei: null }, { eintrag: null, datei: zip }] });
+  assert.equal(liste.length, 1 + 1 + 150 + 1);
+  assert.ok(liste.some((e) => e.pfad === "z2l2cn0rmkA=/db/000149.ldb"));
+  assert.ok(liste.some((e) => e.pfad === "Archiv.zip" && e.datei === zip));
+  assert.deepEqual((await ausAblage({ dateien: [zip] })).map((e) => e.pfad), ["Archiv.zip"], "ohne items: die Dateien");
 });

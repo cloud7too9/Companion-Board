@@ -1,8 +1,11 @@
 /* ============================================================================
-   biom-welt.js  ·  .mcworld/.zip lesen → Biom je Chunk → Kacheln
+   biom-welt.js  ·  .mcworld/.zip oder Weltordner lesen → Biom je Chunk → Kacheln
    ----------------------------------------------------------------------------
    Gemeinsamer Ablauf für den Web Worker (biom-import.worker.js) und Node
    (tools/welt-pruefen.mjs, Tests). ES-Modul, nutzt das Bundle aus vendor/.
+   Eingabe: eine ZIP (.zip/.mcworld als Blob/File) oder ein Weltordner als Liste
+   [{ pfad, datei }] (welt-ordner.js, nur die gebrauchten Dateien); beides wird
+   zu derselben Liste von Einträgen, der Rest läuft gleich.
 
    Zwei Wege, die dasselbe Raster liefern müssen (Test):
    · "streaming" (Standard): jede LevelDB-Datei EINZELN entpacken und mit einem
@@ -16,6 +19,7 @@
    gewinnt dort die letzte in ZIP-Reihenfolge.
    ========================================================================== */
 import { configure, ZipReader, BlobReader, Uint8ArrayWriter, LevelDb, readMcworld } from "./vendor/mcbe-leveldb.js";
+import { ordnerAlsEintraege } from "./welt-ordner.js";
 import {
   chunkSchluesselLesen, chunkId, data3dBiom, levelDatLesen, kachelnBauen, chunksAuswerten, STANDARD_OPTIONEN,
 } from "./biom-dekoder.js";
@@ -29,7 +33,7 @@ configure({ useWebWorkers: false });
    Meldungen gibt es nur für „keine ZIP“ und „kein Weltordner“ (level.dat oder db/ fehlt),
    dazu Java-Welten und kaputte Weltdaten. */
 export const FEHLER = Object.freeze({
-  KEINE_ZIP: "Bitte die erzeugte Archiv.zip auswählen.",
+  KEINE_ZIP: "Das ist keine ZIP. Bitte den Weltordner wählen oder eine .zip/.mcworld-Datei.",
   KEIN_WELTORDNER: "Das sieht nicht nach einem Minecraft-Weltordner aus.",
   JAVA: "Java-Welten werden nicht unterstützt",
   LESEN: "Die Datei konnte nicht gelesen werden",
@@ -52,6 +56,12 @@ async function zipOeffnen(datei) {
     await zip.close().catch(() => {});
     throw new WeltFehler(FEHLER.KEINE_ZIP, { cause: f });
   }
+}
+
+/** ZIP oder Weltordner öffnen → { zip:{ close }, eintraege } */
+async function quelleOeffnen(eingabe) {
+  if (Array.isArray(eingabe)) return { zip: { close: async () => {} }, eintraege: ordnerAlsEintraege(eingabe) };
+  return zipOeffnen(eingabe);
 }
 
 /** Aufbau prüfen und die Kopfdaten lesen: level.dat (Seed, Name, Version) und levelname.txt.
@@ -79,7 +89,7 @@ async function aufbauLesen(eintraege) {
  * → { weltname, seed, spielversion }. Wirft WeltFehler mit einem Text aus FEHLER.
  */
 export async function weltPruefen(datei) {
-  const { zip, eintraege } = await zipOeffnen(datei);
+  const { zip, eintraege } = await quelleOeffnen(datei);
   try {
     return (await aufbauLesen(eintraege)).welt;
   } finally {
@@ -88,7 +98,7 @@ export async function weltPruefen(datei) {
 }
 
 /**
- * .mcworld oder .zip (Blob/File) → { meta: { weltname, seed, spielversion, chunks, unbekannt }, kacheln }
+ * .mcworld oder .zip (Blob/File) oder Weltordner ([{ pfad, datei }]) → { meta: { weltname, seed, spielversion, chunks, unbekannt }, kacheln }
  * optionen: weg "streaming" | "komplett", biomIds (bekannte IDs, für „unbekannt“),
  *           hoehen { netherBiomY, endBiomY }, fortschritt({ phase, aktuell, gesamt }),
  *           roh: Chunk-IDs ("dim:cx:cz"), deren Data3D-Wert zusätzlich zurückkommt (Prüfskript)
@@ -96,7 +106,7 @@ export async function weltPruefen(datei) {
  */
 export async function weltLesen(datei, { weg = "streaming", biomIds = null, hoehen = STANDARD_OPTIONEN, fortschritt = () => {}, roh = [] } = {}) {
   fortschritt({ phase: "oeffnen", aktuell: 0, gesamt: 1 });
-  const { zip, eintraege } = await zipOeffnen(datei);
+  const { zip, eintraege } = await quelleOeffnen(datei);
   try {
     const { current, welt } = await aufbauLesen(eintraege);
 
@@ -113,7 +123,7 @@ export async function weltLesen(datei, { weg = "streaming", biomIds = null, hoeh
       if (rohGesucht.has(s)) rohWerte[s] = geloescht ? undefined : value;
     };
     try {
-      if (weg === "komplett") await komplettLesen(datei, aufnehmen, fortschritt);
+      if (weg === "komplett" && !Array.isArray(datei)) await komplettLesen(datei, aufnehmen, fortschritt);
       else await streamingLesen(eintraege, current, aufnehmen, fortschritt);
     } catch (f) {
       throw new WeltFehler(FEHLER.LESEN, { cause: f });

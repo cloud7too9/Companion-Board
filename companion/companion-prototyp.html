@@ -614,6 +614,13 @@ select.orte-eingabe { padding-right:34px;
 /* Welt-Import */
 .wi-anleitung ol { margin:6px 0 0; padding-left:20px; display:grid; gap:6px; font-size:14px; line-height:1.4; }
 .wi-anleitung .pfad { font-family:ui-monospace, monospace; font-size:12.5px; color:var(--text-dim); }
+.wi-ablage { border:2px dashed var(--border-strong, var(--surface-3)); border-radius:14px; padding:18px 14px; text-align:center;
+  display:grid; gap:10px; justify-items:center; transition:border-color .15s, background .15s; }
+.wi-ablage.ueber { border-color:var(--accent); background:color-mix(in srgb, var(--accent) 12%, transparent); }
+.wi-ablage .card-title { font-size:15px; }
+.wi-welten { display:grid; gap:8px; }
+.wi-welten .card { text-align:left; width:100%; cursor:pointer; color:var(--text); font:inherit; }
+.wi-welten .pfad { font-family:ui-monospace, monospace; }
 .wi-balken { height:6px; border-radius:3px; background:var(--surface-3); overflow:hidden; }
 .wi-balken span { display:block; height:100%; background:var(--accent); transition:width .2s; }
 .wi-vorschau { display:block; width:100%; max-height:260px; object-fit:contain; image-rendering:pixelated;
@@ -1123,7 +1130,8 @@ button.switch { padding:0; }
         </button>
       </nav>
       <input type="file" id="orteDatei" accept="image/*" multiple hidden>
-      <!-- Welt-Import: .zip aus der Dateien-App, .mcworld geht auch -->
+      <!-- Welt-Import: der Weltordner (Safari ab iOS 18.4), sonst .zip aus der Dateien-App oder .mcworld -->
+      <input type="file" id="weltOrdner" webkitdirectory multiple hidden>
       <input type="file" id="weltDatei" accept=".zip,.mcworld,application/zip" hidden>
     </section>
     <!-- === Modul: Sammelobjekte · Rüstungs-Modifikationen =================== -->
@@ -4813,17 +4821,25 @@ document.getElementById("ruestungNeuBtn").addEventListener("click", () => ruestu
    IDs) → Übernehmen ersetzt den Import der Welt. Der Seed muss passen (biomImportPruefen).
    Der Worker (biom-import.worker.js, ES-Modul) braucht http – als Datei geht es nicht.
    ========================================================================== */
-// Anleitung je Gerät – vorerst nur iPhone; weitere kommen als eigener Eintrag dazu
+// Anleitung je Gerät – vorerst nur iPhone; weitere kommen als eigener Eintrag dazu.
+// Den Weltordner selbst wählen geht in Safari ab iOS 18.4; davor bleibt der Weg über die Archiv.zip.
 const WELT_ANLEITUNGEN = Object.freeze([
   { id:"iphone", titel:"iPhone", schritte:[
-    'In der Dateien-App öffnen: <span class="pfad">Auf meinem iPhone › Minecraft › games › com.mojang › minecraftWorlds</span>',
-    'Den richtigen Weltordner finden (sein Name steht in <span class="pfad">levelname.txt</span>), den Ordner <b>öffnen</b>, alles darin auswählen und „Komprimieren“ wählen',
-    'Die entstandene <b>Archiv.zip</b> hier hochladen',
+    'Auf „Weltordner wählen“ tippen und in der Dateien-App öffnen: <span class="pfad">Auf meinem iPhone › Minecraft › games › com.mojang › minecraftWorlds</span>',
+    'Den Ordner der Welt wählen (sein Name ist ein Code wie <span class="pfad">z2l2cn0rmkA=</span>, der Weltname steht in <span class="pfad">levelname.txt</span>) – oder gleich <span class="pfad">minecraftWorlds</span>, dann fragt die Companion, welche Welt',
+    'Die Companion nimmt nur <span class="pfad">level.dat</span>, <span class="pfad">levelname.txt</span> und den Ordner <span class="pfad">db</span>; alles andere bleibt liegen. Klappt die Ordnerwahl nicht (älteres iOS): Ordnerinhalt in der Dateien-App „Komprimieren“ und die <b>Archiv.zip</b> wählen',
   ] },
 ]);
 const WI_PHASEN = { oeffnen:"Öffne die Datei …", lesen:"Lese die Weltdaten", berechnen:"Berechne die Biome …" };
-const wi = { schritt:"start", datei:null, welt:null, fortschritt:null, ergebnis:null, fehler:null, worker:null, loeschen:false, dim:"overworld", sendet:false };
+// quelle: was der Worker liest (File der ZIP oder die Ordner-Liste [{ pfad, datei }]); dateiname: was angezeigt und gespeichert wird;
+// ordner: { behalten, alle } beim Weltordner; welten: mehrere Welten im gewählten Ordner (Schritt „waehlen“)
+const wi = { schritt:"start", quelle:null, dateiname:"", ordner:null, welten:null, welt:null, fortschritt:null, ergebnis:null, fehler:null, worker:null, loeschen:false, dim:"overworld", sendet:false };
 const $weltDatei = document.getElementById("weltDatei");
+const $weltOrdner = document.getElementById("weltOrdner");
+let weltOrdnerModul = null;
+const weltOrdnerLaden = () => (weltOrdnerModul ??= import("./welt-ordner.js"));
+const groesseText = (bytes) => bytes >= 1048576 ? `${(bytes / 1048576).toLocaleString("de-DE", { maximumFractionDigits:1 })} MB`
+  : `${Math.max(1, Math.round(bytes / 1024)).toLocaleString("de-DE")} KB`;
 const datumLang = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleDateString("de-DE"); };
 const chunkSumme = (c) => DIM_ORDER.reduce((n, d) => n + (c?.[d] || 0), 0);
 
@@ -4833,7 +4849,7 @@ function weltImportOeffnen(){
 }
 function weltImportZuruecksetzen(){
   wi.worker?.terminate();
-  Object.assign(wi, { schritt:"start", datei:null, welt:null, fortschritt:null, ergebnis:null, fehler:null, worker:null, loeschen:false, sendet:false });
+  Object.assign(wi, { schritt:"start", quelle:null, dateiname:"", ordner:null, welten:null, welt:null, fortschritt:null, ergebnis:null, fehler:null, worker:null, loeschen:false, sendet:false });
 }
 function wiWorker(){
   wi.worker?.terminate();
@@ -4842,19 +4858,43 @@ function wiWorker(){
   w.onerror = (e) => { console.error("Welt-Import:", e.message); weltImportFehler("Der Welt-Import konnte nicht starten."); };
   return (wi.worker = w);
 }
-function weltImportDatei(datei){
+/** Prüfen im Worker starten: quelle ist das File der ZIP oder die Ordner-Liste einer Welt */
+function weltImportPruefen(quelle, dateiname, ordner = null){
   weltImportZuruecksetzen();
-  wi.datei = datei;
+  Object.assign(wi, { quelle, dateiname, ordner });
   if(!location.protocol.startsWith("http"))
     return weltImportFehler("Der Welt-Import geht nur, wenn die Companion vom Board kommt (http) – nicht als Datei geöffnet.");
   wi.schritt = "pruefe";
   weltImportRendern(true);
-  wiWorker().postMessage({ typ:"pruefen", datei });
+  wiWorker().postMessage({ typ:"pruefen", datei:quelle });
+}
+const weltImportDatei = (datei) => weltImportPruefen(datei, datei.name);
+/** Eine Welt aus dem Ordner: nur ihre gebrauchten Dateien gehen weiter, der Rest wird nicht gelesen */
+const weltImportOrdner = (welt) => weltImportPruefen(welt.dateien, `${welt.ordnername || welt.name}/`, { behalten:welt.behalten, alle:welt.alle });
+/** Gesammelte Dateien (Ordnerwahl oder Ablage): eine ZIP/.mcworld, eine Welt, mehrere Welten oder keine */
+async function weltImportSammlung(liste){
+  if(!liste.length) return;
+  if(liste.length === 1 && /\.(zip|mcworld)$/i.test(liste[0].pfad)) return weltImportDatei(liste[0].datei);
+  let welten;
+  try {
+    welten = await (await weltOrdnerLaden()).weltenFinden(liste);
+  } catch(f){
+    console.error("Welt-Import:", f);
+    return weltImportFehler("Der Ordner konnte nicht gelesen werden.");
+  }
+  if(!welten.length){
+    weltImportZuruecksetzen();
+    return weltImportFehler("Darin ist keine Welt. Bitte den Ordner der Welt wählen, in dem level.dat und db liegen – oder minecraftWorlds.");
+  }
+  if(welten.length === 1) return weltImportOrdner(welten[0]);
+  weltImportZuruecksetzen();
+  Object.assign(wi, { schritt:"waehlen", welten });
+  weltImportRendern(true);
 }
 function weltImportLesen(){
   Object.assign(wi, { schritt:"lese", fortschritt:{ phase:"oeffnen", aktuell:0, gesamt:1 }, fehler:null });
   weltImportRendern(true);
-  wiWorker().postMessage({ typ:"start", datei:wi.datei, biomIds:[...BIOM_INFO.keys()],
+  wiWorker().postMessage({ typ:"start", datei:wi.quelle, biomIds:[...BIOM_INFO.keys()],
     hoehen:{ netherBiomY:CONFIG.netherBiomY, endBiomY:CONFIG.endBiomY } });
 }
 function weltImportAbbrechen(){
@@ -4923,7 +4963,7 @@ function weltImportRendern(oeffnen){
     const f = wi.fortschritt;
     html = kopfHtml("Welt importieren", `Biome für ${seedText}`) + `<div class="orte-inhalt">
       <div class="result-card">
-        <div class="result-label">${esc(wi.datei?.name || "")}</div>
+        <div class="result-label">${esc(wi.dateiname)}</div>
         <div class="card-title" id="wiPhase"><span class="dreher"></span>${wi.schritt === "pruefe" ? "Prüfe die Datei …" : wiPhaseText(f)}</div>
         ${wi.schritt === "lese" ? `<div class="wi-balken"><span id="wiBalken" style="width:${wiProzent(f)}%"></span></div>` : ""}
       </div>
@@ -4939,14 +4979,24 @@ function weltImportRendern(oeffnen){
         <div class="card-title" style="font-size:19px">${esc(w.weltname || "Ohne Namen")}</div>
         <div class="result-row"><span class="rname">Seed</span><span class="mono">${esc(w.seed)} ${passt ? "✔" : "✘"}</span></div>
         ${w.spielversion ? `<div class="result-row"><span class="rname">Spielversion</span><span class="mono">${esc(w.spielversion)}</span></div>` : ""}
-        <div class="result-row"><span class="rname">Datei</span><span>${esc(wi.datei?.name || "")}</span></div>
+        <div class="result-row"><span class="rname">${wi.ordner ? "Ordner" : "Datei"}</span><span>${esc(wi.dateiname)}</span></div>
+        ${wi.ordner ? `<div class="result-row" data-testid="wi-dateien"><span class="rname">Gebraucht</span><span>${zahl(wi.ordner.behalten.anzahl)} von ${zahl(wi.ordner.alle.anzahl)} Dateien · ${groesseText(wi.ordner.behalten.bytes)}</span></div>` : ""}
       </div>
       ${passt ? "" : `<div class="banner bad">Diese Welt hat einen anderen Seed als ${st.welt ? `die gewählte (${esc(st.welt.seed)})` : "die gewählte"}.</div>
         <button class="btn-secondary" data-aktion="${andere ? "wi-welt-wechseln" : "wi-welt-anlegen"}" ${andere ? `data-id="${andere.id}"` : ""}>
           ${andere ? "Zur Welt mit diesem Seed wechseln" : "Neue Welt mit diesem Seed anlegen"}</button>`}
       ${fehler}
-      <div class="sheet-fuss"><button class="btn-secondary" data-aktion="wi-datei">Andere Datei</button>
+      <div class="sheet-fuss"><button class="btn-secondary" data-aktion="wi-neu">Andere Welt</button>
         <button class="btn-primary" data-aktion="wi-lesen" ${passt ? "" : "disabled"}>Biome lesen</button></div>
+    </div>`;
+  } else if(wi.schritt === "waehlen"){
+    html = kopfHtml("Welt importieren", `Biome für ${seedText}`) + `<div class="orte-inhalt">
+      <div class="result-label">In diesem Ordner liegen ${zahl(wi.welten.length)} Welten. Welche?</div>
+      <div class="wi-welten">${wi.welten.map((w, i) => `<button class="card" data-aktion="wi-welt-waehlen" data-nr="${i}">
+        <div class="card-title">${esc(w.name)}</div>
+        <div class="card-meta"><span class="pfad">${esc(w.ordnername)}</span> · ${zahl(w.behalten.anzahl)} Dateien · ${groesseText(w.behalten.bytes)}</div>
+      </button>`).join("")}</div>
+      <div class="sheet-fuss"><button class="btn-secondary" data-aktion="wi-neu">Zurück</button></div>
     </div>`;
   } else if(wi.schritt === "pruefliste"){
     const { meta } = wi.ergebnis, auswertung = wiAuswertung(), summe = chunkSumme(meta.chunks);
@@ -4982,13 +5032,17 @@ function weltImportRendern(oeffnen){
         <div class="result-row"><span class="rname">Aus</span><span>${esc(imp.weltname || imp.dateiname || "–")}${imp.von ? ` · ${esc(imp.von)}` : ""}</span></div>
       </div>` : ""}
       ${fehler}
+      <div class="wi-ablage" data-testid="wi-ablage">
+        <div class="card-title">Weltordner hierher ziehen</div>
+        <button class="btn-primary" data-aktion="wi-ordner" ${st.welt ? "" : "disabled"}>Weltordner wählen</button>
+        <button class="btn-secondary" data-aktion="wi-datei" ${st.welt ? "" : "disabled"}>ZIP oder .mcworld wählen</button>
+      </div>
       ${WELT_ANLEITUNGEN.map((a) => `<div class="card wi-anleitung">
         <div class="card-title">Weltordner aus der Dateien-App hochladen</div>
         <div class="card-meta"><span class="pill">${esc(a.titel)}</span></div>
         <ol>${a.schritte.map((t) => `<li>${t}</li>`).join("")}</ol>
       </div>`).join("")}
       <div class="result-hint">Biome gibt es nur in Gebieten, die schon jemand besucht hat. ${imp ? "Ein neuer Import ersetzt den alten." : ""}</div>
-      <button class="btn-primary" data-aktion="wi-datei" ${st.welt ? "" : "disabled"}>Archiv.zip auswählen</button>
       ${imp ? `<button class="btn-danger" data-aktion="wi-loeschen">${wi.loeschen ? "Wirklich löschen?" : "Import löschen"}</button>` : ""}
     </div>`;
   }
@@ -5015,7 +5069,7 @@ async function weltImportUebernehmen(){
   if(wi.sendet || !wi.ergebnis) return;
   const { meta, kacheln } = wi.ergebnis, weltId = st.weltId;
   wi.sendet = true; wi.fehler = null; weltImportRendern();
-  const imp = { dateiname:wi.datei?.name || "", weltname:meta.weltname, seed:meta.seed, spielversion:meta.spielversion,
+  const imp = { dateiname:wi.dateiname, weltname:meta.weltname, seed:meta.seed, spielversion:meta.spielversion,
                 chunks:meta.chunks, unbekannt:meta.unbekannt };
   const r = await api(`/welten/${weltId}/biome`, { method:"PUT", body:JSON.stringify({ import:imp, kacheln }) });
   wi.sendet = false;
@@ -5107,6 +5161,29 @@ document.getElementById("bannerScreenshotBtn").addEventListener("click", () => $
 $datei.addEventListener("change", () => { const d = [...$datei.files]; $datei.value = ""; if(d.length) importStarten(d); });
 document.getElementById("orteEintragenBtn").addEventListener("click", eintragenOeffnen);
 $weltDatei.addEventListener("change", () => { const d = $weltDatei.files[0]; $weltDatei.value = ""; if(d) weltImportDatei(d); });
+$weltOrdner.addEventListener("change", async () => {
+  const dateien = [...$weltOrdner.files]; $weltOrdner.value = "";
+  if(dateien.length) weltImportSammlung((await weltOrdnerLaden()).ausAuswahl(dateien));
+});
+// Weltordner (oder ZIP) auf die Fläche im Welt-Import ziehen
+// Ohne gewählte Welt nimmt die Fläche nichts an, verhindert aber, dass der Browser die Datei öffnet und die Seite verlässt
+const wiAblage = (e) => st.sheet === "weltimport" && wi.schritt === "start" ? e.target.closest?.(".wi-ablage") : null;
+for(const art of ["dragenter", "dragover"]) $sheet.addEventListener(art, (e) => {
+  const z = wiAblage(e); if(!z) return;
+  e.preventDefault(); e.dataTransfer.dropEffect = st.welt ? "copy" : "none"; if(st.welt) z.classList.add("ueber");
+});
+$sheet.addEventListener("dragleave", (e) => { const z = wiAblage(e); if(z && !z.contains(e.relatedTarget)) z.classList.remove("ueber"); });
+$sheet.addEventListener("drop", async (e) => {
+  const z = wiAblage(e); if(!z) return;
+  e.preventDefault(); z.classList.remove("ueber");
+  if(!st.welt) return;
+  // Einträge sofort holen: nach dem Ereignis (also nach dem ersten await) gibt der Browser sie nicht mehr heraus
+  const eintraege = [...e.dataTransfer.items].filter((i) => i.kind === "file")
+    .map((i) => ({ eintrag:i.webkitGetAsEntry?.() ?? null, datei:i.getAsFile?.() ?? null }));
+  const dateien = [...e.dataTransfer.files];
+  try { weltImportSammlung(await (await weltOrdnerLaden()).ausAblage({ eintraege, dateien })); }
+  catch(f){ console.error("Welt-Import:", f); weltImportFehler("Der Ordner konnte nicht gelesen werden."); }
+});
 document.getElementById("weltKnopf").addEventListener("click", () => { alleSchliessen(); weltOeffnen(); });
 document.getElementById("orteStatusBtn").addEventListener("click", () =>
   toast(DEMO.enabled ? "Demo-Modus – Daten nur in diesem Tab" : "Live – Daten liegen auf dem Board"));
@@ -5191,6 +5268,9 @@ $sheet.addEventListener("click", async (e) => {
     case "import-speichern": importSpeichern(); break;
     // Welt-Import
     case "wi-datei": $weltDatei.click(); break;
+    case "wi-ordner": $weltOrdner.click(); break;
+    case "wi-neu": weltImportZuruecksetzen(); weltImportRendern(); break;
+    case "wi-welt-waehlen": weltImportOrdner(wi.welten[Number(e.target.closest("[data-nr]").dataset.nr)]); break;
     case "wi-lesen": weltImportLesen(); break;
     case "wi-abbrechen": wi.schritt === "pruefe" ? (weltImportZuruecksetzen(), weltImportRendern()) : weltImportAbbrechen(); break;
     case "wi-verwerfen": weltImportZuruecksetzen(); weltImportRendern(); break;

@@ -361,7 +361,7 @@ for (const datei of ['konfig.js', 'regeln.js', 'board-karten.js', 'texterkennung
 }
 await app.register(fastifyStatic, { root: path.join(COMPANION_ORDNER, 'icons'), prefix: '/icons/', maxAge: '7d' });
 // Welt-Import: Worker und Dekoder (ES-Module) liest das Handy selbst; die Bibliothek liegt in vendor/ (dort auch tesseract.js für die Texterkennung)
-for (const datei of ['biom-ids.js', 'biom-dekoder.js', 'biom-welt.js', 'biom-import.worker.js']) {
+for (const datei of ['biom-ids.js', 'biom-dekoder.js', 'biom-welt.js', 'welt-ordner.js', 'biom-import.worker.js']) {
   app.get(`/${datei}`, (req, reply) => reply.headers(OHNE_CACHE).sendFile(datei, COMPANION_ORDNER));
 }
 await app.register(fastifyStatic, { root: path.join(COMPANION_ORDNER, 'vendor'), prefix: '/vendor/', maxAge: '7d', decorateReply: false });

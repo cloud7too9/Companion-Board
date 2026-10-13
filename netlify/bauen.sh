@@ -26,7 +26,7 @@ mkdir -p "$ZIEL"
 mkdir -p "$ZIEL/app"
 cp companion/companion-prototyp.html "$ZIEL/app/index.html"
 cp companion/regeln.js companion/board-karten.js companion/texterkennung.js \
-   companion/biom-ids.js companion/biom-dekoder.js companion/biom-welt.js companion/biom-import.worker.js \
+   companion/biom-ids.js companion/biom-dekoder.js companion/biom-welt.js companion/welt-ordner.js companion/biom-import.worker.js \
    companion/manifest.webmanifest companion/sw.js "$ZIEL/app/"
 cp -r companion/icons companion/vendor companion/ruestungs-baukasten "$ZIEL/app/"
 # Kennblöcke für das Dashboard (es lädt /icons/…)

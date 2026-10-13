@@ -1,7 +1,8 @@
 /* ============================================================================
    biom-import.worker.js  ·  Welt-Import im Hintergrund (Web Worker, type: "module")
    ----------------------------------------------------------------------------
-   Liest eine hochgeladene Welt (.zip oder .mcworld) mit biom-welt.js, damit die
+   Liest eine hochgeladene Welt (.zip, .mcworld oder den Weltordner als Liste
+   [{ pfad, datei }] aus welt-ordner.js) mit biom-welt.js, damit die
    Seite beim Entpacken und Dekodieren nicht hängt. Abbrechen: worker.terminate().
 
    → { typ:"pruefen", datei }                 schnelle Prüfung: Aufbau, Name, Seed
