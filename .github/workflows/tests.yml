@@ -1,6 +1,8 @@
 # Tests für Board-Server, Widgets und Companion – bei jedem Pull Request und jedem Push auf main.
 # Dieselben Befehle wie lokal (planung/UEBERGABE.md, Kapitel 6). Die Screenshots der Playwright-Tests
 # (companion/tests/bilder/, darunter die Haltepunkte) hängen als Download „bilder“ am Lauf.
+# Actions in Hauptversionen, die auf Node 24 laufen; das Runner-Abbild ist fest (ubuntu-24.04), damit ein
+# Wechsel von ubuntu-latest nicht unbemerkt die Tests ändert.
 name: Tests
 
 on:
@@ -20,14 +22,14 @@ permissions:
 jobs:
   board-server:
     name: Board-Server
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     defaults:
       run:
         working-directory: koordinaten-board/server
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
@@ -37,14 +39,14 @@ jobs:
 
   widgets:
     name: Widgets
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     defaults:
       run:
         working-directory: companion/widgets
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
@@ -55,11 +57,11 @@ jobs:
 
   playwright:
     name: Companion und Dashboard (Playwright)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
@@ -84,13 +86,14 @@ jobs:
           npm ci
           npx playwright install --with-deps chromium
 
+      # alle.mjs läuft nach einem Fehler weiter und listet am Ende alle fehlgeschlagenen Dateien
       - name: Tests
         working-directory: companion/tests
         run: npm test
 
       - name: Screenshots hochladen
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: bilder
           path: companion/tests/bilder/

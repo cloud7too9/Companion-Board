@@ -28,8 +28,8 @@ const server = createServer(async (req, res) => {
   const ziel = !path.relative(DIST, datei).startsWith("..") && existsSync(datei) && path.extname(datei) ? datei : path.join(DIST, "index.html");
   res.writeHead(200, { "content-type": TYPEN[path.extname(ziel)] ?? "application/octet-stream" }).end(await readFile(ziel));
 });
-await new Promise((ok) => server.listen(3188, "127.0.0.1", ok));
-const ADRESSE = "http://127.0.0.1:3188/dashboard/";
+await new Promise((ok) => server.listen(3196, "127.0.0.1", ok));
+const ADRESSE = "http://127.0.0.1:3196/dashboard/";
 
 const browser = await chromium.launch(CHROMIUM_OPTIONEN);
 const fehler = [];

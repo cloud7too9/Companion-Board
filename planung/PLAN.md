@@ -49,9 +49,9 @@ Daneben laufen zwei unabhängige Stränge:
 | Widget-Registry von MainHub | `model/panel-registry.ts` | 6 Beispiel-Panels | wird durch das Companion-Register ersetzt |
 | Modul-Vertrag `BEREICHE` | `companion/companion-prototyp.html` (Abschnitt 9b) | `ansichten` nur dokumentiert: 1×1/2×1/2×2 auf 4 Spalten | **wird abgelöst** durch Register und Größen-Vertrag. Den Kommentar dort nachziehen. |
 | Anzeigeschemas `BOARD_KARTEN` | `companion-prototyp.html`, geprüft in `koordinaten-board/server/src/zeigen.js` | Ort, Sammelobjekt, Portal, Banner und Rüstung als allgemeine Karten | **wandern in den Server** (E3). Das Dashboard bekommt fertige Karten. |
-| Board-Anzeige | `koordinaten-board/client/` (React) unter `/anzeige` | Orte der aktiven Welt und „Aufs Board“. **Nur auf `localhost`** (`istLokal` in `server.js`), sonst nur mit `ANZEIGE_OFFEN=1`, dann aber für jedes Gerät im Netz und ohne Schutz *(überholt durch Umbau Phase 1: nur noch mit Anzeige-Link, `ANZEIGE_OFFEN` entfernt)* | bleibt vorerst. Geht später in `/dashboard` auf. Bekommt vorher schon den Anzeige-Link (A6). |
+| Board-Anzeige | `koordinaten-board/client/` (React) unter `/anzeige` | Orte der aktiven Welt und „Aufs Board“. **Nur auf `localhost`** (`istLokal` in `server.js`), sonst nur mit `ANZEIGE_OFFEN=1`, dann aber für jedes Gerät im Netz und ohne Schutz *(überholt durch Umbau Phase 1: nur noch mit Anzeige-Link, `ANZEIGE_OFFEN` entfernt)* | bleibt vorerst. Geht später in `/dashboard` auf. Bekommt vorher schon den Anzeige-Link (A6). *(Erledigt, Bauplan „Sitzung“ S4: `koordinaten-board/client/` ist gelöscht, die Anzeige ist das Dashboard.)* |
 | Daten | `koordinaten-board/server/src/daten.js` | IDs vom Server (`neueId`), Urheber als Name im Feld `von` | stabile Benutzer-ID, Client-IDs |
-| Beitreten | QR-Code → `/?pin=…`, Name frei, `sperre.js` | Board-PIN + freier Name | wird **Account mit PIN**, die Anmeldung erreicht man über den QR-Code (E9) |
+| Beitreten | QR-Code → `/?pin=…`, Name frei, `sperre.js` | Board-PIN + freier Name | wird **Account mit PIN**, die Anmeldung erreicht man über den QR-Code (E9) *(gebaut, Bauplan „Anmeldung“ L1–L3: Konto mit Passwort und PIN über die Anmeldeseite unter `/`; die Board-PIN und `/?pin=…` gibt es nicht mehr, alte QR-Codes führen zur Anmeldeseite)* |
 | Offline | `localStorage` für Verbindung und Name | kein Service Worker, keine IndexedDB *(überholt seit 13.10.2026: Service Worker und PWA laufen über Netlify, siehe `Bauplan-Offline-Sync-und-Identitaet.md`, Nachtrag)* | neu |
 | Welt-Import | `biom-dekoder.js`, `biom-welt.js`, `vendor/` | Dekoder fertig (PR #6), **noch kein Upload-Feld** | Strang C |
 
@@ -179,7 +179,7 @@ Betrifft `companion/companion-prototyp.html`, `companion/regeln.js` und `koordin
   - Das Gerät merkt sich danach einen Geräteschlüssel und fragt nicht erneut.
 - Gekapselt hinter `IdentitaetsAnbieter.werBistDu()`, damit später ein richtiges Login dahinter stehen kann.
 - PINs speichert der Server nur gehasht (`node:crypto`, scrypt). Die bestehende Sperre gegen Durchprobieren (`sperre.js`) gilt auch für Account-PINs.
-- Was aus der heutigen Board-PIN im QR-Code wird, klärt Nachfrage N4.
+- Was aus der heutigen Board-PIN im QR-Code wird, klärt Nachfrage N4. *(Überholt: Seit dem Bauplan „Anmeldung“, L2, gibt es keine Board-PIN mehr.)*
 - Persönliche und geteilte Geräte (`typ`) gibt es im Modell. Ein geteiltes Gerät bekommt ein Profil mit `geteilt = true`.
 - Commits: „Datenmodell: stabile Benutzer-ID und Sync-Status“, „Accounts mit PIN“, „Identität gekapselt“
 
@@ -279,7 +279,7 @@ Git: Nach jeder Phase pushen. Nach jedem Strang (bzw. nach jedem Haltepunkt mit 
 | N1 | ~~Wo genau wird am Handy abgehakt: im Bereich der Companion oder durch Tippen auf das leere Widget in „Anzeige anordnen“, das dann den Inhalt öffnet?~~ **Entschieden (Max, 01.10.2026):** im Bereich der Companion. „Anzeige anordnen“ ordnet nur an. | A4 |
 | N2 | ~~Wie kommt die Steuerung ans Handy? Als Teil von `companion/widgets/` (React, eigene Route `/dashboard/anordnen`, aus der Companion verlinkt) oder in der Vanilla-Seite nachgebaut?~~ **Entschieden (Max, 01.10.2026): Weg 1**, die React-Route `/dashboard/anordnen`, aus dem Board-Sheet der Companion verlinkt. | A6 |
 | N3 | ~~Woher weiß eine Anzeige, welche sie ist, und reicht der Schlüssel als Schutz?~~ **Entschieden:** über den Anzeige-Link (A6), der Schlüssel im Link reicht, keine zusätzliche Bestätigung am Handy. | A6 |
-| N4 | ~~Bleibt die Board-PIN im QR-Code als Zugang zum Server, oder ersetzen die Account-PINs sie ganz?~~ **Entschieden (Max, 01.10.2026, „Ja“):** Die Board-PIN im QR-Code bleibt als Zugang zum Server; die Account-PIN kommt dazu. | B2 |
+| N4 | ~~Bleibt die Board-PIN im QR-Code als Zugang zum Server, oder ersetzen die Account-PINs sie ganz?~~ **Entschieden (Max, 01.10.2026, „Ja“):** Die Board-PIN im QR-Code bleibt als Zugang zum Server; die Account-PIN kommt dazu. **Überholt (14.10.2026, Bauplan „Anmeldung“, L2):** Die Board-PIN ist entfernt, der Zugang ist das Konto mit Passwort. | B2 |
 
 **Weiter offen aus den Ideen:**
 - Design-Themes für Sammelobjekte, Banner und Rüstung (E8)

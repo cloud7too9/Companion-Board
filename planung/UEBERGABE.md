@@ -1,4 +1,4 @@
-# Übergabe · Umsetzung des Plans (Stand 13.10.2026)
+# Übergabe · Umsetzung des Plans (Stand 14.10.2026)
 
 > **Einstieg für den nächsten Chat:** zuerst [`../UEBERGABE.md`](../UEBERGABE.md) (Arbeitsweise, Konventionen), dann diese Datei, dann [`WARTELISTE.md`](WARTELISTE.md) (was auf Max wartet). Der Plan selbst steht in [`PLAN.md`](PLAN.md).
 >
@@ -91,7 +91,7 @@ Board → Anzeigen → anordnen     ──▶  PUT /api/anzeigen/:id/layout, /vo
   2. Zuordnung in `WIDGETS` (Board `widgets.js`).
   3. Gegebenenfalls ein Anzeigeschema in `BOARD_KARTEN`.
 - **Rollen:**
-  - **Anzeige**: jedes Gerät braucht den Anzeige-Link, seit Umbau Phase 1 auch das Board-Gerät selbst (Konsole, `daten/anzeige-link.txt`). Sie hat keine Bedienelemente.
+  - **Anzeige**: jedes Gerät meldet sich auf der Anmeldeseite unter „Dashboard-Login“ mit einem Zugangs-Code an (Anzeige-Token, Bauplan „Anmeldung“, L5); bis L6 geht weiterhin auch der Anzeige-Link (Konsole, `daten/anzeige-link.txt`), auch auf dem Board-Gerät selbst. Sie hat keine Bedienelemente.
   - **Steuerung**: ein Handy mit Token. Es ändert Layouts und startet das Vollbild.
 - **Identität:** Das Token enthält Account und Gerät. Ein gesperrtes Gerät oder ein Token von vor B2 gilt nicht. Hinter `werBistDu()` kann später ein richtiges Login stehen, ohne die Daten anzufassen.
 - **Sitzung (E16, gebaut 13.10.2026):** „Aufs Board“ schickt über `/ws` nur die Quelle (`zeigen`), der Server legt ein Widget in die Sitzung der Anzeige; die alte `/anzeige` und die Nachricht `gezeigt` gibt es seit S4 nicht mehr.
@@ -107,19 +107,21 @@ npm start                                              # lokal; Betrieb auf dem 
 ```
 
 - **Handy:** QR-Code der Anzeige scannen → Anmeldeseite (`/`). Anmelden mit Anzeigename und Passwort oder registrieren (echter Name, Anzeigename, Passwort, PIN); neue Konten gibt ein freigegebenes Konto unter Board → Konten frei, das erste gilt sofort. Danach geht es in die Companion unter `/app/`.
-- **Anzeige:** nur mit dem Anzeige-Link aus der Konsole (oder Board → Anzeigen), auch auf dem Board-Gerät selbst: `…/dashboard?anzeige=…&schluessel=…`. Alte Links auf `/anzeige` leiten mit Schlüssel dorthin um.
+- **Anzeige:** mit Dashboard-Login (`/` → „Dashboard-Login“, Code aus Companion → Board → „Anzeige-Gerät anmelden“) oder, bis L6, mit dem Anzeige-Link aus der Konsole (oder Board → Anzeigen), auch auf dem Board-Gerät selbst: `…/dashboard?anzeige=…&schluessel=…`. Alte Links auf `/anzeige` leiten mit Schlüssel dorthin um.
 - **Anordnen:** am Handy Board → Anzeigen → „Anzeige anordnen“, am besten im Querformat.
 - **Ohne Board:** `cd companion/widgets && npm run dev`. Dann gibt es Beispielkarten, man bearbeitet lokal, die Galerie geht im Bearbeiten-Modus. `companion/companion-prototyp.html` direkt geöffnet läuft im DEMO-Mock.
 
 ---
 
-## 6. Tests (alle grün, 13.10.2026)
+## 6. Tests (alle grün, 14.10.2026)
 
 | Teil | Befehl | Ergebnis |
 |---|---|---|
-| Board-Server | `cd koordinaten-board && npm test` | 60 Tests |
-| Widgets | `cd companion/widgets && npm run typecheck && npm test` | Typecheck ok, 125 Unit-Tests |
-| Companion und Dashboard (Playwright) | `cd companion/tests && npm test` | 17 Dateien mit zusammen 659 Prüfungen, dazu 20 Dekoder-Tests |
+| Board-Server | `cd koordinaten-board && npm test` | 83 Tests |
+| Widgets | `cd companion/widgets && npm run typecheck && npm test` | Typecheck ok, 126 Unit-Tests |
+| Companion und Dashboard (Playwright) | `cd companion/tests && npm test` | 18 Playwright-Dateien, dazu 37 Tests für Dekoder und Welt-Funde (`node --test`) |
+
+`npm test` in `companion/tests` startet `alle.mjs`: Es läuft nach einem Fehler weiter und listet am Ende jede Datei mit OK/FEHL und Dauer. Einzelne Dateien: `node alle.mjs karte board` (Teil des Namens genügt).
 
 **CI auf GitHub:** `.github/workflows/tests.yml` führt alle drei Teile bei jedem Pull Request und jedem Push auf `main` aus (Jobs „Board-Server“, „Widgets“, „Companion und Dashboard (Playwright)“, zusammen etwa 5 Minuten). Die Screenshots aus `companion/tests/bilder/`, darunter die Haltepunkte, hängen als Download „bilder“ am Lauf (14 Tage). Ein neuer Push auf denselben PR bricht den alten Lauf ab.
 
@@ -127,7 +129,7 @@ Voraussetzungen für die Playwright-Tests:
 - Alles muss gebaut sein:
   - `npm --prefix ../../koordinaten-board run installieren && npm --prefix ../../koordinaten-board run build` (Server-Pakete und das Dashboard)
 - In der Cloud-Umgebung braucht es `CHROMIUM=/opt/pw-browsers/chromium` (für Schleifen mit `export`). Auf GitHub installiert die CI Chromium selbst (`npx playwright install --with-deps chromium`).
-- Die Tests starten eigene Board-Prozesse auf Ports 3185–3198. Ein hängender Prozess blockiert den nächsten Lauf; mit `ps -eo pid,args | grep "node src/server.js"` finden. Server-Tests und Playwright nicht parallel starten.
+- Die Tests starten eigene Board-Prozesse, jede Datei auf eigenen Ports (3184–3200, keiner doppelt). Ein hängender Prozess blockiert den nächsten Lauf; mit `ps -eo pid,args | grep "node src/server.js"` finden. Server-Tests und Playwright nicht parallel starten.
 - Screenshots für die Haltepunkte landen in `companion/tests/bilder/`.
 
 ---
@@ -137,7 +139,7 @@ Voraussetzungen für die Playwright-Tests:
 - **Typecheck der Widgets:** Dafür `npm run typecheck` nehmen (`tsc -b`). `tsc -p .` prüft nichts, weil die oberste `tsconfig.json` nur Referenzen enthält. `npm run build` prüft ebenfalls.
 - **Die Playwright-Tests laufen gegen `dist`.** Nach Änderungen an den Widgets erst `npm run build`, sonst testet man den alten Stand.
 - **Tests auf dem langsameren Runner:** Nach dem Anmelden öffnet die Companion bei einem leeren Board „Noch keine Welt“ erst nach dem Laden der Welten. Ein Test, der Sheets schließt, muss vorher auf dieses Sheet warten (`.sheet-kopf h2` = „Welt“), sonst überdeckt es später den nächsten Klick. Nachstellen lässt sich so etwas mit einer Verzögerung per `page.route("**/api/orte/welten", …)`.
-- **Seit Umbau Phase 1:** Die Anzeige braucht auch auf dem Board-Gerät den Anzeige-Link (`daten/anzeige-link.txt`, Konsole). Tests, die ein Board starten, holen ihn mit `anzeigeLinkQuery()` aus `companion/tests/hilfen.mjs`. Liefert ein Test die Companion von einem anderen Ursprung aus als das Board, braucht das Board `ERLAUBTE_URSPRUENGE` mit diesem Ursprung (so in `getrennt.test.mjs`, `anzeigeschema.test.mjs`). **Konten in Tests:** `konto(board, name)` aus `hilfen.mjs` registriert per API (das erste Konto gibt die weiteren frei), `anmelden(seite, ursprung, name)` meldet sich über die Anmeldeseite an (Passwort `creeper123`). Mit `TEST_UHR=1` stellt `POST /api/test/uhr { minuten }` die Uhr des Servers vor („30 Minuten offline“).
+- **Seit Umbau Phase 1:** Die Anzeige braucht auch auf dem Board-Gerät einen Zugang: den Anzeige-Token aus dem Dashboard-Login (L5, so in `dashboard-login.test.mjs`) oder bis L6 den Anzeige-Link (`daten/anzeige-link.txt`, Konsole). Tests, die ein Board starten, holen den Link mit `anzeigeLinkQuery()` aus `companion/tests/hilfen.mjs`. Liefert ein Test die Companion von einem anderen Ursprung aus als das Board, braucht das Board `ERLAUBTE_URSPRUENGE` mit diesem Ursprung (so in `getrennt.test.mjs`, `anzeigeschema.test.mjs`). **Konten in Tests:** `konto(board, name)` aus `hilfen.mjs` registriert per API (das erste Konto gibt die weiteren frei), `anmelden(seite, ursprung, name)` meldet sich über die Anmeldeseite an (Passwort `creeper123`). Mit `TEST_UHR=1` stellt `POST /api/test/uhr { minuten }` die Uhr des Servers vor („30 Minuten offline“).
 - **Im Betrieb läuft die Companion über `https://mainhubv1.com/app/`** (sicherer Kontext, Service Worker aktiv). Nur lokal vom Board unter `http://localhost:3000` gilt noch:
   - `crypto.randomUUID` gibt es dort nicht. Deshalb erzeugt `neueEintragId()` die IDs aus `getRandomValues`.
   - Service Worker sind dort aus (`konfig.pwa` fehlt).
