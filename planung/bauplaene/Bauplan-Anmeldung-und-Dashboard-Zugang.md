@@ -334,6 +334,12 @@ Branch: **`board/anmeldung`** für alles. Nach jeder Phase pushen.
 - **Layout wählen (AN4):** Die Auswahl zeigt je Anzeige die Bereiche und die Zahl der Widgets. Läuft eine schon auf einem anderen Gerät, steht dort „dieses bekommt eine Kopie“. `PUT /api/dashboard/layout` antwortet `{ anzeigeId, kopie }`; eine Kopie meldet `geaendert` „anzeigen“, sie erscheint in der Companion unter Board → Anzeigen.
 - **Dashboard ohne Zugang** (weder Link noch Anzeige-Token) geht zur Anmeldeseite statt leere Widgets mit „braucht ihren Anzeige-Link“ zu zeigen. Ein alter Anzeige-Link läuft bis L6 weiter wie bisher.
 - **Konto und Anzeige auf einem Gerät** bleiben getrennt (`board.verbindung` und `board.anzeige`). Abmelden des einen lässt das andere stehen.
+- **TV-Ansicht** (Max, 14.10.2026: „Die Login Seite braucht eine TV Browser Ansicht“):
+  - **Großbild** auf Fernsehern und breiten Bildschirmen im Querformat (ab 900 px Breite): zwei Spalten, links Titel und Reiter, rechts die Ansicht. Alles vergrößert mit `--tv-zoom` aus Höhe und Breite (knapp 2 bei Full HD), passt auch auf 960 × 540.
+  - **Fernbedienung** auf Fernsehern (Kennung im Browser: Tizen, webOS, Android TV, Fire TV …) oder mit `?tv`: Pfeiltasten springen zum nächsten Element, OK löst aus, deutlicher Fokusrahmen.
+    - Zifferntasten tippen PIN und Code. Wer die PIN mit Zifferntasten tippt, landet danach auf OK.
+    - Ein Layout ist gewählt, sobald der Fokus darauf steht. OK startet dann die Anzeige.
+    - Ein Fernseher ohne Konto öffnet gleich den Dashboard-Login.
 - **Offen (Vorschlag für L6):** Anzeigen lassen sich noch nicht löschen. Wechselt ein Gerät auf ein Layout, das schon ein anderes zeigt, bekommt es eine neue Kopie, und seine bisherige Anzeige bleibt in der Liste stehen. Abhilfe: „Anzeige löschen“ unter Board → Anzeigen (nur, wenn kein Gerät sie zeigt).
 
 **Als Nächstes:** L6 (Anzeige-Link mit Schlüssel abbauen, Doku).
