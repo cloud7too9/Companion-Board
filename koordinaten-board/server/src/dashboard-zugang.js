@@ -39,8 +39,8 @@ export function dashboardZugang({ daten, geheim, jetzt = Date.now }) {
   const anzeigeTokens = signierer(geheim, 'anzeige');
   const iso = (ms = jetzt()) => new Date(ms).toISOString();
   // Gegen Durchprobieren: Code je Adresse, Dashboard-PIN je Zugang (Freischalten) bzw. je Anzeige-Gerät
-  const codeSperre = fehlversuchSperre({ jetzt });
-  const pinSperre = fehlversuchSperre({ jetzt });
+  const codeSperre = fehlversuchSperre({ jetzt, name: 'Zugangs-Code je Adresse' });
+  const pinSperre = fehlversuchSperre({ jetzt, name: 'Dashboard-PIN' });
   const kontakte = new Map();   // anzeigeGeraetId → letzter Kontakt in ms
 
   const gueltig = (z) => z.gueltigBis === null || Date.parse(z.gueltigBis) > jetzt();

@@ -352,3 +352,26 @@ test('Anzeige zeigt die aktive Welt', () => {
   assert.deepEqual(sicht.orte.map((o) => [o.name, o.dimension]), [['End City', 'ende']]);
   assert.throws(() => d.einstellungenAendern({ aktiveWelt: 'w_9' }), DatenFehler);
 });
+
+test('aenderungen wird gekürzt: nur die letzten Einträge bleiben, die höchste Nummer zählt weiter', async () => {
+  const { Speicher } = await import('../src/speicher.js');
+  const o = ordner();
+  const s = new Speicher(path.join(o, 'daten.db'));
+  const inhalt = { welten: [], zaehler: 0, einstellungen: {} };
+  for (const t of ['benutzer', 'profile', 'geraete', 'typen', 'instanzen', 'banner', 'ruestung', 'portale', 'anzeigen', 'zugaenge', 'anzeigeGeraete']) inhalt[t] = [];
+  inhalt.sammel = {};
+  let gespeichert = {};
+  for (let i = 0; i < 30; i++) {
+    inhalt.welten = [{ id: 'w_1', seed: '1', runde: i }];
+    gespeichert = s.schreiben(inhalt, gespeichert).gespeichert;
+  }
+  const nr = s.aenderungsNr();
+  assert.equal(s.umfang().aenderungen, 30);
+  assert.equal(s.aenderungenKuerzen(5), 25);
+  assert.deepEqual([s.umfang().aenderungen, s.aenderungsNr()], [5, nr], 'die Nummer läuft weiter');
+  s.schliessen();
+  const wieder = new Speicher(path.join(o, 'daten.db'));
+  assert.equal(wieder.aenderungsNr(), nr, 'auch nach dem Öffnen (dort wird ebenfalls gekürzt)');
+  wieder.schliessen();
+  rmSync(o, { recursive: true, force: true });
+});

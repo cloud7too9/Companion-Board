@@ -3,9 +3,15 @@
 // (Einstellungen, Zähler, Stand), `aenderungen` (fortlaufende Änderungsnummer je geschriebener Zeile) und
 // die Biome je Welt (Import + eine Zeile je Kachel). daten.js hält die Daten weiter im Speicher und
 // schreibt hier nur, was sich seit dem letzten Speichern geändert hat; so steigt `version` je Zeile.
+// Von `aenderungen` zählt nur die höchste Nummer; ältere Einträge kürzt der Speicher regelmäßig weg
+// (AENDERUNGEN_BEHALTEN), sonst wüchse die Tabelle allein durch den Kontakt der Geräte um Tausende Zeilen am Tag.
 import { DatabaseSync } from 'node:sqlite';
 
 /** Sammlungen aus daten.js, die als Zeilen gespeichert werden (sammel als weltId|objektId) */
+/** So viele Einträge bleiben in `aenderungen`, wenn gekürzt wird (beim Öffnen und alle 500 Speichervorgänge) */
+export const AENDERUNGEN_BEHALTEN = 5000;
+const KUERZEN_ALLE = 500;
+
 export const SAMMLUNGEN = ['benutzer', 'profile', 'geraete', 'welten', 'typen', 'instanzen', 'sammel', 'banner', 'ruestung', 'portale', 'anzeigen', 'zugaenge', 'anzeigeGeraete'];
 
 const SCHEMA = `
@@ -37,6 +43,7 @@ export class Speicher {
       wertSetzen: this.db.prepare('INSERT INTO werte (name, wert) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET wert = excluded.wert'),
       aenderung: this.db.prepare('INSERT INTO aenderungen (sammlung, id, version, am) VALUES (?, ?, ?, ?)'),
       letzteNr: this.db.prepare('SELECT COALESCE(MAX(nr), 0) AS nr FROM aenderungen'),
+      kuerzen: this.db.prepare('DELETE FROM aenderungen WHERE nr <= (SELECT COALESCE(MAX(nr), 0) FROM aenderungen) - ?'),
       biomImport: this.db.prepare('SELECT daten FROM biome_import WHERE welt_id = ?'),
       biomKacheln: this.db.prepare('SELECT dim, kx, kz, daten FROM biome_kacheln WHERE welt_id = ? ORDER BY dim, kx, kz'),
       biomImportSetzen: this.db.prepare('INSERT INTO biome_import (welt_id, daten) VALUES (?, ?) ON CONFLICT(welt_id) DO UPDATE SET daten = excluded.daten'),
@@ -51,6 +58,13 @@ export class Speicher {
       this.s[`${t}.ordnen`] = this.db.prepare(`UPDATE ${t} SET reihenfolge = ? WHERE id = ? AND reihenfolge <> ?`);
       this.s[`${t}.weg`] = this.db.prepare(`DELETE FROM ${t} WHERE id = ?`);
     }
+    this.schreibvorgaenge = 0;
+    this.aenderungenKuerzen();
+  }
+
+  /** Nur die letzten `behalten` Einträge von `aenderungen` behalten (die höchste Nummer bleibt immer) → Zahl entfernter Zeilen */
+  aenderungenKuerzen(behalten = AENDERUNGEN_BEHALTEN) {
+    return Number(this.s.kuerzen.run(behalten).changes);
   }
 
   /** Noch nie etwas gespeichert? Dann darf daten.json übernommen werden. */
@@ -126,6 +140,7 @@ export class Speicher {
       this.db.exec('ROLLBACK');
       throw f;
     }
+    if (++this.schreibvorgaenge % KUERZEN_ALLE === 0) this.aenderungenKuerzen();
     return { gespeichert: neu, nr: this.s.letzteNr.get().nr, geschrieben };
   }
 

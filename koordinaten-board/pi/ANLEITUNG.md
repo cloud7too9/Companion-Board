@@ -54,11 +54,18 @@ sudo journalctl -u companion-board -f              # Konsole: Adresse der Anmeld
 
 **Daten vom Laptop mitnehmen:** `koordinaten-board/server/daten/` vom Laptop (daten.json oder schon daten.db, dazu `geheim.txt`, `biome/`) nach `/var/lib/companion-board/` kopieren, bevor der Dienst das erste Mal startet; `sudo chown -R board:board /var/lib/companion-board`. Eine `daten.json` übernimmt der Server beim ersten Start selbst nach `daten.db`.
 
-**Update:** `cd /opt/companion-board && sudo -u board git pull && cd koordinaten-board/server && sudo -u board npm ci --omit=dev && sudo systemctl restart companion-board`.
+**Update:** erst sichern (der Server stellt beim Start manchmal Daten um, z. B. bei der Anmeldung), dann holen und neu starten:
+`sudo -u board /opt/companion-board/koordinaten-board/pi/sicherung.sh vor-update && cd /opt/companion-board && sudo -u board git pull && cd koordinaten-board/server && sudo -u board npm ci --omit=dev && sudo systemctl restart companion-board`.
+Hat sich `pi/companion-board.service` geändert (z. B. am 14.10.2026: `UMask=0077`), die Datei einmal neu kopieren: `sudo cp /opt/companion-board/koordinaten-board/pi/companion-board.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl restart companion-board`.
 
 **Update auf die Anmeldung mit Passwort** (Bauplan „Anmeldung und Dashboard-Zugang“, 14.10.2026): Beim ersten Start nach dem Update entfernt der Server alle bisherigen Konten (ohne Passwort) samt ihren Geräten; Orte, Banner und alles andere bleiben stehen, der Ersteller heißt dann „unbekannt“. **Gleich danach** `https://mainhubv1.com/` öffnen und registrieren: Das **erste** Konto gilt sofort, jedes weitere wartet, bis ein freigegebenes Konto es in der Companion unter Board → Konten freigibt. `RAUM_PIN` und `COMPANION_PFAD` in `/etc/companion-board.env` braucht es nicht mehr (der Server liest sie nicht), `pin.txt` im Datenordner darf weg.
 
-**Sicherung:** `pi/sicherung.sh` zieht nachts eine Kopie von `daten.db` (SQLite-Backup im laufenden Betrieb). Cron als `board`: `sudo -u board crontab -e` → `15 3 * * * /opt/companion-board/koordinaten-board/pi/sicherung.sh`. Die Kopien vom Pi wegholen (Laptop oder Hetzner), sonst liegt alles auf einer SD-Karte, z. B. vom Laptop: `rsync -a board@<pi>:/var/lib/companion-board/sicherung/ ~/companion-sicherung/` (Nutzer `board` hat keine Shell; dann mit dem eigenen Pi-Nutzer kopieren, der die Dateien lesen darf, oder `sudo` in einem Cron auf dem Pi, der nach außen schiebt).
+**Sicherung:** `pi/sicherung.sh` zieht nachts eine Kopie von `daten.db` (SQLite-Backup im laufenden Betrieb), prüft sie (`PRAGMA integrity_check`), packt sie (`.db.gz`) und behält die letzten 14. Cron als `board`: `sudo -u board crontab -e` → `15 3 * * * /opt/companion-board/koordinaten-board/pi/sicherung.sh`. **Die Kopien vom Pi wegholen**, sonst liegt alles auf einer SD-Karte:
+- am einfachsten im selben Cron: `SICHERUNG_EXTERN=nutzer@laptop:companion-sicherung/` vor den Befehl schreiben (dafür braucht `board` einen SSH-Schlüssel, dessen öffentlicher Teil auf dem Ziel liegt; `rsync` mit `sudo apt-get install -y rsync`);
+- oder vom Laptop holen: `rsync -a <pi-nutzer>@<pi>:/var/lib/companion-board/sicherung/ ~/companion-sicherung/` (der Pi-Nutzer muss die Dateien lesen dürfen, sie gehören `board`).
+Mit `MAILTO=…` in der Crontab meldet Cron, wenn eine Sicherung scheitert.
+
+**Überwachung:** `https://api.mainhubv1.com/api/health` antwortet `{ ok:true, … }` und **503**, sobald das Speichern in `daten.db` scheitert (z. B. SD-Karte voll oder schreibgeschützt). Ein kostenloser Uptime-Dienst, der die Adresse alle paar Minuten abfragt, meldet so auch einen Ausfall des Pi. Gesperrte Adressen nach vielen Fehlversuchen stehen als Warnung im Log (`journalctl -u companion-board`).
 
 **RAM messen** (Umbauplan): `free -m` und `ps -o rss,cmd -C node,cloudflared` nach dem Start und nach einem Welt-Import. `MemoryMax=400M` in der Dienstdatei ist die Leitplanke.
 

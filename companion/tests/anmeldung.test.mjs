@@ -161,7 +161,8 @@ try {
 
   // ---- Anderes Konto: dieses Gerät meldet sich ab ---------------------------------------
   await uhr(31);
-  await max2.reload();
+  // Die Companion leitet nach 31 Minuten womöglich schon selbst zur PIN-Sperre um; dann bricht das Neuladen ab
+  await max2.reload().catch(() => {});
   await warteAuf(max2, () => document.querySelector(".tastatur"));
   await max2.click('[data-weiter="abmelden"]');
   pruefe(await warteAuf(max2, () => document.getElementById("anmName") && !localStorage.getItem("board.verbindung")), "„Anderes Konto“ → Anmeldung, Gerät vergessen");

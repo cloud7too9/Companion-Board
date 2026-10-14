@@ -83,6 +83,8 @@ export class Daten {
     /** Änderungsnummer: steigt mit jeder Änderung, läuft über Neustarts weiter (aenderungen.nr in daten.db) */
     this.version = 0;
     this.timer = null;
+    this.gespeichertAm = null;  // letztes erfolgreiches Speichern (für /api/health)
+    this.speicherFehler = null; // { am, text }, solange das verzögerte Speichern fehlschlägt
     this.speicher = null;       // SQLite, geöffnet beim Laden oder ersten Speichern
     this.gespeichert = {};      // je Sammlung: id → zuletzt geschriebene Zeile (JSON), für den Abgleich beim Speichern
   }
@@ -178,7 +180,11 @@ export class Daten {
   speichernVerzoegert() {
     this.version += 1;
     clearTimeout(this.timer);
-    this.timer = setTimeout(() => this.speichern().catch(console.error), 300);
+    this.timer = setTimeout(() => this.speichern().catch((f) => {
+      // Laut melden: Die Daten liegen dann nur noch im Speicher. /api/health antwortet 503, bis es wieder klappt.
+      this.speicherFehler = { am: new Date().toISOString(), text: f.message };
+      console.error('FEHLER beim Speichern in daten.db – Änderungen liegen nur im Speicher:', f);
+    }), 300);
   }
 
   /** Schreibt, was sich seit dem letzten Mal geändert hat, in daten.db (eine Transaktion) */
@@ -187,6 +193,8 @@ export class Daten {
     const { gespeichert, nr } = this.oeffnen().schreiben(this.inhalt, this.gespeichert);
     this.gespeichert = gespeichert;
     this.version = Math.max(this.version, nr);
+    this.gespeichertAm = new Date().toISOString();
+    this.speicherFehler = null;
   }
 
   /** Beim Beenden: ausstehende Änderungen schreiben und daten.db schließen */

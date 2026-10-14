@@ -735,3 +735,17 @@ test('Dashboard-Zugänge (Anmeldung L4): Code, Dashboard-PIN, Layout wählen, An
   assert.equal((await anfrage('GET', '/api/dashboard/sitzung', tablet)).status, 401);
   assert.deepEqual((await anfrage('GET', '/api/dashboard/zugaenge', max)).daten.zugaenge.map((z) => [z.gueltigBis, z.anzeigen]), [[null, 0]]);
 });
+
+test('Betrieb: /api/health ohne Anmeldung, zu große Nachrichten über /ws werden abgewiesen', async () => {
+  const h = await anfrage('GET', '/api/health');
+  assert.equal(h.status, 200);
+  assert.equal(h.daten.ok, true);
+  assert.equal(typeof h.daten.lauf, 'string');
+  assert.ok(Date.parse(h.daten.gespeichertAm) > 0, 'zuletzt gespeichert');
+  const max = await konto('Max');
+  const ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws?token=${encodeURIComponent(max)}`);
+  await new Promise((ok) => { ws.onopen = ok; });
+  const zu = new Promise((ok) => { ws.onclose = (e) => ok(e.code); });
+  ws.send(JSON.stringify({ art: 'zeigen', quelle: 'x'.repeat(70 * 1024) }));
+  assert.equal(await zu, 1009, 'Nachricht über 64 KB: Verbindung zu (1009)');
+});

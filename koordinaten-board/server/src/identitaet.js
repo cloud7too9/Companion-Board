@@ -7,7 +7,7 @@
 // (erstellerId), nie am Namen. Das Modul kennt vom Board nur die Daten-Schnittstelle (benutzer…, geraet…, konto…).
 import { randomBytes, randomInt, scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
-import { fehlversuchSperre } from './sperre.js';
+import { fehlversuchSperre, anfrageGrenze } from './sperre.js';
 import { regeln } from './regeln.js';
 import { signierer } from './signatur.js';
 
@@ -17,6 +17,8 @@ const FARBEN = ['#00e5ff', '#7cff6b', '#ffd23f', '#b98cff', '#ff9f43', '#4dabff'
 /** Den Kontakt eines Geräts zählt jede Anfrage im Speicher; in daten.db landet er höchstens einmal pro Minute,
     sonst bekäme die Zeile bei jeder Anfrage eine neue Version und einen Eintrag in `aenderungen` */
 const KONTAKT_SPEICHERN_MS = 60_000;
+/** Höchstens so viele Konten warten gleichzeitig auf Freigabe – sonst ließe sich die Datenbank mit Konten füllen */
+const MAX_WARTEND = 10;
 /** Immer dieselbe Meldung: verrät nicht, ob es den Anzeigenamen gibt */
 const ANMELDUNG_FALSCH = 'Anzeigename oder Passwort stimmt nicht';
 
@@ -55,10 +57,14 @@ const leerHashHolen = async () => (leerHash ??= await pinHashen(randomBytes(16).
 export function identitaet({ daten, geheim, jetzt = Date.now }) {
   const token = signierer(geheim);
   const iso = () => new Date(jetzt()).toISOString();
-  // Gegen Durchprobieren: Passwort je Anzeigename, PIN je Gerät, Passwort beim Zurücksetzen je Konto
-  const passwortSperre = fehlversuchSperre({ jetzt });
-  const pinSperre = fehlversuchSperre({ jetzt });
-  const resetSperre = fehlversuchSperre({ jetzt });
+  // Gegen Durchprobieren: Passwort je Anzeigename, PIN je Gerät, Passwort beim Zurücksetzen je Konto. Dazu je Adresse:
+  // viele Fehlanmeldungen mit wechselnden Namen sperren die Adresse 10 Minuten (spart auch die teuren Hashes),
+  // neue Konten höchstens 20 pro Stunde.
+  const passwortSperre = fehlversuchSperre({ jetzt, name: 'Passwort je Anzeigename' });
+  const pinSperre = fehlversuchSperre({ jetzt, name: 'PIN je Gerät' });
+  const resetSperre = fehlversuchSperre({ jetzt, name: 'PIN zurücksetzen je Konto' });
+  const adressSperre = fehlversuchSperre({ max: 30, dauerMs: 10 * 60_000, jetzt, name: 'Anmeldung je Adresse' });
+  const registrierGrenze = anfrageGrenze({ max: 20, fensterMs: 60 * 60_000, jetzt, name: 'Registrieren je Adresse' });
   /** geraetId → letzter Kontakt in ms (jede Anfrage, jeder Herzschlag) */
   const kontakte = new Map();
 
@@ -125,16 +131,17 @@ export function identitaet({ daten, geheim, jetzt = Date.now }) {
       };
     },
 
-    /** Erste Anmeldung auf einem Gerät: Anzeigename + Passwort → { token, id, name, freigegeben } */
-    async anmelden({ anzeigename, passwort }) {
+    /** Erste Anmeldung auf einem Gerät: Anzeigename + Passwort → { token, id, name, freigegeben }; ip: Adresse für die Sperre */
+    async anmelden({ anzeigename, passwort }, ip = '') {
       const name = anzeigenameSauber(anzeigename);
       const schluessel = name.toLocaleLowerCase('de');
-      const rest = passwortSperre.gesperrt(schluessel);
+      const rest = (ip && adressSperre.gesperrt(ip)) || passwortSperre.gesperrt(schluessel);
       if (rest) fehler(429, `Zu viele Fehlversuche – bitte ${rest} s warten`);
       const b = name ? daten.benutzerMitName(name) : null;
       const passt = await pinPasst(String(passwort ?? ''), b?.passwortHash ?? await leerHashHolen());
       if (!b || !passt) {
         passwortSperre.fehlschlag(schluessel);
+        if (ip) adressSperre.fehlschlag(ip);
         fehler(401, ANMELDUNG_FALSCH);
       }
       passwortSperre.erfolg(schluessel);
@@ -142,9 +149,14 @@ export function identitaet({ daten, geheim, jetzt = Date.now }) {
     },
 
     /** Neues Konto + Gerät. Es wartet auf Freigabe, außer es ist das erste (⚠ AN14). */
-    async registrieren(body = {}) {
+    async registrieren(body = {}, ip = '') {
       const f = kontoPruefen(body);
       if (f) fehler(400, f);
+      const rest = ip ? registrierGrenze.zaehlen(ip) : 0;
+      if (rest) fehler(429, `Zu viele neue Konten von dieser Adresse – bitte in ${Math.ceil(rest / 60)} Minuten noch einmal`);
+      if (daten.kontenListe().filter((k) => !k.freigegebenAm).length >= MAX_WARTEND) {
+        fehler(429, 'Gerade warten schon viele neue Konten auf Freigabe. Bitte jemanden, sie in der Companion unter Board → Konten freizugeben oder abzulehnen.');
+      }
       const b = daten.benutzerAnlegen({
         echterName: String(body.echterName).trim(), anzeigename: anzeigenameSauber(body.anzeigename),
         passwortHash: await pinHashen(body.passwort), pinHash: await pinHashen(body.pin), am: iso(),
