@@ -604,7 +604,15 @@ select.orte-eingabe { padding-right:34px;
   max-height:30px; overflow:hidden; }   /* eine Zeile – die Karte ist kleiner, seit die Liste darunter steht */
 .karte-legende .chip { padding:6px 9px; font-size:11px; font-weight:600; gap:6px; box-shadow:none; }
 .karte-legende i { width:10px; height:10px; border-radius:3px; display:inline-block; }
-.karte-hinweis { position:absolute; left:14px; top:14px; right:14px; pointer-events:none; }
+.karte-hinweis { position:absolute; left:14px; top:14px; right:70px; pointer-events:none; }
+/* Kategorien ein- und ausblenden (Max, 14.10.2026): Knopf oben rechts, Punkt, solange etwas ausgeblendet ist */
+.karte-kategorien { position:absolute; right:14px; top:14px; width:44px; height:44px; border-radius:14px; border:1px solid var(--border);
+  background:var(--surface); color:var(--text); display:grid; place-items:center; box-shadow:0 6px 18px rgba(0,0,0,.35); cursor:pointer; }
+.karte-kategorien[hidden] { display:none; }
+.karte-kategorien[data-ausgeblendet] { color:var(--accent); }
+.karte-kategorien[data-ausgeblendet]::after { content:""; position:absolute; top:6px; right:6px; width:8px; height:8px; border-radius:50%;
+  background:var(--accent); box-shadow:0 0 0 2px var(--surface); }
+.kat-zeile .ort-kat-icon { width:32px; height:32px; }
 .karte-hinweis .chip { font-size:12px; color:var(--text-dim); box-shadow:none; }
 .karte-legende:has(.tipp) { max-height:66px; }
 .karte-legende .chip.tipp { flex-basis:100%; width:max-content; max-width:100%; color:var(--text); border-color:var(--accent); }
@@ -1102,6 +1110,9 @@ button.switch { padding:0; }
         <canvas id="ortKarte"></canvas>
         <div class="vignette"></div>
         <div class="karte-hinweis" id="karteHinweis"></div>
+        <button class="karte-kategorien" id="karteKategorien" aria-label="Kategorien auf der Karte ein- und ausblenden">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 8l10 5 10-5z"/><path d="M2 13l10 5 10-5"/><path d="M2 18l10 5 10-5" opacity=".55"/></svg>
+        </button>
         <div class="karte-legende" id="karteLegende"></div>
         <div class="karte-knoepfe">
           <button id="karteBiome" aria-label="Biome zeigen" aria-pressed="true">
@@ -2008,6 +2019,7 @@ const st = {
   instanzen: [],
   dim: lsLesen("orte.dim") || "overworld",
   filter: null,          // Kategorie oder null
+  ausgeblendet: new Set(lsLesen("orte.ausgeblendet") || []),   // Kategorien, die die Karte nicht zeigt (nur auf diesem Gerät)
   suche: "",
   standort: lsLesen("orte.standort"),  // { x, y, z, dim } – nur auf diesem Gerät
   importe: [],           // Screenshot-Prüfliste
@@ -2029,6 +2041,20 @@ function sichtbareInstanzen(){
     .map((i) => ({ i, t:typVon(i) }))
     .filter(({ i, t }) => t && (!st.filter || t.kategorie === st.filter)
       && (!q || `${t.kategorie} ${kategorieName(t.kategorie)} ${t.variante || ""} ${i.x} ${i.z}`.toLowerCase().includes(q)));
+}
+
+/** Was die Karte zeigt: die sichtbaren Orte ohne die ausgeblendeten Kategorien (die Liste zeigt sie weiter) */
+const karteInstanzen = () => sichtbareInstanzen().filter(({ t }) => !st.ausgeblendet.has(t.kategorie));
+
+/** Kategorien der aktuellen Dimension mit Anzahl, in der Reihenfolge der Liste (unbekannte hinten) → [{ k, n }] */
+function kategorienDerDimension(){
+  const dimId = dimIdVon(st.dim), zaehler = new Map();
+  for(const i of st.instanzen) if(i.dimensionId === dimId){
+    const k = typVon(i)?.kategorie; if(k) zaehler.set(k, (zaehler.get(k) || 0) + 1);
+  }
+  const reihenfolge = [EIGENE_ORTE, ...FEATURE_KATEGORIEN[st.dim]];
+  return [...reihenfolge, ...[...zaehler.keys()].filter((k) => !reihenfolge.includes(k))]
+    .filter((k) => zaehler.has(k)).map((k) => ({ k, n:zaehler.get(k) }));
 }
 
 /** Gleicher Typ auf fast gleicher Stelle? */
@@ -2233,6 +2259,7 @@ const karte = (() => {
   const ctx = canvas.getContext("2d");
   const $hinweis = document.getElementById("karteHinweis");
   const $legende = document.getElementById("karteLegende");
+  const $kategorien = document.getElementById("karteKategorien");
   const sicht = { cx:0, cz:0, zoom:0.25 };   // Mittelpunkt in Blöcken, Pixel pro Block
   const zeiger = new Map();
   let ziehen = null, pinch = null, bewegt = false, angepasst = null, dpr = 1;
@@ -2250,7 +2277,7 @@ const karte = (() => {
 
   /** Ausschnitt so wählen, dass alle Orte der Dimension (plus Standort) passen */
   function alles(){
-    const punkte = sichtbareInstanzen().map(({ i }) => [i.x, i.z]);
+    const punkte = karteInstanzen().map(({ i }) => [i.x, i.z]);
     if(st.standort){
       const s = st.standort.dim === st.dim ? st.standort : null;
       const u = !s && umrechnen(st.standort.x, st.standort.z, st.standort.dim);
@@ -2315,7 +2342,7 @@ const karte = (() => {
     ctx.moveTo(0, Math.round(az) + .5); ctx.lineTo(w, Math.round(az) + .5);
     ctx.stroke();
 
-    const eintraege = sichtbareInstanzen();
+    const eintraege = karteInstanzen();
     marker = [];
     const belegt = [];   // bereits gezeichnete Beschriftungen – keine Überlappung
     const frei = (x, y, w, h) => {
@@ -2382,8 +2409,12 @@ const karte = (() => {
 
     // Hinweis + Legende (häufigste Biome im Ausschnitt), darüber ggf. das angetippte Biom
     const imp = bm.weltId === st.weltId ? bm.import : null;
+    const kats = kategorienDerDimension(), aus = kats.filter(({ k }) => st.ausgeblendet.has(k)).length;
     $hinweis.innerHTML = `<span class="chip mono">${rasterweite()} Blöcke · ${imp
-      ? `Biome ${datumKurz(imp.importiertAm)} · ${zahl(imp.chunks?.[st.dim] || 0)} Chunks${bm.an ? "" : " · aus"}` : "keine Biome – Welt-Import"}</span>`;
+      ? `Biome ${datumKurz(imp.importiertAm)} · ${zahl(imp.chunks?.[st.dim] || 0)} Chunks${bm.an ? "" : " · aus"}` : "keine Biome – Welt-Import"}${
+      aus ? ` · ${aus} ${aus === 1 ? "Kategorie" : "Kategorien"} aus` : ""}</span>`;
+    $kategorien.hidden = !kats.length;
+    $kategorien.toggleAttribute("data-ausgeblendet", aus > 0);
     biomKnopfZeigen();
     const farbe = (name) => [...BIOM_INFO.values()].find((b) => b.name === name)?.farbe;
     $legende.innerHTML = (tipp ? `<span class="chip tipp mono">${esc(tipp)}</span>` : "")
@@ -2460,6 +2491,7 @@ const karte = (() => {
   document.getElementById("karteZoomIn").addEventListener("click", () => zoomen(1.6));
   document.getElementById("karteZoomOut").addEventListener("click", () => zoomen(1 / 1.6));
   document.getElementById("karteFit").addEventListener("click", () => { alles(); zeichnen(); });
+  $kategorien.addEventListener("click", () => karteKategorienOeffnen());
   document.getElementById("karteBiome").addEventListener("click", () => {
     bm.an = !bm.an; lsSchreiben("orte.biome", bm.an); tipp = null;
     biomKnopfZeigen(); zeichnen();
@@ -2504,6 +2536,35 @@ function alleSchliessen(){
 }
 const kopfHtml = (titel, sub, bild) => `<div class="sheet-kopf">${bild ? `<span class="sheet-kopf-bild">${bild}</span>` : ""}<div class="titel"><h2>${titel}</h2>${sub ? `<div class="sub">${sub}</div>` : ""}</div>
   <button class="icon-btn" data-aktion="schliessen" aria-label="Schließen">${X_ICON}</button></div>`;
+
+/** Kategorien auf der Karte ein- und ausblenden (Max, 14.10.2026). Gemerkt auf diesem Gerät; die Liste zeigt weiter alles. */
+function karteKategorienOeffnen(){
+  const kats = kategorienDerDimension(), scroll = st.sheet === "karte-kategorien" ? $sheet.scrollTop : 0;
+  sheetOeffnen("karte-kategorien", kopfHtml("Auf der Karte", `${esc(dimLabel(st.dim))} · Kategorien ein- und ausblenden`) + `<div class="orte-inhalt">
+    ${kats.length ? `<div class="knopf-raster">
+        <button class="btn-secondary" data-aktion="kat-alle" data-an="1">Alle zeigen</button>
+        <button class="btn-secondary" data-aktion="kat-alle" data-an="0">Alle ausblenden</button>
+      </div>
+      <div class="list-stack">${kats.map(({ k, n }) => {
+        const an = !st.ausgeblendet.has(k);
+        return `<div class="card konto-zeile kat-zeile" data-kat="${esc(k)}">
+          <span class="ort-kat-icon">${kennblockHtml(k)}</span>
+          <span class="text"><span class="card-title">${esc(kategorieName(k))}</span>
+            <span class="card-meta" style="display:block">${n} ${n === 1 ? "Eintrag" : "Einträge"}</span></span>
+          <button class="switch ${an ? "on" : ""}" data-aktion="kat-umschalten" data-kat="${esc(k)}" role="switch" aria-checked="${an}" aria-label="${esc(kategorieName(k))} auf der Karte"></button>
+        </div>`;
+      }).join("")}</div>
+      <div class="result-hint">Gilt nur für die Karte auf diesem Gerät. Die Liste darunter zeigt weiter alle Einträge.</div>`
+      : `<div class="banner info">${esc(inDim(st.dim).replace(/^i/, "I"))} ist noch nichts erfasst.</div>`}
+    <div class="sheet-fuss"><button class="btn-primary" data-aktion="schliessen">Fertig</button></div>
+  </div>`);
+  $sheet.scrollTop = scroll;
+}
+function kategorienZeigen(kats, an){
+  for(const k of kats) an ? st.ausgeblendet.delete(k) : st.ausgeblendet.add(k);
+  lsSchreiben("orte.ausgeblendet", [...st.ausgeblendet]);
+  karte.zeichnen();
+}
 
 function koordFelder(prefix, x, y, z){
   const feld = (achse, wert, optional) => `<label class="field"><span class="field-label">${achse}</span>
@@ -5618,6 +5679,13 @@ $sheet.addEventListener("click", async (e) => {
     case "konto-ablehnen":
       if(bd.kontoFrage !== id){ bd.kontoFrage = id; boardSheetRendern(); break; }
       kontoAblehnen(id); break;
+    case "kat-umschalten": {
+      const k = a.dataset.kat, an = st.ausgeblendet.has(k);   // ausgeblendet → wieder zeigen
+      kategorienZeigen([k], an);
+      a.classList.toggle("on", an); a.setAttribute("aria-checked", String(an));
+      break;
+    }
+    case "kat-alle": kategorienZeigen(kategorienDerDimension().map(({ k }) => k), a.dataset.an === "1"); karteKategorienOeffnen(); break;
     case "zugang-erzeugen": zugangErzeugen(); break;
     case "zugang-widerrufen":
       // Zweimal tippen – alle damit angemeldeten Anzeigen fliegen raus

@@ -112,6 +112,39 @@ await p.click('#orteSheetInhalt [data-aktion="welt-import"]'); await warte();
 pruefe((await text("#orteSheetInhalt")).includes("Weltordner"), "„Welt-Import …“ öffnet den Welt-Import");
 await p.click('#orteSheetInhalt [data-aktion="schliessen"]'); await warte();
 
+// ---- Kategorien auf der Karte ein- und ausblenden (Max, 14.10.2026) ---------------------------
+const aufKarte = () => p.evaluate(() => [...new Set(karteInstanzen().map(({ t }) => t.kategorie))]);
+const katVorher = await aufKarte();
+pruefe(katVorher.length >= 3 && await p.isVisible("#karteKategorien"), `Knopf „Kategorien“ oben rechts an der Karte (${katVorher.length} Kategorien sichtbar)`);
+await p.click("#karteKategorien"); await warte();
+const zeilen = await p.$$eval("#orteSheetInhalt .kat-zeile", (z) => z.map((e) => ({ kat: e.dataset.kat, an: e.querySelector(".switch").classList.contains("on"),
+  text: e.textContent.replace(/\s+/g, " ").trim() })));
+pruefe(await p.evaluate(() => st.sheet) === "karte-kategorien" && zeilen.length === katVorher.length && zeilen.every((z) => z.an && /\d+ Eintr/.test(z.text)),
+  `Sheet „Auf der Karte“: je Kategorie Name, Anzahl, Schalter an (${zeilen.map((z) => z.text).join(" | ")})`);
+pruefe(!zeilen.some((z) => ENGLISCH.test(z.text)), "Kategorien deutsch");
+const aus = zeilen[1].kat;
+await p.click(`#orteSheetInhalt .kat-zeile[data-kat="${aus}"] .switch`); await warte();
+pruefe(!(await aufKarte()).includes(aus) && (await aufKarte()).length === katVorher.length - 1, `„${aus}“ ausgeblendet: nicht mehr auf der Karte`);
+pruefe(await p.$eval(`#orteSheetInhalt .kat-zeile[data-kat="${aus}"] .switch`, (s) => s.getAttribute("aria-checked")) === "false", "Schalter zeigt „aus“");
+await p.screenshot({ path: `${DIR}/c6-karte-kategorien.png` });
+await p.click('#orteSheetInhalt [data-aktion="schliessen"]'); await warte();
+pruefe(await p.$$eval(`.ort-reihe[data-kat="${aus}"]`, (r) => r.length) > 0, "Die Liste zeigt die Kategorie weiter");
+pruefe((await text("#karteHinweis")).includes("1 Kategorie aus") && await p.$eval("#karteKategorien", (b) => b.hasAttribute("data-ausgeblendet")),
+  `Karte sagt, dass etwas ausgeblendet ist (${await text("#karteHinweis")})`);
+await p.screenshot({ path: `${DIR}/c7-karte-ohne-kategorie.png` });
+await p.reload();
+await p.waitForFunction(() => typeof st !== "undefined" && st.welt && bm.kacheln?.size > 0); await warte(600);
+pruefe(!(await aufKarte()).includes(aus), "Nach dem Neuladen bleibt sie ausgeblendet (auf diesem Gerät gemerkt)");
+await p.click("#karteKategorien"); await warte();
+await p.click('#orteSheetInhalt [data-aktion="kat-alle"][data-an="0"]'); await warte();
+pruefe((await aufKarte()).length === 0 && await p.$$eval("#orteSheetInhalt .kat-zeile .switch.on", (s) => s.length) === 0, "„Alle ausblenden“: Karte leer, alle Schalter aus");
+await p.click('#orteSheetInhalt [data-aktion="kat-alle"][data-an="1"]'); await warte();
+// (das Neuladen hat die Beispieldaten zurückgesetzt, der oben gelöschte Stronghold ist wieder da)
+const katNachher = await aufKarte(), katAlle = await p.evaluate(() => kategorienDerDimension().map(({ k }) => k));
+pruefe(katNachher.length === katAlle.length && katAlle.every((k) => katNachher.includes(k)), `„Alle zeigen“: alles wieder da (${katNachher.length} Kategorien)`);
+await p.click('#orteSheetInhalt [data-aktion="schliessen"]'); await warte();
+pruefe(!(await text("#karteHinweis")).includes("aus ·") && !(await p.$eval("#karteKategorien", (b) => b.hasAttribute("data-ausgeblendet"))), "Hinweis und Punkt am Knopf wieder weg");
+
 // ---- Nether: deutsche Biome im Detail -------------------------------------------------------
 await p.evaluate(() => dimWechseln("nether")); await warte(500);
 const bastion = await p.evaluate(() => st.instanzen.find((i) => typVon(i).kategorie === "Bastion").id);
