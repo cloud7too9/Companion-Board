@@ -279,9 +279,12 @@ try {
   pruefe(r.ok, "Max' Konto bleibt (nur das Gerät ist abgemeldet)");
 
   pruefe(fehler.length === 0, `keine Fehler in der Konsole${fehler.length ? ": " + fehler.join(" | ") : ""}`);
-  // erwartet: 7 Muster abgelehnt, Schildkröten-Stiefel abgelehnt, ungültiges Token (Prüfung mit werBistDu)
-  const erwartet = ["422 /api/banner", "422 /api/ruestung", "401 /api/ich"];
-  pruefe(JSON.stringify(antworten) === JSON.stringify(erwartet), `nur erwartete HTTP-Fehler: ${antworten.join(", ")}`);
+  // erwartet: 7 Muster abgelehnt, Schildkröten-Stiefel abgelehnt; dazu höchstens einmal 401 /api/ich vom ungültigen Token.
+  // Den kann der Abbruch der Live-Verbindung (4001) überholen: Dann ist die Seite schon auf dem Weg zur Anmeldung und
+  // die Anfrage an /api/ich wird abgebrochen, ohne Antwort.
+  const erwartet = ["422 /api/banner", "422 /api/ruestung"];
+  const ohneIch = antworten.filter((a) => a !== "401 /api/ich");
+  pruefe(JSON.stringify(ohneIch) === JSON.stringify(erwartet) && antworten.length - ohneIch.length <= 1, `nur erwartete HTTP-Fehler: ${antworten.join(", ")}`);
 } catch (e) {
   pruefe(false, "Abbruch: " + e.message);
 } finally {

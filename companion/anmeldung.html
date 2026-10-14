@@ -190,6 +190,34 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .punkte.wackeln { animation:none; }
 }
+
+/* ---- TV-Ansicht (Großbild) --------------------------------------------------
+   html.tv setzt das Skript: auf Fernsehern (Kennung im Browser oder ?tv) und auf breiten Bildschirmen im
+   Querformat. Zwei Spalten – links Titel und Reiter, rechts die Ansicht –, beides mit --tv-zoom aus der Größe
+   des Bildschirms vergrößert, damit man es aus ein paar Metern liest. html.fernbedienung (nur Fernseher und
+   ?tv): Pfeiltasten springen zwischen den Elementen, der Fokus ist deutlich zu sehen. */
+html.tv, html.tv body { height:auto; min-height:100%; }
+html.tv body { display:block; background:var(--bg); }
+html.tv .device {
+  max-width:none; height:auto; min-height:100vh; overflow:visible;
+  display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1.15fr); align-items:center; gap:4vw; padding:5vh 6vw;
+}
+html.tv .kopf, html.tv .buehne { zoom:var(--tv-zoom, 1); }
+html.tv .kopf { padding:0; align-items:flex-start; gap:8px; }
+html.tv .kopf h1 { font-size:54px; }
+html.tv .marke svg { width:46px; height:46px; }
+html.tv .navigation { margin:20px 0 6px; }
+html.tv .kopf-unter { font-size:18px; }
+html.tv .buehne { overflow:visible; min-height:0; padding:0; }
+html.tv .ansicht { max-width:400px; }
+.tv-hinweis { display:none; margin:14px 0 0; font-size:13.5px; line-height:1.5; color:var(--text-faint); max-width:34ch; }
+html.fernbedienung .tv-hinweis { display:block; }
+html.tv :focus-visible { outline:3px solid var(--accent) !important; outline-offset:3px; }
+html.tv .taste:not(.ok):focus-visible { background:var(--accent-soft); border-color:var(--accent); }
+html.tv .layout-liste { gap:12px; }
+html.tv .layout-liste legend { margin-bottom:12px; }
+html.tv .layout-karte input:focus-visible { outline:none !important; }   /* den Rahmen trägt die Karte */
+html.tv .layout-karte:has(input:focus-visible) { box-shadow:0 0 0 3px var(--accent); }
 </style>
 <script src="app/konfig.js"></script>
 <script src="app/regeln.js"></script>
@@ -207,6 +235,7 @@ body {
       <button type="button" role="tab" data-nav="dashboard" aria-selected="false" tabindex="-1">Dashboard-Login</button>
     </nav>
     <p class="kopf-unter" id="kopfUnter">Anmeldung</p>
+    <p class="tv-hinweis">Fernbedienung: Mit den Pfeiltasten wählen, OK bestätigt. PIN und Code lassen sich auch mit den Zifferntasten tippen.</p>
   </header>
 
   <main class="buehne" id="buehne"><p class="laden">Einen Moment …</p></main>
@@ -242,6 +271,22 @@ if(window.COMPANION_KONFIG?.pwa){
     const link = document.createElement("link"); link.rel = rel; link.href = href; document.head.appendChild(link);
   }
 }
+
+/* ---- TV-Ansicht: Fernseher (Kennung im Browser, oder ?tv) und breite Bildschirme im Querformat ------------
+   Erkennt sich ein Fernseher nicht, hilft …/?tv. Der Maßstab richtet sich nach Höhe und Breite: 1 bei 560 px
+   Höhe, knapp 2 bei Full HD; so passen PIN-Feld und Layout-Auswahl auch auf Fernseher mit 960 × 540 Pixeln. */
+const FERNSEHER = /SmartTV|SMART-TV|Tizen|Web0S|webOS|NetCast|HbbTV|BRAVIA|AFT[A-Z]|CrKey|GoogleTV|Android ?TV|Opera TV|VIDAA|PhilipsTV|Viera|Roku/i.test(navigator.userAgent)
+  || new URLSearchParams(location.search).has("tv");
+const GROSSBILD = matchMedia("(orientation: landscape) and (min-width: 900px) and (min-height: 480px)");
+function tvAnsicht(){
+  const html = document.documentElement;
+  html.classList.toggle("tv", FERNSEHER || GROSSBILD.matches);
+  html.classList.toggle("fernbedienung", FERNSEHER);
+  html.style.setProperty("--tv-zoom", String(Math.max(0.9, Math.min(3, innerHeight / 560, innerWidth / 1000))));
+}
+tvAnsicht();
+GROSSBILD.addEventListener?.("change", tvAnsicht);
+addEventListener("resize", tvAnsicht);
 
 function lsLesen(k){ try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }
 function lsSchreiben(k, v){ try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch {} }
@@ -309,10 +354,11 @@ function navSetzen(aktiv){
     t.setAttribute("aria-selected", String(an)); t.tabIndex = an ? 0 : -1;
   });
 }
-/** Neue Ansicht: offene Wartezeiten beenden */
+/** Neue Ansicht: offene Wartezeiten beenden; mit Fernbedienung steht der Fokus gleich auf einem Element */
 function ansicht(html){
   clearInterval(wartenTimer); wartenTimer = null;
   $buehne.innerHTML = html;
+  tvFokus();
 }
 $nav.addEventListener("click", (e) => {
   const ziel = e.target.closest("[data-nav]")?.dataset.nav;
@@ -323,8 +369,53 @@ $nav.addEventListener("keydown", (e) => {
   if(e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
   const tabs = [...$nav.querySelectorAll("[data-nav]")];
   const neu = tabs[(tabs.indexOf(document.activeElement) + 1) % tabs.length];
+  e.preventDefault();   // die Pfeiltasten der Fernbedienung (unten) springen hier nicht weiter
   neu.focus(); neu.click();
 });
+
+/* ---- Fernbedienung: Pfeiltasten springen zum nächsten Element in dieser Richtung, OK (Enter) löst es aus ----
+   In Textfeldern bleiben links und rechts beim Text. Springt der Fokus auf ein Layout (Radioknopf), ist es
+   gewählt; OK startet dann die Anzeige. */
+const fernbedienung = () => document.documentElement.classList.contains("fernbedienung");
+const RICHTUNGEN = { ArrowUp:[0, -1], ArrowDown:[0, 1], ArrowLeft:[-1, 0], ArrowRight:[1, 0] };
+function bedienbar(){
+  return [...document.querySelectorAll("button, input, select, textarea, a[href]")]
+    .filter((e) => !e.disabled && e.getClientRects().length && !e.closest("[hidden]"));
+}
+function springen(dx, dy){
+  const von = document.activeElement;
+  if(!von || von === document.body || !von.getClientRects().length){ tvFokus(); return true; }
+  const a = von.getBoundingClientRect(), ax = a.left + a.width / 2, ay = a.top + a.height / 2;
+  let ziel = null, bester = Infinity;
+  for(const e of bedienbar()){
+    if(e === von) continue;
+    const r = e.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+    const vor = dx ? (x - ax) * dx : (y - ay) * dy;          // wie weit in Pfeilrichtung
+    const quer = dx ? Math.abs(y - ay) : Math.abs(x - ax);   // wie weit daneben
+    if(vor > 4 && vor + quer * 2 < bester){ bester = vor + quer * 2; ziel = e; }
+  }
+  if(!ziel) return false;
+  ziel.focus();
+  if(ziel.type === "radio") ziel.checked = true;
+  ziel.scrollIntoView({ block:"nearest" });
+  return true;
+}
+document.addEventListener("keydown", (e) => {
+  if(!fernbedienung() || e.defaultPrevented) return;
+  const t = document.activeElement;
+  if(e.key === "Enter" && t?.type === "radio" && t.form){ e.preventDefault(); t.form.requestSubmit(); return; }
+  const r = RICHTUNGEN[e.key];
+  if(!r || (r[0] && t?.matches("input:not([type=radio]), textarea"))) return;
+  if(springen(...r)) e.preventDefault();
+});
+/** Mit Fernbedienung: Fokus auf das, was man in dieser Ansicht als Erstes braucht */
+function tvFokus(){
+  if(!fernbedienung()) return;
+  for(const sel of [".layout-karte input:checked", "#dashCode", '.tastatur [data-ziffer="1"]', "input:not([type=radio])", ".knopf:not(:disabled)", "button:not(:disabled)"]){
+    const e = $buehne.querySelector(sel);
+    if(e){ e.focus(); return; }
+  }
+}
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
 const initiale = (name) => esc(String(name).trim().charAt(0).toLocaleUpperCase("de") || "?");
@@ -586,7 +677,6 @@ function zeigeDashboardLogin(meldung){
       zeigeAnzeigePin({ ticket:r.data.ticket });
     });
   });
-  $code.focus();
 }
 
 /** Schritt 2: Dashboard-PIN – nach dem Code (ticket) oder nach über 15 Minuten ohne Kontakt (offline) */
@@ -776,16 +866,22 @@ function pinPadVerbinden(absenden){
   const taste = (e) => {
     if(!document.getElementById("pinPunkte")) return document.removeEventListener("keydown", taste);
     // preventDefault: sonst löst Enter zusätzlich den gerade fokussierten Knopf aus
-    if(/^\d$/.test(e.key)){ e.preventDefault(); eingabe(e.key); }
+    if(/^\d$/.test(e.key)){
+      e.preventDefault(); eingabe(e.key);
+      // Fernbedienung: Wer mit den Zifferntasten tippt, landet auf OK – sonst löste OK die Taste mit dem Fokus aus
+      if(fernbedienung() && !$ok.disabled && document.activeElement?.closest(".tastatur")) $ok.focus();
+    }
     else if(e.key === "Backspace"){ e.preventDefault(); loeschen(); }
-    else if(e.key === "Enter"){ e.preventDefault(); ok(); }
+    // Enter auf einer Taste des Ziffernblocks (Fernbedienung, Tab) drückt diese Taste, sonst schickt es die PIN ab
+    else if(e.key === "Enter" && !document.activeElement?.closest(".tastatur")){ e.preventDefault(); ok(); }
   };
   document.addEventListener("keydown", taste);
   zeichnen();
 }
 
-// Einstieg: vom Dashboard zurückgeschickt (?dashboard) oder nur als Anzeige angemeldet → Dashboard-Login, sonst das Konto
-if(new URLSearchParams(location.search).has("dashboard") || (!verbindung() && anzeigeVerbindung())) dashboardStart();
+// Einstieg: vom Dashboard zurückgeschickt (?dashboard), nur als Anzeige angemeldet oder ein Fernseher ohne Konto
+// → Dashboard-Login, sonst das Konto
+if(new URLSearchParams(location.search).has("dashboard") || (!verbindung() && (anzeigeVerbindung() || FERNSEHER))) dashboardStart();
 else start();
 </script>
 </body>

@@ -155,6 +155,8 @@ Nach dem Merge baut Netlify Anmeldeseite und Dashboard neu; am Pi einmal das **U
 
 1. In der Companion Board → „Anzeige-Gerät anmelden“: Gültigkeit wählen (Standard 20 Minuten), Dashboard-PIN zweimal, „Code generieren“. Der Code steht groß darüber.
 2. Am Fernseher oder Tablet `https://mainhubv1.com/` öffnen → Reiter „Dashboard-Login“ → Code (Groß- und Kleinschreibung zählt) → Dashboard-PIN → Layout wählen → „Anzeige starten“. Neu laden geht ohne Code.
+   - Der Fernseher bekommt die TV-Ansicht und öffnet gleich den Dashboard-Login. Bedient wird mit der Fernbedienung: Pfeiltasten wählen, OK bestätigt, PIN mit den Zifferntasten.
+   - Erkennt sich der Fernseher nicht (Seite schmal wie am Handy, Pfeiltasten springen nicht): `https://mainhubv1.com/?tv` öffnen.
 3. Ein zweites Gerät mit demselben Code und demselben Layout: Es bekommt eine eigene Kopie („Board 2“) mit eigenem Raster. Angeordnet wird sie in der Companion unter Board → Anzeigen.
 4. Das Gerät über eine Viertelstunde ohne Verbindung (WLAN aus): Danach fragt es nach der Dashboard-PIN.
 5. In der Companion unter „Erzeugte Codes“ zweimal „Widerrufen“: Alle Anzeigen des Codes landen wieder beim Dashboard-Login.
