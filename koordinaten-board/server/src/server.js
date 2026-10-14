@@ -338,7 +338,9 @@ app.put('/api/dashboard/layout', async (req, reply) => {
   if (!geraet) return reply;
   if (dash.pinGrund(geraet)) return anzeigeAbgelehnt(reply, { geraet, pinNoetig: true });
   try {
-    return dash.layoutWaehlen(geraet, String(req.body?.anzeigeId ?? ''));
+    const r = dash.layoutWaehlen(geraet, String(req.body?.anzeigeId ?? ''));
+    if (r.kopie) geaendertMelden('anzeigen');   // die Kopie erscheint in der Companion unter Board → Anzeigen
+    return r;
   } catch (f) {
     return anmeldeFehler(reply, f);
   }

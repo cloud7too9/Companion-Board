@@ -110,10 +110,10 @@ test('Anzeige-Gerät: 14 Minuten offline läuft, 16 Minuten → Dashboard-PIN; a
   const s = dash.sitzung(geraet);
   assert.equal(s.pinNoetig, false);
   assert.equal(s.anzeigeId, null);
-  assert.deepEqual(s.layouts.map((l) => [l.name, l.inhalt, l.widgets]), [['Board', 'Standard-Layout', null]]);
+  assert.deepEqual(s.layouts.map((l) => [l.name, l.inhalt, l.widgets, l.belegt]), [['Board', 'Standard-Layout', null, false]]);
 
   const board = daten.anzeigenListe()[0];
-  assert.deepEqual(dash.layoutWaehlen(geraet, board.id), { anzeigeId: board.id });
+  assert.deepEqual(dash.layoutWaehlen(geraet, board.id), { anzeigeId: board.id, kopie: false });
   assert.throws(() => dash.layoutWaehlen(geraet, 'gibt-es-nicht'), /Anzeige nicht gefunden/);
   assert.equal(dash.ausToken(token).anzeigeId, board.id);
 
@@ -166,4 +166,40 @@ test('Widerrufen meldet alle Anzeigen des Codes ab, Abmelden nur das eine Gerät
   assert.ok(daten.zugang(b.zugang.id), 'Abmelden lässt den Code stehen');
   assert.equal(dash.ausToken('abc.def'), null);
   assert.equal(dash.ausToken(undefined), null);
+});
+
+test('Layout und Raster je Gerät (AN4): freie Anzeige übernehmen, belegte kopieren', async () => {
+  const { daten, dash } = await neu();
+  const board = daten.anzeigenListe()[0];
+  const layout = { layer: [{ id: 'l1', name: 'Start', instanzen: [{ id: 'w1', typ: 'sammelobjekte.status', stufe: 'standard', x: 0, y: 0 }] }], aktiverLayer: 'l1' };
+  daten.anzeigeLayoutSetzen(board.id, layout);
+  daten.anzeigeReihenSetzen(board.id, 24);
+  const tv = await anmelden(dash), tablet = await anmelden(dash), handy = await anmelden(dash);
+
+  assert.deepEqual(dash.layoutWaehlen(tv.geraet, board.id), { anzeigeId: board.id, kopie: false }, 'frei: der Fernseher übernimmt „Board“');
+  assert.deepEqual(dash.sitzung(dash.ausToken(tablet.token)).layouts.map((l) => [l.name, l.belegt]), [['Board', true]]);
+  assert.deepEqual(dash.sitzung(dash.ausToken(tv.token)).layouts.map((l) => [l.name, l.belegt]), [['Board', false]], 'die eigene ist nicht belegt');
+
+  const t = dash.layoutWaehlen(tablet.geraet, board.id);
+  assert.equal(t.kopie, true);
+  const kopie = daten.anzeigeLayout(t.anzeigeId);
+  assert.equal(kopie.anzeige.name, 'Board 2');
+  assert.deepEqual(kopie.layout, daten.anzeigeLayout(board.id).layout, 'gleiches Layout');
+  assert.equal(kopie.reihen, null, 'eigenes Raster: das Tablet meldet seine Reihen selbst');
+  daten.anzeigeReihenSetzen(t.anzeigeId, 12);
+  assert.deepEqual([daten.anzeigeLayout(board.id).reihen, daten.anzeigeLayout(t.anzeigeId).reihen], [24, 12]);
+  // Eigenes Layout: Änderungen am Tablet berühren den Fernseher nicht
+  daten.anzeigeLayoutSetzen(t.anzeigeId, { ...layout, layer: [{ ...layout.layer[0], instanzen: [] }] });
+  assert.equal(daten.anzeigeLayout(board.id).layout.layer[0].instanzen.length, 1);
+
+  assert.deepEqual(dash.layoutWaehlen(dash.ausToken(tv.token), board.id), { anzeigeId: board.id, kopie: false }, 'nochmal dasselbe: bleibt');
+  assert.equal(daten.anzeigeLayout(dash.layoutWaehlen(handy.geraet, t.anzeigeId).anzeigeId).anzeige.name, 'Board 3', 'Kopie der Kopie heißt „Board 3“');
+  assert.equal(daten.anzeigenListe().length, 4 - 1);
+  // Gibt der Fernseher „Board“ frei (abgemeldet), übernimmt das nächste Gerät sie wieder direkt
+  dash.abmelden(dash.ausToken(tv.token));
+  const neuesTv = await anmelden(dash);
+  assert.deepEqual(dash.layoutWaehlen(neuesTv.geraet, board.id), { anzeigeId: board.id, kopie: false });
+  assert.equal(daten.anzeigeKopieren(board.id).name, 'Board 4');
+  daten.anzeigeUmbenennen(board.id, { name: 'Raum 101' });
+  assert.equal(daten.anzeigeKopieren(board.id).name, 'Raum 101 2', 'Zahl im Namen ohne Anzeige ohne Zahl bleibt');
 });

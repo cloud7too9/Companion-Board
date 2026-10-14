@@ -46,6 +46,8 @@ const warteAuf = (p, fn, arg, ms = 8000) => p.waitForFunction(fn, arg, { timeout
 const laeuft = (p) => warteAuf(p, () => document.querySelector('[data-testid="anzeige-name"]')?.textContent === "Anzeige Board"
   && document.querySelector('[data-testid="verbunden"]')?.dataset.verbunden === "true"
   && ![...document.querySelectorAll('[data-testid="widget-leer"]')].some((e) => e.textContent.includes("Anzeige-Link")));
+// Dashboard ganz ohne Zugang (weder Link noch Anzeige-Token): zur Anmeldeseite, Reiter Dashboard-Login (Bauplan „Anmeldung“, L5)
+const zumLogin = (p) => warteAuf(p, () => location.pathname === "/" && location.search === "?dashboard" && document.getElementById("dashCode"));
 const hinweis = (p, text, ms) => warteAuf(p, (t) => document.querySelectorAll('[data-testid="widget-leer"]').length > 0
   && [...document.querySelectorAll('[data-panel-id] [data-testid="widget-leer"]')].every((e) => e.textContent === t), text, ms);
 
@@ -77,7 +79,7 @@ try {
   // ---- Anzeige „von außen“: ohne Link gesperrt, mit Link erlaubt, merkt sich den Schlüssel ----
   const tv = await seite({ width: 1280, height: 720 });
   await tv.goto(`http://${AUSSEN}:${PORT}/dashboard/`);
-  pruefe(await hinweis(tv, "Diese Anzeige braucht ihren Anzeige-Link"), "Anderes Gerät ohne Link: Hinweis auf den Anzeige-Link");
+  pruefe(await zumLogin(tv), "Anderes Gerät ohne Link: zur Anmeldeseite, Reiter Dashboard-Login");
   await tv.goto(board1.link);
   pruefe(await laeuft(tv), "Mit Anzeige-Link läuft die Anzeige");
   await tv.goto(`http://${AUSSEN}:${PORT}/dashboard/`);
@@ -111,7 +113,7 @@ try {
   // Auch das Board-Gerät selbst (localhost) braucht den Link (Umbau Phase 1)
   const lokal = await seite({ width: 1280, height: 720 });
   await lokal.goto(`${BOARD}/dashboard/`);
-  pruefe(await hinweis(lokal, "Diese Anzeige braucht ihren Anzeige-Link"), "localhost ohne Link: gesperrt");
+  pruefe(await zumLogin(lokal), "localhost ohne Link: gesperrt, zur Anmeldeseite (Dashboard-Login)");
   await lokal.goto(`${BOARD}/dashboard${await anzeigeLinkQuery(path.join(TMP, "daten"))}`);
   pruefe(await laeuft(lokal), "localhost mit Link: Anzeige läuft");
 } catch (f) {

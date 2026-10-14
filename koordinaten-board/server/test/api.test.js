@@ -682,7 +682,7 @@ test('Dashboard-Zugänge (Anmeldung L4): Code, Dashboard-PIN, Layout wählen, An
   assert.deepEqual([(await anfrage('GET', '/api/anzeige/layout', tv)).status, (await anfrage('GET', '/api/anzeige/layout', tv)).daten.error], [409, 'layout']);
   assert.equal(await wsCode(`rolle=anzeige&anzeigeToken=${encodeURIComponent(tv)}`), 4003);
   assert.equal((await anfrage('PUT', '/api/dashboard/layout', tv, { anzeigeId: 'gibt-es-nicht' })).status, 404);
-  assert.deepEqual((await anfrage('PUT', '/api/dashboard/layout', tv, { anzeigeId: board.id })).daten, { anzeigeId: board.id });
+  assert.deepEqual((await anfrage('PUT', '/api/dashboard/layout', tv, { anzeigeId: board.id })).daten, { anzeigeId: board.id, kopie: false });
 
   // Mit Layout: Anzeige-API mit Header oder ?anzeigeToken=, Widgets, Reihen melden
   assert.deepEqual((await anfrage('GET', '/api/anzeige', tv)).daten.anzeige, { id: board.id, name: 'Board' });

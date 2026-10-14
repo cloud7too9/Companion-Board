@@ -174,9 +174,8 @@ try {
     const tv = await browser.newPage({ viewport: { width: 1280, height: 720 } });
     tv.on("pageerror", (e) => fehler.push(e.message));
     await tv.goto(`http://${AUSSEN}:${PORT}/dashboard/`);
-    pruefe(await tv.waitForFunction(() => document.querySelector('[data-panel-id="w-sammelstatus"] [data-testid="widget-leer"]')?.textContent
-      === "Diese Anzeige braucht ihren Anzeige-Link" && document.querySelector('[data-panel-id="w-beitreten"] [data-testid="widget-leer"]')?.textContent
-      === "Diese Anzeige braucht ihren Anzeige-Link", null, { timeout: 8000 }).then(() => true, () => false), "Anderes Gerät ohne Link: Hinweis auf den Anzeige-Link, auch in den Widgets der Anzeige");
+    pruefe(await tv.waitForFunction(() => location.pathname === "/" && location.search === "?dashboard" && document.getElementById("dashCode"),
+      null, { timeout: 8000 }).then(() => true, () => false), "Anderes Gerät ohne Zugang: zur Anmeldeseite, Reiter Dashboard-Login");
     const link = new URL(tablet.link);
     await tv.goto(`http://${AUSSEN}:${PORT}/dashboard${link.search}`);
     pruefe(await tv.waitForFunction(() => document.querySelector('[data-panel-id="w-sammelstatus"] [data-testid="karte"]')?.textContent.includes("2 von 18")

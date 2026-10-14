@@ -11,12 +11,14 @@
 /* ============================================================================
    Minecraft Companion · ANMELDESEITE (Einstieg unter /)
    ----------------------------------------------------------------------------
-   Bauplan „Anmeldung und Dashboard-Zugang“, L3. Aufbau aus dem Prototyp
+   Bauplan „Anmeldung und Dashboard-Zugang“, L3 und L5. Aufbau aus dem Prototyp
    entwuerfe/anmeldung-prototyp.html, ohne Mock und Simulation.
-   Regeln wie am Server (identitaet.js):
+   Regeln wie am Server (identitaet.js, dashboard-zugang.js):
      · Passwort: erste Anmeldung auf einem Gerät + PIN zurücksetzen
      · PIN: nach über 30 Minuten ohne Kontakt und nach einem PIN-Wechsel
      · neue Konten warten, bis ein anderes Konto sie freigibt (das erste gilt sofort)
+     · Dashboard-Login (Anzeige-Geräte): Zugangs-Code → Dashboard-PIN → Layout wählen;
+       Dashboard-PIN wieder nach über 15 Minuten ohne Kontakt
    Bewusst eine Datei, keine Build-Tools, wie die Companion.
    ========================================================================== */
 
@@ -220,10 +222,13 @@ body {
      board.pinLokal       { benutzerId, salz, hash, runden } – PIN-Sperre ohne Netz (AN12)
      board.kontakt        letzter Kontakt zum Board (ms), zählt die 30 Minuten ohne Netz
      anmeldung.willkommen Benutzer-ID, solange die Willkommenskarte noch aussteht
+     board.anzeige        { adresse, token } – dieses Gerät als Anzeige (Dashboard-Login), getrennt vom Konto;
+                          das Dashboard unter /dashboard/ liest den Anzeige-Token von hier
    ========================================================================== */
 const BOARD_ADRESSE = String(window.COMPANION_KONFIG?.apiAdresse || "").replace(/\/+$/, "") || location.origin;
 const API = `${BOARD_ADRESSE}/api`;
 const COMPANION = "app/";              // die Companion, relativ zu dieser Seite
+const DASHBOARD = "dashboard/";       // die Anzeige (Widget-Dashboard), relativ zu dieser Seite
 const WARTEN_PRUEFEN_MS = 10000;      // wartendes Konto: so oft fragen, ob es freigegeben ist
 
 // Alte Anzeige-Links auf die Startseite (?anzeige=…&schluessel=…) gehören zum Dashboard
@@ -251,6 +256,12 @@ function vergessen(){
   try { indexedDB.deleteDatabase("companion-spiegel"); } catch {}
 }
 const kontaktMerken = () => lsSchreiben("board.kontakt", Date.now());
+/** Dieses Gerät als Anzeige an diesem Board (Dashboard-Login, L5) */
+function anzeigeVerbindung(){
+  const v = lsLesen("board.anzeige");
+  return v?.adresse === BOARD_ADRESSE && v.token ? v : null;
+}
+const anzeigeVergessen = () => lsSchreiben("board.anzeige", null);
 /** PIN auf diesem Gerät richtig eingegeben: Hash für die PIN-Sperre ohne Netz ablegen (nur mit WebCrypto) */
 async function pinMerken(benutzerId, pin){
   const h = await pinLokalHashen(pin).catch(() => null);
@@ -258,9 +269,10 @@ async function pinMerken(benutzerId, pin){
 }
 
 const nichtErreichbar = (r) => r.status === 0 || (r.status >= 502 && r.status <= 504) || r.status === 530;
-/** Anfrage ans Board → { ok, status, data, text } (text: Meldung für den Nutzer) */
-async function anfrage(methode, pfad, body){
-  const v = verbindung();
+/** Anfrage ans Board → { ok, status, data, text } (text: Meldung für den Nutzer).
+    anzeige:true → mit dem Anzeige-Token statt dem des Kontos (Dashboard-Login) */
+async function anfrage(methode, pfad, body, { anzeige = false } = {}){
+  const v = anzeige ? anzeigeVerbindung() : verbindung();
   let res;
   try {
     res = await fetch(API + pfad, { method:methode, cache:"no-store",
@@ -272,6 +284,7 @@ async function anfrage(methode, pfad, body){
   const r = { ok:res.ok, status:res.status, data };
   r.text = nichtErreichbar(r) ? "Das Board ist nicht erreichbar. Läuft es noch?"
     : res.status === 404 && /^\/(anmelden|registrieren)$/.test(pfad) ? "Das Board kennt die Anmeldung mit Passwort noch nicht – der Pi braucht ein Update."
+    : res.status === 404 && /^\/dashboard\/(code|sitzung)$/.test(pfad) ? "Das Board kennt den Dashboard-Login noch nicht – der Pi braucht ein Update."
     : data?.fehler || data?.message || `Fehler ${res.status}`;
   return r;
 }
@@ -304,7 +317,7 @@ function ansicht(html){
 $nav.addEventListener("click", (e) => {
   const ziel = e.target.closest("[data-nav]")?.dataset.nav;
   if(ziel === "app") start();
-  else if(ziel === "dashboard") zeigeDashboard();
+  else if(ziel === "dashboard") dashboardStart();
 });
 $nav.addEventListener("keydown", (e) => {
   if(e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
@@ -525,14 +538,144 @@ function zeigeOffline(){
   </div>`);
 }
 
-/** Reiter Dashboard-Login: Anzeige-Geräte melden sich hier bald mit einem Zugangs-Code an (L5) */
-function zeigeDashboard(){
+/* ---- Dashboard-Login (L5): Anzeige-Geräte (TV, Tablet) ohne Konto -------------------------------
+   Code aus der Companion → Ticket → Dashboard-PIN → Anzeige-Token → Layout wählen → /dashboard/.
+   Layout und Raster gehören dem Gerät (AN4): Zeigt ein anderes Gerät das gewählte Layout schon,
+   bekommt dieses eine Kopie („Board 2“), die man in der Companion eigens anordnet. */
+
+/** Angemeldete Anzeige → Dashboard-PIN oder Layout wählen, sonst der Code */
+async function dashboardStart(meldung){
+  if(!anzeigeVerbindung()) return zeigeDashboardLogin(meldung);
   navSetzen("dashboard");
   unterzeile("");
-  ansicht(`<div class="ansicht" role="tabpanel" aria-label="Dashboard-Login">
-    ${bannerHtml("info", "Kommt bald: Anzeige-Geräte (TV, Tablet) melden sich hier mit einem Zugangs-Code an.")}
-    <p class="sub">Bis dahin öffnet ein Anzeige-Gerät seinen Anzeige-Link. Den gibt es in der Companion unter Board → Anzeigen.</p>
+  ansicht(`<p class="laden">Einen Moment …</p>`);
+  const r = await anfrage("GET", "/dashboard/sitzung", undefined, { anzeige:true });
+  if(nichtErreichbar(r)) return zeigeDashboardOffline();
+  if(r.status === 401){
+    anzeigeVergessen();
+    return zeigeDashboardLogin({ art:"info", text:"Diese Anzeige ist nicht mehr angemeldet (abgemeldet oder Code widerrufen). Bitte mit einem neuen Code anmelden." });
+  }
+  if(!r.ok) return zeigeDashboardLogin({ art:"bad", text:r.text });
+  return r.data.pinNoetig ? zeigeAnzeigePin({ offline:r.data.offline }) : zeigeLayoutWahl(r.data, meldung);
+}
+
+/** Schritt 1: nur der Zugangs-Code (5 Zeichen, Groß- und Kleinschreibung zählt) */
+function zeigeDashboardLogin(meldung){
+  navSetzen("dashboard");
+  unterzeile("");
+  ansicht(`<form class="ansicht" id="formDashboard" role="tabpanel" aria-label="Dashboard-Login" novalidate>
+    ${bannerHtml(meldung?.art, meldung?.text)}
+    <div class="feld">
+      <label for="dashCode">Zugangs-Code</label>
+      <input class="eingabe mono code" id="dashCode" type="text" maxlength="5" autocomplete="off"
+        autocapitalize="off" autocorrect="off" spellcheck="false" required>
+      <span class="hilfe">Den Code erzeugst du in der Companion unter Board → „Anzeige-Gerät anmelden“. Groß- und Kleinschreibung zählt.</span>
+    </div>
+    <div id="dashMeldung" aria-live="polite"></div>
+    <button class="knopf" type="submit">Weiter</button>
+  </form>`);
+  const $code = document.getElementById("dashCode"), $form = document.getElementById("formDashboard");
+  $code.addEventListener("input", () => { $code.value = $code.value.replace(/[^0-9A-Za-z]/g, ""); });
+  $form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const $m = document.getElementById("dashMeldung");
+    if(!ZUGANGS_CODE.test($code.value)){ $m.innerHTML = bannerHtml("bad", "Der Zugangs-Code hat genau 5 Zeichen"); return; }
+    mitKnopf($form.querySelector('[type="submit"]'), async () => {
+      const r = await anfrage("POST", "/dashboard/code", { code:$code.value }, { anzeige:true });
+      if(!r.ok){ $m.innerHTML = bannerHtml(r.status === 410 ? "warn" : meldungArt(r), r.text); $code.select(); return; }
+      zeigeAnzeigePin({ ticket:r.data.ticket });
+    });
+  });
+  $code.focus();
+}
+
+/** Schritt 2: Dashboard-PIN – nach dem Code (ticket) oder nach über 15 Minuten ohne Kontakt (offline) */
+function zeigeAnzeigePin(k){
+  navSetzen("dashboard");
+  unterzeile("");
+  const grund = k.ticket
+    ? "Gib die Dashboard-PIN ein, die beim Erzeugen des Codes festgelegt wurde."
+    : `Diese Anzeige war ${dauer(k.offline || OFFLINE_MINUTEN.anzeige)} ohne Verbindung. Bitte bestätige mit der Dashboard-PIN.`;
+  ansicht(`<div class="ansicht">
+    <div class="pin-kopf">
+      <h2>Dashboard-PIN</h2>
+      <p class="grund">${esc(grund)}</p>
+    </div>
+    ${pinPadHtml()}
+    <div id="pinMeldung" aria-live="polite"></div>
+    <button class="link leise" type="button" data-weiter="anderer-code">Anderer Code</button>
   </div>`);
+  pinPadVerbinden(async (pin, wackeln) => {
+    const $m = document.getElementById("pinMeldung");
+    const r = k.ticket
+      ? await anfrage("POST", "/dashboard/freischalten", { ticket:k.ticket, pin }, { anzeige:true })
+      : await anfrage("POST", "/dashboard/pin", { pin }, { anzeige:true });
+    if(r.ok){
+      if(k.ticket) lsSchreiben("board.anzeige", { adresse:BOARD_ADRESSE, token:r.data.anzeigeToken });
+      return dashboardStart();
+    }
+    // Nicht die PIN, sondern der Weg dahin gilt nicht mehr: Ticket nach 5 Minuten, Code abgelaufen, widerrufen, abgemeldet
+    const falschePin = r.status === 401 && r.data?.fehler === "Falsche Dashboard-PIN";
+    if(!falschePin && r.status !== 429 && !nichtErreichbar(r)){
+      if(!k.ticket) anzeigeVergessen();
+      return zeigeDashboardLogin({ art:"warn", text:k.ticket ? r.text : "Diese Anzeige ist nicht mehr angemeldet. Bitte mit einem neuen Code anmelden." });
+    }
+    wackeln();
+    $m.innerHTML = bannerHtml(meldungArt(r), r.text);
+  });
+}
+
+/** Schritt 3: Layout wählen (das gewählte ist vorausgewählt, sonst das erste freie) */
+function zeigeLayoutWahl(s, meldung){
+  navSetzen("dashboard");
+  unterzeile("Anzeige-Layout wählen");
+  const vorwahl = s.layouts.some((l) => l.id === s.anzeigeId) ? s.anzeigeId : (s.layouts.find((l) => !l.belegt) ?? s.layouts[0])?.id;
+  const widgets = (l) => l.widgets == null ? "Standard" : `${l.widgets} ${l.widgets === 1 ? "Widget" : "Widgets"}`;
+  ansicht(`<form class="ansicht" id="formLayout" novalidate>
+    ${bannerHtml(meldung?.art, meldung?.text)}
+    <fieldset class="layout-liste">
+      <legend class="sub">Welches Layout soll dieses Gerät zeigen?</legend>
+      ${s.layouts.map((l) => `<label class="layout-karte">
+        <input type="radio" name="layout" value="${esc(l.id)}" ${l.id === vorwahl ? "checked" : ""}>
+        <span class="layout-text"><b>${esc(l.name)}</b><span>${esc(l.inhalt)}${l.belegt ? " · läuft schon auf einem anderen Gerät, dieses bekommt eine Kopie" : ""}</span></span>
+        <span class="layout-meta mono">${widgets(l)}</span>
+      </label>`).join("")}
+    </fieldset>
+    <p class="sub">Layout und Raster gehören diesem Gerät. Angeordnet wird in der Companion unter Board → Anzeigen.</p>
+    <div id="layoutMeldung" aria-live="polite"></div>
+    <button class="knopf" type="submit" ${s.layouts.length ? "" : "disabled"}>Anzeige starten</button>
+    <button class="link leise" type="button" data-weiter="anzeige-abmelden">Anzeige abmelden</button>
+  </form>`);
+  const $form = document.getElementById("formLayout");
+  $form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const anzeigeId = new FormData($form).get("layout");
+    if(!anzeigeId) return;
+    mitKnopf($form.querySelector('[type="submit"]'), async () => {
+      const r = await anfrage("PUT", "/dashboard/layout", { anzeigeId }, { anzeige:true });
+      if(r.status === 401 || r.status === 423) return dashboardStart();
+      if(!r.ok){ document.getElementById("layoutMeldung").innerHTML = bannerHtml(meldungArt(r), r.text); return; }
+      location.href = DASHBOARD;
+    });
+  });
+}
+
+/** Board nicht erreichbar: die Anzeige wartet, bis es wieder da ist */
+function zeigeDashboardOffline(){
+  navSetzen("dashboard");
+  unterzeile("");
+  ansicht(`<div class="ansicht">
+    ${bannerHtml("warn", "Das Board ist gerade nicht erreichbar.")}
+    <p class="sub">Diese Anzeige ist angemeldet. Sobald das Board wieder läuft, geht es hier weiter.</p>
+    <button class="knopf" type="button" data-weiter="dashboard-start">Erneut versuchen</button>
+  </div>`);
+}
+
+/** Anzeige auf diesem Gerät abmelden: das Board vergisst das Anzeige-Gerät, der Code bleibt */
+async function anzeigeAbmelden(meldung){
+  if(anzeigeVerbindung()) await anfrage("POST", "/dashboard/abmelden", undefined, { anzeige:true });
+  anzeigeVergessen();
+  zeigeDashboardLogin(meldung);
 }
 
 function zurCompanion(){
@@ -588,6 +731,9 @@ $buehne.addEventListener("click", (e) => {
   else if(ziel === "reset") zeigeReset();
   else if(ziel === "abmelden") abmelden();
   else if(ziel === "companion") zurCompanion();
+  else if(ziel === "dashboard-start") dashboardStart();
+  else if(ziel === "anderer-code") anzeigeAbmelden();
+  else if(ziel === "anzeige-abmelden") anzeigeAbmelden({ art:"info", text:"Anzeige abgemeldet. Für eine neue Anmeldung brauchst du wieder einen Code." });
 });
 
 /* ============================================================================
@@ -638,7 +784,9 @@ function pinPadVerbinden(absenden){
   zeichnen();
 }
 
-start();
+// Einstieg: vom Dashboard zurückgeschickt (?dashboard) oder nur als Anzeige angemeldet → Dashboard-Login, sonst das Konto
+if(new URLSearchParams(location.search).has("dashboard") || (!verbindung() && anzeigeVerbindung())) dashboardStart();
+else start();
 </script>
 </body>
 </html>

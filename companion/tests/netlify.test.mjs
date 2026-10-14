@@ -104,12 +104,12 @@ try {
   pruefe(ort.instanz?.id, `Ort über die API angelegt (${ort.instanz?.id ?? ort.message})`);
   await p.screenshot({ path: `${DIR}/n1-companion-app.png` });
 
-  // ---- Die Anzeige: Dashboard nur mit Anzeige-Link; ein alter Link auf die Startseite geht weiter; Kennblock aus /icons/ ----
+  // ---- Die Anzeige: Dashboard nur mit Zugang (sonst Dashboard-Login); ein alter Link auf die Startseite geht weiter; Kennblock aus /icons/ ----
   const tv = await browser.newPage({ viewport: { width: 1600, height: 900 } });
   tv.on("pageerror", (e) => fehler.push(`Anzeige: ${e.message}`));
   await tv.goto(`${SEITE}/dashboard/`);
-  pruefe(await warteAuf(tv, () => document.querySelector('[data-panel-id="w-orte"] [data-testid="widget-leer"]')?.textContent === "Diese Anzeige braucht ihren Anzeige-Link"),
-    "Dashboard ohne Link gesperrt");
+  pruefe(await warteAuf(tv, () => location.pathname === "/" && location.search === "?dashboard" && document.getElementById("dashCode")),
+    "Dashboard ohne Zugang → Anmeldeseite, Reiter Dashboard-Login");
   await tv.goto(`${SEITE}/${link}`);
   pruefe(await warteAuf(tv, () => location.pathname === "/dashboard/" && document.querySelector('[data-testid="anzeige-titel"]')?.textContent === "Netlify-Welt"
     && document.querySelector('[data-panel-id="w-sammelstatus"] [data-testid="karte"]') && !document.querySelector('[data-testid="beispielkarten"]'), null, 15000),

@@ -43,6 +43,17 @@ describe("Anzeige-Link", () => {
     expect(zugangParameter(zugangHolen(""))).toEqual({ anzeige: "a_1", schluessel: "abc" });
     expect(zugangParameter(null)).toEqual({});
   });
+
+  it("Anzeige-Token vom Dashboard-Login (L5) gilt vor einem gemerkten Link, nur für dasselbe Board", () => {
+    localStorage.setItem("anzeige.zugang", JSON.stringify({ anzeige: "a_1", schluessel: "abc" }));
+    localStorage.setItem("board.anzeige", JSON.stringify({ adresse: "https://api.beispiel.de", token: "t.123" }));
+    expect(zugangHolen("", "https://api.beispiel.de")).toEqual({ anzeigeToken: "t.123" });
+    expect(zugangParameter(zugangHolen("", "https://api.beispiel.de"))).toEqual({ anzeigeToken: "t.123" });
+    // Anderes Board: der Token gilt dort nicht
+    expect(zugangHolen("", "https://anderes.board")).toEqual({ anzeige: "a_1", schluessel: "abc" });
+    // Ein Link in der Adresse geht vor
+    expect(zugangHolen("?anzeige=a_2&schluessel=xyz", "https://api.beispiel.de")).toEqual({ anzeige: "a_2", schluessel: "xyz" });
+  });
 });
 
 describe("KarteAnsicht", () => {
