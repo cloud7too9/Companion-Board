@@ -292,13 +292,14 @@ Branch: **`board/anmeldung`** für alles. Nach jeder Phase pushen.
 
 ## 10. Stand der Umsetzung (14.10.2026)
 
-**L1–L3 gebaut**, auf dem Branch der Cloud-Sitzung (`claude/festive-euler-a82up2`) statt `board/anmeldung`, ein PR. ⏸ **H15** (Max meldet sich nach dem Pi-Update am Handy an; Screenshots `a1`–`a8`, `n6-offline-pin.png`).
+**L1–L4 gebaut**, auf dem Branch der Cloud-Sitzung (`claude/festive-euler-a82up2`) statt `board/anmeldung`, ein PR je Schritt (L1–L3 zusammen, L4 allein). ⏸ **H15** (Max meldet sich nach dem Pi-Update am Handy an; Screenshots `a1`–`a8`, `n6-offline-pin.png`).
 
 | Phase | Gebaut |
 |---|---|
 | L1 | `daten.js`: Felder aus Kapitel 4, `zugaenge` und `anzeigeGeraete` in `SAMMLUNGEN`, `kontenUmstellen()` bei jedem Laden (Konten ohne Passwort samt Profilen und Geräten weg, Ersteller → „unbekannt“, auch in `erledigt` und Sammelobjekten). `regeln.js`: `KONTO_PIN`, `PASSWORT_MIN`, `kontoPruefen`, `passwortPruefen`, `anzeigenameSauber`, `CODE_ZEICHEN`, `ZUGANGS_CODE`, `GUELTIGKEITEN`, `gueltigkeitPruefen`, `OFFLINE_MINUTEN` |
 | L2 | `identitaet.js` neu, Routen aus 5.1, Hook in `server.js` (Reihenfolge 401 → 403 wartet → 423 PIN → Kontakt), `/ws` mit 4030/4023, Sperren (Passwort je Anzeigename, PIN je Gerät, Zurücksetzen je Konto). Server-Tests: `identitaet.test.js`, `api.test.js` (Konten, Passwort-Sperre, PIN-Pflicht mit Test-Uhr) |
 | L3 | `companion/anmeldung.html`, Server und Netlify liefern sie unter `/`, die Companion unter `/app/`; Companion leitet bei fehlendem Token, 401, 423 und wartendem Konto dorthin; Konten im Board-Sheet; Offline-Sperre. Playwright: `anmeldung.test.mjs` (neu), alle anderen Tests auf Konten umgestellt |
+| L4 | `dashboard-zugang.js` (neu) mit den Routen aus 5.2, `signatur.js` (neu, HMAC-Signatur für Konto-Token, Ticket und Anzeige-Token, je mit eigenem Zweck), `daten.js` (Zugänge und Anzeige-Geräte). `server.js`: Anzeige-Token neben dem Anzeige-Link für `/api/anzeige/*`, `/api/widgets/*` und `/ws` (Rolle `anzeige`, Herzschlag, 4023 PIN nötig, 4003 widerrufen). Server-Tests: `dashboard-zugang.test.js` (neu), `api.test.js` (ganzer Ablauf mit Test-Uhr) |
 
 **Abweichungen vom Bauplan** (bewusst, kurz begründet):
 
@@ -312,5 +313,19 @@ Branch: **`board/anmeldung`** für alles. Nach jeder Phase pushen.
 - **Altes Board** (vor dem Pi-Update): Die Anmeldeseite meldet „der Pi braucht ein Update“; schon angemeldete Handys laufen mit dem alten Token weiter, `IDENTITAET.werBistDu()` versteht beide Antworten von `/api/ich`.
 - **Test-Uhr:** `TEST_UHR=1` schaltet `POST /api/test/uhr { minuten }` frei (Kapitel 7, L3 „Zeit am Server per Test-Schalter vorstellen“).
 
-**Als Nächstes:** L4 (Dashboard-Zugänge am Server, `dashboard-zugang.js`). L5 wartet auf **AN4**. Danach L6 (Anzeige-Link mit Schlüssel abbauen, Doku).
+**Zu L4 im Einzelnen** (Ergänzungen zu Kapitel 5.2):
+
+- **Anzeige-Token** im Header `Authorization: Bearer …` oder als `?anzeigeToken=…` (WebSocket). Konto-Token, Ticket und Anzeige-Token sind mit verschiedenen Zwecken signiert. Keins gilt an Stelle eines anderen.
+- **Antworten der Anzeige-API** (`/api/anzeige/*`, `/api/widgets/*`) für ein Anzeige-Gerät:
+  - **423** `{ error:"pin" }`: über 15 Minuten ohne Kontakt.
+  - **409** `{ error:"layout" }`: noch kein Layout gewählt oder die gewählte Anzeige gelöscht.
+  - **403**: ohne Link und ohne gültigen Token.
+  - `/ws` schließt in denselben Fällen mit 4023 bzw. 4003.
+- **Kontakt** zählt bei jeder erlaubten Anfrage der Anzeige und bei jedem Pong. In `daten.db` landet er höchstens einmal pro Minute, wie bei den Konten.
+- **`GET /api/dashboard/sitzung`** gibt `anzeigeId: null` zurück, wenn die gewählte Anzeige gelöscht ist. Die Anzeige wählt dann neu. Wird eine Anzeige gelöscht, schließt `/ws` der Geräte, die sie gewählt hatten, mit 4003.
+- **Live:** Erzeugen, Freischalten, Widerrufen und Abmelden melden `geaendert` mit Bereich `zugaenge`. Companion und Dashboard ignorieren ihn bis L5.
+- **Abgelaufene Codes** bleiben in der Liste (`gueltig: false`), bis jemand sie widerruft. Angemeldete Anzeigen laufen weiter (AN5).
+- **Noch ohne Oberfläche:** Companion und Dashboard nutzen die Zugänge erst mit L5.
+
+**Als Nächstes:** L5 (Dashboard-Login auf der Anmeldeseite, Code generieren in der Companion, Dashboard mit Anzeige-Token) wartet auf **AN4**. Danach L6 (Anzeige-Link mit Schlüssel abbauen, Doku).
 
