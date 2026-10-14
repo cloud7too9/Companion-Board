@@ -10,6 +10,8 @@ Seit dem 14.10.2026 mergt Claude ohne Rückfrage, sobald die CI grün ist (Max: 
 
 | PR | Inhalt |
 |---|---|
+| #31 | Schnell 2, Companion: Service Worker merkt nur erfolgreiche Antworten (Kopie sofort), ganze App-Shell samt Welt-Import im Cache, Seite nach 3 s aus dem Cache, eigener Dauer-Cache für `vendor/` und Texturen; Karte zeichnet beim Ziehen und Zoomen einmal pro Bild; Board-Sheet behält die Scrollstelle; Weltwechsel verwirft späte Antworten der alten Welt; Suche mit kurzer Verzögerung; nach längerem Standby frisch verbinden; Umrechner verliert beim Live-Update den Fokus nicht |
+| #30 | Schnell 1, Board-Server: Grenzen je Adresse (Anmeldung, Registrieren, höchstens 10 wartende Konten), Sperren räumen sich auf, `aenderungen` wird gekürzt, `/api/health`, WebSocket-Nachrichten höchstens 64 KB, Geheimnisse nur für den Dienst lesbar, Speicherfehler laut, sauberes Beenden, `sicherung.sh` prüft, packt und kopiert optional weg |
 | #29 | Karte: Kategorien ein- und ausblenden (Knopf oben rechts, Schalter je Kategorie, „Alle zeigen“/„Alle ausblenden“, gemerkt pro Gerät; die Liste zeigt weiter alles) |
 | #28 | Anmeldeseite: TV-Ansicht (Großbild auf Fernsehern und breiten Bildschirmen, Fernbedienung mit Pfeiltasten, OK und Zifferntasten, Fernseher starten im Dashboard-Login, `?tv`), Test mit Fernseher-Browser (Screenshots `t1`–`t3`) |
 | #27 | Anmeldung L5: Dashboard-Login auf der Anmeldeseite (Code, Dashboard-PIN, Layout wählen), „Anzeige-Gerät anmelden“ im Board-Sheet (Code generieren, Widerrufen), Dashboard mit Anzeige-Token; **AN4** (Max): Layout und Raster je Gerät, ein zweites Gerät bekommt eine Kopie; `dashboard-login.test.mjs` (⏸ H16) |
