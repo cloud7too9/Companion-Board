@@ -2351,7 +2351,7 @@ const karte = (() => {
     };
 
     // 2) Features + eigene Orte als Marker (Stil wie drawStructure in Modul A)
-    const akzent = var_("--accent");
+    const akzent = var_("--accent"), tinte = var_("--accent-ink");
     const punkte = eintraege.slice()
       .sort((a, b) => (a.t.kategorie === EIGENE_ORTE) - (b.t.kategorie === EIGENE_ORTE));
     const schilder = [];
@@ -2373,7 +2373,7 @@ const karte = (() => {
         ctx.imageSmoothingQuality = "high";
         ctx.drawImage(bild, px - bw / 2, py - bh / 2, bw, bh);
       } else {
-        ctx.fillStyle = eigen ? var_("--accent-ink") : akzent;
+        ctx.fillStyle = eigen ? tinte : akzent;
         ctx.font = "700 12px ui-monospace, monospace";
         ctx.fillText(symbol(t.kategorie), px, py + 1);
       }
@@ -2423,7 +2423,11 @@ const karte = (() => {
   }
   let tipp = null;   // „X · Z · Biom“ der zuletzt angetippten Stelle, bis die Karte bewegt wird
 
-  function zoomen(faktor, px, py){
+  /** Beim Ziehen kommen pointermove-Ereignisse schneller, als der Bildschirm zeichnet: einmal je Bild reicht */
+  let geplant = 0;
+  const spaeterZeichnen = () => { geplant ||= requestAnimationFrame(() => { geplant = 0; zeichnen(); }); };
+
+  function zoomen(faktor, px, py, spaeter = false){
     const w = canvas.width / dpr, h = canvas.height / dpr;
     px = px ?? w / 2; py = py ?? h / 2;
     const [wx, wz] = zuWelt(px, py);
@@ -2432,7 +2436,7 @@ const karte = (() => {
     // Punkt unter dem Finger bleibt stehen
     sicht.cx = wx - (px - w / 2) / sicht.zoom;
     sicht.cz = wz - (py - h / 2) / sicht.zoom;
-    zeichnen();
+    spaeter ? spaeterZeichnen() : zeichnen();
   }
 
   const lokal = (e) => { const r = canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
@@ -2454,7 +2458,7 @@ const karte = (() => {
       const [a, b] = [...zeiger.values()];
       const faktor = Math.hypot(a[0] - b[0], a[1] - b[1]) / pinch.abstand;
       const ziel = Math.max(CONFIG.zoomMin, Math.min(CONFIG.zoomMax, pinch.zoom * faktor));
-      zoomen(ziel / sicht.zoom, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+      zoomen(ziel / sicht.zoom, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, true);
       bewegt = true;
       return;
     }
@@ -2463,7 +2467,7 @@ const karte = (() => {
       if(Math.hypot(px - ziehen.px, py - ziehen.py) > 5){ bewegt = true; tipp = null; }
       sicht.cx = ziehen.cx - (px - ziehen.px) / sicht.zoom;
       sicht.cz = ziehen.cz - (py - ziehen.py) / sicht.zoom;
-      zeichnen();
+      spaeterZeichnen();
     }
   });
   const loslassen = (e) => {
@@ -3053,8 +3057,9 @@ function bekannteFundorte(kategorie, dim){
 }
 
 async function samLaden(){
-  if(!st.weltId) return;
-  const r = await api(`/sammelobjekte/welten/${st.weltId}`);
+  const welt = st.weltId; if(!welt) return;
+  const r = await api(`/sammelobjekte/welten/${welt}`);
+  if(welt !== st.weltId) return;   // inzwischen andere Welt gewählt
   if(!r.ok){ toast(meldungAus(r), true); return; }
   sam.status = r.data.status || {};
   sam.weltId = st.weltId;
@@ -3579,12 +3584,16 @@ const pruefZeilen = (p) => pruefZeile("overworld", p.hin, p.artHin) + pruefZeile
 
 
 async function portaleLaden(){
-  if(!st.weltId) return;
-  const r = await api(`/portale/welten/${st.weltId}`);
+  const welt = st.weltId; if(!welt) return;
+  const r = await api(`/portale/welten/${welt}`);
+  if(welt !== st.weltId) return;
   if(!r.ok) return toast(meldungAus(r), true);
   pt.liste = r.data.verbindungen;
-  if(aktivesModul === "portale") render();
+  if(aktivesModul !== "portale") return;
+  // Wer gerade im Umrechner tippt, behält das Feld (und die Tastatur): neu gezeichnet wird danach
+  if(rechnerTippt()) pt.spaeterZeichnen = true; else render();
 }
+const rechnerTippt = () => Boolean(document.activeElement?.matches?.("[data-rkoord]"));
 
 // --- Bühne: Infokarte, Umrechner, Verbindungen ------------------------------
 function infoKarteHtml(){
@@ -3794,6 +3803,12 @@ $portalStage.addEventListener("input", (e) => {
   lsSchreiben("portale.rechner", pt.rechner);
   document.getElementById("rechnerErgebnis").innerHTML = rechnerErgebnisHtml();
 });
+// Kam während des Tippens im Umrechner Neues vom Board, wird es nachgezeichnet, sobald das Feld den Fokus abgibt
+$portalStage.addEventListener("focusout", () => setTimeout(() => {
+  if(!pt.spaeterZeichnen || rechnerTippt()) return;
+  pt.spaeterZeichnen = false;
+  if(aktivesModul === "portale") render();
+}));
 $portalStage.addEventListener("click", async (e) => {
   const t = e.target;
   const vz = t.closest("[data-rvz]");
@@ -4148,8 +4163,8 @@ async function weltenAuffrischen(){
 }
 /** Orte der aktuellen Welt neu holen, ohne Ansicht, Filter oder Kartenausschnitt zu verändern */
 async function orteAuffrischen(){
-  if(!st.weltId) return;
-  const r = await api(`/orte/welten/${st.weltId}`); if(!r.ok) return;
+  const welt = st.weltId; if(!welt) return;
+  const r = await api(`/orte/welten/${welt}`); if(!r.ok || welt !== st.weltId) return;
   Object.assign(st, { typen:r.data.typen, instanzen:r.data.instanzen });
   const w = st.welten.find((x) => x.id === st.weltId); if(w) w.anzahl = st.instanzen.length;
   render();
@@ -4409,6 +4424,8 @@ async function anzeigeQrHolen(id){
 }
 function boardSheetRendern(){
   const v = bd.verbindung;
+  // Live-Meldungen (Teilnehmer, Zustand …) zeichnen das Sheet neu – dabei nicht nach oben springen
+  const scroll = st.sheet === "board" ? $sheet.scrollTop : 0;
   if(v){
     const [punkt, text] = boardStatus();
     const zeile = (l, w) => `<div class="board-zeile"><span>${l}</span><b>${w}</b></div>`;
@@ -4441,6 +4458,7 @@ function boardSheetRendern(){
         <button class="btn-primary" data-aktion="schliessen">Fertig</button>
       </div>
     </div>`);
+    $sheet.scrollTop = scroll;
     return;
   }
   // Ohne Verbindung gibt es das Sheet nur im DEMO-Modus: live führt init() vorher zur Anmeldeseite
@@ -4449,11 +4467,22 @@ function boardSheetRendern(){
     <div class="sheet-fuss"><button class="btn-primary" data-aktion="schliessen">Fertig</button></div>
   </div>`);
 }
-// Handy aus dem Standby zurück → sofort neu verbinden statt den Backoff abzuwarten; offline zu lange weg → PIN
+// Handy aus dem Standby zurück → sofort neu verbinden statt den Backoff abzuwarten; offline zu lange weg → PIN.
+// Nach über 30 s im Hintergrund kann die Verbindung tot sein, obwohl sie offen aussieht (iOS): dann neu aufbauen;
+// das Board schickt beim Verbinden den Stand, die Companion lädt nach, was sie verpasst hat (B3).
+const STANDBY_NEU_MS = 30_000;
+let verstecktSeit = 0;
 document.addEventListener("visibilitychange", () => {
-  if(document.visibilityState !== "visible") return;
+  if(document.visibilityState !== "visible"){ verstecktSeit = Date.now(); return; }
   offlinePruefen();
-  if(bd.verbindung && !bd.socket){ bd.wartezeit = 500; boardVerbinden(); }
+  if(!bd.verbindung || DEMO.enabled) return;
+  const lange = verstecktSeit && Date.now() - verstecktSeit > STANDBY_NEU_MS;
+  verstecktSeit = 0;
+  if(!bd.socket || lange){ bd.wartezeit = 500; boardVerbinden(); }
+});
+// Wieder Netz: nicht auf den nächsten Versuch warten
+window.addEventListener("online", () => {
+  if(bd.verbindung && !DEMO.enabled && !bd.socket){ bd.wartezeit = 500; boardVerbinden(); }
 });
 
 /* ============================================================================
@@ -5441,8 +5470,11 @@ async function weltenLaden(){
   if(st.weltId) await weltLaden(st.weltId);
   return true;
 }
+let weltLadenNr = 0;
 async function weltLaden(id){
+  const nr = ++weltLadenNr;
   const r = await api(`/orte/welten/${id}`);
+  if(nr !== weltLadenNr) return;   // schnell nacheinander gewechselt: nur die zuletzt gewählte Welt zählt
   if(!r.ok){ toast(meldungAus(r), true); return; }
   Object.assign(st, { weltId:id, welt:r.data.welt, dimensionen:r.data.dimensionen, typen:r.data.typen, instanzen:r.data.instanzen, filter:null });
   lsSchreiben("orte.welt", id);
@@ -5469,7 +5501,12 @@ function renderStatus(){
 
 // Reiter, Ansicht, Liste
 $tabs.addEventListener("click", (e) => { const b = e.target.closest(".tab"); if(b && b.dataset.dim !== st.dim) dimWechseln(b.dataset.dim); });
-$suche.addEventListener("input", () => { st.suche = $suche.value; renderListe(); });
+let sucheTimer = null;
+$suche.addEventListener("input", () => {
+  st.suche = $suche.value;
+  clearTimeout(sucheTimer);
+  sucheTimer = setTimeout(() => { renderListe(); karte.zeichnen(); }, 120);
+});
 $filter.addEventListener("click", (e) => { const b = e.target.closest(".seg-btn"); if(!b) return; st.filter = b.dataset.filter || null; renderFilter(); renderListe(); });
 $hud.addEventListener("click", (e) => { if(e.target.closest("[data-aktion=standort]")) standortOeffnen(); });
 $liste.addEventListener("click", (e) => { const z = e.target.closest(".ort-reihe"); if(z) detailOeffnen(z.dataset.id); });
