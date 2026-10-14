@@ -50,6 +50,8 @@ interface BoardState {
   qrSvg: string;
   /** Anzeige ohne gültigen Anzeige-Link: Hinweis für die Widgets der Anzeige, sonst null */
   zugangHinweis: string | null;
+  /** Angemeldete Anzeige, Board gerade nicht erreichbar: Sie versucht es weiter (statt Beispielkarten) */
+  nichtErreichbar: boolean;
   /** Ohne Token als Anzeige, mit Token als Steuerung */
   starten: (optionen?: { token?: string }) => () => void;
   /** Reihen der eigenen Fläche ans Board melden (nur am Board) */
@@ -117,6 +119,7 @@ export const useBoardStore = create<BoardState>((set, get) => ({
   beitritt: null,
   qrSvg: "",
   zugangHinweis: null,
+  nichtErreichbar: false,
 
   starten: (optionen = {}) => {
     let aus = false;
@@ -180,6 +183,9 @@ export const useBoardStore = create<BoardState>((set, get) => ({
           if (n?.art !== "geaendert") return;
           // Konten und Dashboard-Zugänge (Bauplan „Anmeldung“) zeigt die Anzeige nicht; Layout und Anzeigen betreffen keine Karte
           if (n.bereich === "konten" || n.bereich === "zugaenge") return;
+          // Layout einer anderen Anzeige (Sitzung, Anordnen) geht diese Anzeige nichts an
+          const eigene = get().anzeige?.id;
+          if (n.bereich === "layout" && !token && n.anzeigeId && eigene && n.anzeigeId !== eigene) return;
           if (n.bereich === "layout" || n.bereich === "anzeigen") void layoutLaden();
           else geaendert();
         } catch { /* keine JSON-Nachricht */ }
@@ -196,19 +202,27 @@ export const useBoardStore = create<BoardState>((set, get) => ({
       };
     };
 
-    void boardDa().then(async (da) => {
+    const boardPruefen = (versuch = 0) => void boardDa().then(async (da) => {
       if (aus) return;
       // Anzeige ganz ohne Zugang: am Board anmelden (Zugangs-Code), statt leerer Widgets
       if (da && !token && !zugang) return zumDashboardLogin();
+      // Angemeldete Anzeige (Fernseher), Board gerade weg (Pi startet neu, Router, Tunnel): weiter versuchen,
+      // bis 30 s zwischen den Versuchen. Beispielkarten gibt es nur ohne Zugang (Entwicklung mit npm run dev).
+      if (!da && zugang) {
+        set({ nichtErreichbar: true });
+        warten = setTimeout(() => boardPruefen(versuch + 1), Math.min(30_000, 2000 * 2 ** versuch));
+        return;
+      }
       if (da && !token) await layoutLaden();   // erst das Layout, dann den Modus – kein Aufblitzen des lokalen Layouts
       if (!da) {
         set({ modus: "beispiel", zustand: beispielZustand(), teilnehmer: BEISPIEL_TEILNEHMER, beitritt: BEISPIEL_BEITRITT, qrSvg: BEISPIEL_QR });
         return;
       }
-      set({ modus: "board" });
+      set({ modus: "board", nichtErreichbar: false });
       void beitrittLaden();
       verbinden();
     });
+    boardPruefen();
 
     return () => {
       aus = true;
@@ -241,7 +255,7 @@ export const useBoardStore = create<BoardState>((set, get) => ({
     return jsonLaden<WidgetAntwort>(adresse(`/api/widgets/${encodeURIComponent(typ)}`, parameter),
       (status) => {
         if (mitToken(get().zugang) && TOKEN_REICHT_NICHT.has(status)) zumDashboardLogin();
-        return { karte: null, hinweis: fehlerHinweis(status, get().zugang) };
+        return { karte: null, hinweis: fehlerHinweis(status, get().zugang), ...(status === 0 ? { netzFehler: true } : {}) };
       }, get().token);
   },
 

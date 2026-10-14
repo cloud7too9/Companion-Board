@@ -60,7 +60,7 @@ function Zeile({ o, jetzt }: { o: Ort; jetzt: number }) {
  */
 export function OrteWidget({ gross = false }: { gross?: boolean }) {
   const zustand = useBoardStore((s) => s.zustand);
-  const jetzt = useJetzt();
+  const jetzt = useJetzt(5000);   // „Neu“ (90 s) – alle 5 Sekunden reicht
   const orte = useMemo(() => zustand?.orte ?? [], [zustand]);
   const angeheftet = useMemo(() => orte.filter((o) => o.angeheftet).sort(sortieren).slice(0, MAX_ANGEHEFTET), [orte]);
   const angeheftetIds = new Set(angeheftet.map((o) => o.id));

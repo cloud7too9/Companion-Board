@@ -15,7 +15,7 @@ const LOKALE_WIDGETS: Record<string, (p: { gross: boolean }) => JSX.Element> = {
   "board.zuletzt": () => <ZuletztWidget />,
 };
 
-export const istLokalesWidget = (typ: string) => Object.hasOwn(LOKALE_WIDGETS, typ);
+export const istLokalesWidget = (typ: string) => Object.prototype.hasOwnProperty.call(LOKALE_WIDGETS, typ);
 
 export function LokalesWidget({ typ, gross = false }: { typ: string; gross?: boolean }) {
   const Komponente = LOKALE_WIDGETS[typ];

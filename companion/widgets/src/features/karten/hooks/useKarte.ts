@@ -16,7 +16,8 @@ export function useKarte(typ: string, quelle?: string): WidgetAntwort | null {
     if (modus === "pruefen" || !typ) return;
     let aktuell = true;
     // Beim Neuladen bleibt die alte Karte stehen, bis die neue da ist (kein Flackern)
-    void karteLaden(typ, quelle).then((a) => { if (aktuell) setAntwort(a); });
+    // Kurz kein Netz: die letzte Karte bleibt stehen statt „Board nicht erreichbar“
+    void karteLaden(typ, quelle).then((a) => { if (aktuell) setAntwort((alt) => (a.netzFehler && alt?.karte ? alt : a)); });
     return () => { aktuell = false; };
   }, [modus, version, typ, quelle, karteLaden]);
 

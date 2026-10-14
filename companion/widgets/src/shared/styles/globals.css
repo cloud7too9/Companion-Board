@@ -10,6 +10,13 @@ body,
   height: 100%;
 }
 
+/* Volle Fensterhöhe: 100dvh, wo der Browser es kennt (Handy mit einblendender Adressleiste), sonst 100vh
+   (ältere Browser am Fernseher ignorieren 100dvh – mit h-dvh allein hätte die Seite dort keine Höhe) */
+.hoehe-voll {
+  height: 100vh;
+  height: 100dvh;
+}
+
 /* Die Seite scrollt nie. Auch Gummiband-Effekt und Pull-to-Refresh sind aus,
    damit Gesten auf der Fläche nicht mit dem Browser kollidieren. */
 html,

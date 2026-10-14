@@ -7,7 +7,7 @@ import { kurzSeed, useJetzt } from "../../anzeige/lib/anzeige-hilfen";
 
 /** Uhr der Anzeige (Stunden:Minuten), wie auf der alten Anzeige */
 function Uhr() {
-  const jetzt = useJetzt();
+  const jetzt = useJetzt(5000);   // zeigt nur Stunden und Minuten
   return (
     <span className="tabular-nums text-sm font-semibold sm:text-base" data-testid="uhr">
       {new Date(jetzt).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
@@ -38,6 +38,7 @@ export function WorkspaceHeader() {
   const nurAnzeige = useWorkspaceStore((s) => s.nurAnzeige);
   const zustand = useBoardStore((s) => s.zustand);
   const verbunden = useBoardStore((s) => s.verbunden);
+  const nichtErreichbar = useBoardStore((s) => s.nichtErreichbar);
 
   // Jede Bildschirmgröße zeigt dasselbe Raster mit 32 Spalten – Bearbeiten
   // geht überall, per Knopf oder langem Drücken auf die Kopfzeile. Am Board
@@ -89,6 +90,15 @@ export function WorkspaceHeader() {
               data-testid="beispielkarten"
             >
               Beispielkarten
+            </span>
+          )}
+          {nichtErreichbar && (
+            <span
+              className="rounded-full border border-border px-2 py-0.5 text-[11px] leading-4 text-text-muted"
+              title="Das Board antwortet gerade nicht – die Anzeige versucht es weiter"
+              data-testid="nicht-erreichbar"
+            >
+              Board nicht erreichbar · neuer Versuch läuft
             </span>
           )}
         </div>

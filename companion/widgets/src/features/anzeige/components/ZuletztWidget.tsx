@@ -7,7 +7,7 @@ const ANZAHL = 8;
 /** „Zuletzt gespeichert“: die neuesten Orte mit Urheber und Zeit (Bauplan „Sitzung“, S3) */
 export function ZuletztWidget() {
   const zustand = useBoardStore((s) => s.zustand);
-  const jetzt = useJetzt();
+  const jetzt = useJetzt(15_000);   // „vor x Min.“ – alle 15 Sekunden reicht
   const neueste = useMemo(() => [...(zustand?.orte ?? [])].sort((a, b) => b.erstelltAm.localeCompare(a.erstelltAm)).slice(0, ANZAHL), [zustand]);
   if (!zustand) return <p className="text-sm text-text-muted" data-testid="widget-laedt">Lädt …</p>;
   if (neueste.length === 0) return <p className="flex h-full items-center justify-center text-sm text-text-muted" data-testid="zuletzt-leer">Noch nichts gespeichert</p>;

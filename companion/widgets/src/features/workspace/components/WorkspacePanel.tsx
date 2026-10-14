@@ -7,6 +7,7 @@ import { WidgetInhalt } from "./WidgetInhalt";
 import { PanelToolbar } from "./PanelToolbar";
 import { WidgetGehaeuse } from "./WidgetGehaeuse";
 import { useKarte } from "../../karten/hooks/useKarte";
+import { Fehlergrenze, WIDGET_FEHLER } from "../../../shared/ui/Fehlergrenze";
 import { LokalesWidget, istLokalesWidget } from "../../anzeige/lokale-widgets";
 
 interface Props {
@@ -91,7 +92,11 @@ export function WorkspacePanel({
           </>
         )}
       >
-        {leer ? undefined : lokal ? <LokalesWidget typ={item.typ} /> : <WidgetInhalt instanz={item} antwort={antwort} />}
+        {leer ? undefined : (
+          <Fehlergrenze ersatz={WIDGET_FEHLER} neuVersuchen={antwort}>
+            {lokal ? <LokalesWidget typ={item.typ} /> : <WidgetInhalt instanz={item} antwort={antwort} />}
+          </Fehlergrenze>
+        )}
       </WidgetGehaeuse>
       {arrangeable && (
         <div
