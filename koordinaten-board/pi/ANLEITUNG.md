@@ -149,6 +149,16 @@ Nach dem Merge baut Netlify die Anmeldeseite unter `/`; am Pi einmal das **Updat
 3. Das Handy über eine halbe Stunde liegen lassen (oder die App ganz schließen) und wieder öffnen: „Hallo, … Bitte bestätige mit deiner PIN.“ Mit „PIN vergessen?“ lässt sie sich mit dem Passwort neu setzen; ein anderes Gerät desselben Kontos fragt danach nach der neuen PIN.
 4. Flugmodus, über 30 Minuten nach dem letzten Kontakt: Die App fragt auch ohne Netz nach der PIN. Wieder online geht es ohne zweite Abfrage weiter.
 
+## Probe des Dashboard-Logins (Bauplan „Anmeldung“, L5, Haltepunkt H16)
+
+Nach dem Merge baut Netlify Anmeldeseite und Dashboard neu; am Pi einmal das **Update** (oben) ausführen.
+
+1. In der Companion Board → „Anzeige-Gerät anmelden“: Gültigkeit wählen (Standard 20 Minuten), Dashboard-PIN zweimal, „Code generieren“. Der Code steht groß darüber.
+2. Am Fernseher oder Tablet `https://mainhubv1.com/` öffnen → Reiter „Dashboard-Login“ → Code (Groß- und Kleinschreibung zählt) → Dashboard-PIN → Layout wählen → „Anzeige starten“. Neu laden geht ohne Code.
+3. Ein zweites Gerät mit demselben Code und demselben Layout: Es bekommt eine eigene Kopie („Board 2“) mit eigenem Raster. Angeordnet wird sie in der Companion unter Board → Anzeigen.
+4. Das Gerät über eine Viertelstunde ohne Verbindung (WLAN aus): Danach fragt es nach der Dashboard-PIN.
+5. In der Companion unter „Erzeugte Codes“ zweimal „Widerrufen“: Alle Anzeigen des Codes landen wieder beim Dashboard-Login.
+
 ## Aufräumen nach der Probe (Phase 6, Umbauplan): erledigt
 
 Am 13.10.2026 entfernt (E18): `netzwerk.js`, das Adress-Lernen (`adresse.txt`), `start.bat`, `start.sh`, `anzeige-oeffnen.bat` und die Firewall-Skripte. Der Server nimmt die Adresse für QR-Code und Anzeige-Link nur noch aus `OEFFENTLICHE_URL` (auf dem Pi gesetzt); ohne sie gilt `http://localhost:<PORT>` für die Entwicklung.

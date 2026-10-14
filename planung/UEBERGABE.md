@@ -16,11 +16,11 @@
   - aus Strang B die Phasen **B1** (Datenmodell) und **B2** (Accounts mit PIN)
   - der **Umbau auf Netlify + Raspberry Pi** (Phasen 1–6, in Betrieb unter `mainhubv1.com` seit 13.10.2026; Plan im Archiv: `docs/plaene/UMBAUPLAN.md`, Einrichtung: `koordinaten-board/pi/ANLEITUNG.md`)
   - der **Bauplan „Sitzung“** (S1–S4, 13.10.2026): [`bauplaene/Bauplan-Sitzung.md`](bauplaene/Bauplan-Sitzung.md). **Das Widget-Dashboard ist die einzige Anzeige**, „Aufs Board“ legt ein Widget in die Sitzung der Anzeige, `/anzeige` leitet auf `/dashboard/` um.
-  - aus dem **Bauplan „Anmeldung und Dashboard-Zugang“** die Phasen **L1–L4** (14.10.2026): [`bauplaene/Bauplan-Anmeldung-und-Dashboard-Zugang.md`](bauplaene/Bauplan-Anmeldung-und-Dashboard-Zugang.md). **Unter `/` liegt die Anmeldeseite**, die Companion unter `/app/` (lokal wie auf Netlify). Konten mit Passwort und PIN, Freigabe neuer Konten, PIN nach über 30 Minuten ohne Kontakt; die Board-PIN ist weg. Am Server gibt es Dashboard-Zugänge mit Zugangs-Code und Dashboard-PIN (L4, noch ohne Oberfläche).
+  - aus dem **Bauplan „Anmeldung und Dashboard-Zugang“** die Phasen **L1–L5** (14.10.2026): [`bauplaene/Bauplan-Anmeldung-und-Dashboard-Zugang.md`](bauplaene/Bauplan-Anmeldung-und-Dashboard-Zugang.md). **Unter `/` liegt die Anmeldeseite**, die Companion unter `/app/` (lokal wie auf Netlify). Konten mit Passwort und PIN, Freigabe neuer Konten, PIN nach über 30 Minuten ohne Kontakt; die Board-PIN ist weg. Anzeige-Geräte melden sich auf der Anmeldeseite unter „Dashboard-Login“ mit Zugangs-Code und Dashboard-PIN an (L4, L5); den Code erzeugt die Companion im Board-Sheet. Layout und Raster gehören dem Gerät (AN4).
   - **CI auf GitHub:** Bei jedem PR und jedem Push auf `main` laufen alle Tests (Kapitel 6)
   - **Nur Bedrock (E15):** Java gibt es nirgendwo mehr
 - **Als Nächstes** (Kapitel 9):
-  0. **Anmeldung:** ⏸ **H15** (Max meldet sich nach dem Pi-Update am Handy an, Screenshots `a1`–`a8`). **L4** (Dashboard-Zugänge am Server) ist gebaut; **L5** (Oberfläche dazu) wartet auf **AN4** (gleiches Layout auf verschieden großen Geräten). Danach L6 (Anzeige-Link abbauen).
+  0. **Anmeldung:** ⏸ **H15** (Max meldet sich nach dem Pi-Update am Handy an, Screenshots `a1`–`a8`) und ⏸ **H16** (TV bzw. Tablet mit Code anmelden, Screenshots `d1`–`d7`). L1–L5 sind gebaut, als Nächstes **L6** (Anzeige-Link mit Schlüssel abbauen).
   1. ⏸ **H10**: Probe nach dem Umschalten auf das Dashboard (Max, `koordinaten-board/pi/ANLEITUNG.md`). Danach wandert auch der Bauplan „Sitzung“ ins Archiv.
   2. **Offline:** **B3 gebaut** (13.10.2026): live ohne Netz aus dem Spiegel in IndexedDB, Nachladen über `/api/aenderungen`; ⏸ H14 am iPhone im Flugmodus. Als Nächstes B4 und B5 (Nachtrag im Offline-Bauplan).
   3. A7 (Größenstufen je Widget): Planungsrunde mit Max
@@ -48,6 +48,7 @@
 | **B2** Accounts mit PIN | **Abgelöst durch L1–L3** (14.10.2026). Geblieben: Das Token ist der **Geräteschlüssel**, `werBistDu()` gekapselt an Board und Companion, PIN nur als **scrypt-Hash**. | Board `identitaet.js`, Companion `IDENTITAET` |
 | **L1–L3** Anmeldung | Konten mit echtem Namen, Anzeigename, Passwort und PIN; neue Konten warten auf Freigabe (das erste gilt sofort, ⚠ AN14). Anmeldeseite unter `/` (Registrieren, Willkommenskarte, PIN-Sperre, PIN zurücksetzen). Server: 403 für wartende Konten, 423 „PIN nötig“ nach über 30 Minuten ohne Kontakt oder PIN-Wechsel; Kontakt zählen auch die Pongs auf `/ws`. Companion: Konten im Board-Sheet, Offline-Sperre mit lokalem PIN-Hash. Board-PIN abgebaut. ⏸ H15. | Board `identitaet.js`, `server.js` (Hook), `daten.js` (`kontenUmstellen`), `companion/anmeldung.html`, `regeln.js` (Anmeldung, lokaler PIN-Hash) |
 | **L4** Dashboard-Zugänge | Ein Konto erzeugt einen Zugangs-Code (5 Zeichen, 20 Min. … dauerhaft) mit Dashboard-PIN; das Anzeige-Gerät tauscht Code → Ticket → Anzeige-Token und wählt ein Layout. Mit dem Token liest es `/api/anzeige/*`, `/api/widgets/*` und `/ws`. Nach über 15 Minuten ohne Kontakt 423 bzw. 4023, widerrufen schließt mit 4003. Noch ohne Oberfläche (L5). | Board `dashboard-zugang.js`, `signatur.js`, `server.js` (`anzeigeZugang`, `/api/dashboard/…`) |
+| **L5** Dashboard-Login | Anmeldeseite: Reiter „Dashboard-Login“ (Code, Dashboard-PIN, Layout wählen). Companion: „Anzeige-Gerät anmelden“ im Board-Sheet (Code generieren, Erzeugte Codes, Widerrufen). Dashboard liest den Anzeige-Token und schickt ohne Zugang zur Anmeldeseite. **AN4:** jedes Gerät hat seine eigene Anzeige, ein zweites Gerät auf demselben Layout bekommt eine Kopie. ⏸ H16. | `companion/anmeldung.html`, `companion-prototyp.html` (`boardZugaengeHtml`), `widgets/…/lib/zugang.ts`, Board `dashboard-zugang.js` (`layoutWaehlen`), `daten.js` (`anzeigeKopieren`) |
 | **E15** Nur Bedrock | Portal-Prüfung mit festem Suchradius ±128 (`PORTAL_SUCHRADIUS`), kein Umschalter, kein `edition` mehr im Kontext der Karten. Der Welt-Import weist Java-Welten mit klarer Meldung ab. | `companion/board-karten.js`, Portal-Verwaltung in `companion-prototyp.html` |
 | **CI** | Drei Jobs bei jedem PR und Push auf `main`, Screenshots als Download „bilder“ | `.github/workflows/tests.yml` |
 | **B3–B5** Offline | **B3 gebaut** (13.10.2026): `betriebErkennen` → live, getrennt oder demo; `api()` spiegelt GET-Antworten in IndexedDB und antwortet offline daraus; Server `GET /api/aenderungen`, `nr`/`lauf` in `geaendert`, `stand` beim Verbinden; ⏸ H14. B4 und B5 nicht gebaut. N5 ist hinfällig (HTTPS über Netlify/Cloudflare). | `companion/sw.js`, `companion-prototyp.html` (Abschnitt Offline), `server.js` |
@@ -160,7 +161,7 @@ Voraussetzungen für die Playwright-Tests:
 ## 8. Was auf Max wartet (Details in `WARTELISTE.md`)
 
 - **Pi-Update nach dem Merge der Anmeldung**, danach sofort am Handy registrieren (das erste Konto gilt ohne Freigabe) und **H15** (Anmeldung am Handy).
-- **AN4:** gleiches Layout auf verschieden großen Anzeige-Geräten (blockiert L5).
+- **H16:** Dashboard-Login am TV oder Tablet (nach dem Pi-Update).
 - **H10:** Probe nach dem Umschalten auf das Dashboard.
 - **H11:** Weltordner am iPhone wählen (Welt-Import, W0).
 - **H13:** Welt-Funde am iPhone übernehmen (W2).
@@ -178,7 +179,7 @@ Voraussetzungen für die Playwright-Tests:
 
 ## 9. Nächste Schritte
 
-0. **Anmeldung** (Bauplan „Anmeldung und Dashboard-Zugang“): L1–L4 gebaut, ⏸ **H15**. Weiter mit **L5** (Dashboard-Login und „Code generieren“, wartet auf AN4) und **L6** (Anzeige-Link mit Schlüssel abbauen).
+0. **Anmeldung** (Bauplan „Anmeldung und Dashboard-Zugang“): L1–L5 gebaut, ⏸ **H15**, ⏸ **H16**. Weiter mit **L6** (Anzeige-Link mit Schlüssel abbauen: `?anzeige=…&schluessel=…`, Abschnitt „Anzeige-Link“ im Board-Sheet, `anzeige-link.txt`, Tests darauf umstellen).
 1. ⏸ **H10** (Max): Probe nach dem Umschalten, Schritte in `koordinaten-board/pi/ANLEITUNG.md`. Kommt dabei etwas zurück, gehört es in den Bauplan „Sitzung“. Danach zieht der Bauplan nach `docs/bauplaene/`.
 2. **Offline B3–B5** auf `bereich/offline`, neu zugeschnitten am 13.10.2026 (N5 hinfällig, HTTPS und Service Worker sind da; Einzelheiten im Nachtrag von `bauplaene/Bauplan-Offline-Sync-und-Identitaet.md`):
    - **B3 gebaut** (13.10.2026): Live-Modus ohne Netz statt DEMO-Rückfall, Spiegel in IndexedDB (in `api()`), Server `GET /api/aenderungen?seit=<nr>&lauf=` plus `nr`/`lauf` in `geaendert`, Nachladen nach Wiederverbinden, Playwright offline mit Daten (`netlify.test.mjs`).

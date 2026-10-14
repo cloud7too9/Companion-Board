@@ -10,6 +10,7 @@ Seit dem 14.10.2026 mergt Claude ohne Rückfrage, sobald die CI grün ist (Max: 
 
 | PR | Inhalt |
 |---|---|
+| #27 | Anmeldung L5: Dashboard-Login auf der Anmeldeseite (Code, Dashboard-PIN, Layout wählen), „Anzeige-Gerät anmelden“ im Board-Sheet (Code generieren, Widerrufen), Dashboard mit Anzeige-Token; **AN4** (Max): Layout und Raster je Gerät, ein zweites Gerät bekommt eine Kopie; `dashboard-login.test.mjs` (⏸ H16) |
 | #26 | Anmeldung L4: Dashboard-Zugänge am Server (`dashboard-zugang.js`) – Zugangs-Code mit Dashboard-PIN, Code → Ticket → Anzeige-Token, Layout wählen, 15-Minuten-Regel, Widerrufen meldet ab; Anzeige-Token neben dem Anzeige-Link für `/api/anzeige/*`, `/api/widgets/*` und `/ws`; `signatur.js` für alle Tokens. Noch ohne Oberfläche (L5 wartet auf AN4) |
 | #25 | Anmeldung L1–L3: Konten mit Passwort und PIN, Freigabe neuer Konten, PIN nach über 30 Minuten ohne Kontakt (Hook 403/423, Pongs als Herzschlag), Anmeldeseite unter `/`, Companion unter `/app/`, Offline-Sperre mit lokalem PIN-Hash, Board-PIN abgebaut; alle Tests auf Konten umgestellt, `anmeldung.test.mjs` (⏸ H15) |
 | #24 | W4: Strukturbereiche aus Chunk-Tag 119 (AABBVolumes) + Entscheidungen zur Anmeldung (andere Sitzung) |

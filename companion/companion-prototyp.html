@@ -652,6 +652,10 @@ select.orte-eingabe { padding-right:34px;
   border-top:1px solid var(--border-soft); transition:background .45s ease; }
 .sheet-fuss .btn-primary { flex:1; }
 .knopf-raster { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+/* Dashboard-Zugänge: neuer Code groß, Liste der erzeugten Codes */
+.code-gross { font-family:var(--mono); font-size:38px; font-weight:700; letter-spacing:.18em; color:var(--text); margin:4px 0 2px; }
+.zugang-form { display:flex; flex-direction:column; gap:10px; }
+.zugang-code { font-family:var(--mono); letter-spacing:.12em; }
 .anzeige-anordnen { width:100%; margin-bottom:8px; }
 .konto-zeile { display:flex; flex-direction:row; align-items:center; justify-content:space-between; gap:10px; text-align:left; }
 .konto-zeile .text { flex:1; min-width:0; }
@@ -1463,6 +1467,9 @@ function koordinatenErkennen(text){
    GET    /konten      → { konten:[{ id, anzeigename, echterName, freigegebenAm, freigegebenVon }] }
    POST   /konten/:id/freigeben → { konto }      DELETE /konten/:id → { ok:true } (nur wartende)
    POST   /abmelden    → { ok:true }   (das Gerät vergisst das Board)
+   GET    /dashboard/zugaenge → { zugaenge:[{ id, code, gueltigBis, gueltig, von, anzeigen }] }
+   POST   /dashboard/zugaenge { minuten|null, pin } → { id, code, gueltigBis }   (Code für ein Anzeige-Gerät)
+   DELETE /dashboard/zugaenge/:id → { ok:true, abgemeldet }   (meldet alle Anzeigen des Codes ab)
    401 = nicht angemeldet, 423 = PIN nötig, 403 { error:"freigabe" } = Konto wartet → Anmeldeseite.
    Umsetzung: koordinaten-board/server/src/companion-api.js + identitaet.js + daten.js,
    geprüft mit denselben Regeln aus regeln.js.
@@ -3817,6 +3824,8 @@ const bd = {
   ich: null,                                 // Live: { id, anzeigename, rolle } aus IDENTITAET.werBistDu()
   konten: null,                              // Live: alle Konten [{ id, anzeigename, echterName, freigegebenAm, freigegebenVon }]
   kontoFrage: null,                          // „Wirklich ablehnen?“ für diese Konto-ID
+  zugaenge: null,                            // Live: Codes für Anzeige-Geräte [{ id, code, gueltigBis, gueltig, von, anzeigen }]
+  neuerCode: null, zugangFrage: null,        // gerade erzeugter Code { code, gueltigBis }, „Wirklich widerrufen?“
   kontaktGemerkt: 0,                         // zuletzt in „board.kontakt“ geschrieben (ms)
   weg: false,                                // schon unterwegs zur Anmeldeseite
   offen: new Map(), zaehler: 0,              // gesendete Nachrichten, die auf „ok“ warten
@@ -3957,6 +3966,70 @@ async function kontoAblehnen(id){
   toast("Konto abgelehnt");
   boardKontenLaden();
 }
+// --- Dashboard-Zugänge: Code für ein Anzeige-Gerät (Bauplan „Anmeldung“, L5, AN7) -------
+/* Am TV oder Tablet auf der Anmeldeseite unter „Dashboard-Login“: Code, Dashboard-PIN, Layout wählen.
+   Ein abgelaufener Code schaltet keine neuen Geräte frei; Widerrufen meldet alle seine Anzeigen ab. */
+const GUELTIGKEIT_NAMEN = { 5:"5 Minuten", 20:"20 Minuten", 60:"1 Stunde", 1440:"1 Tag" };
+const gueltigkeitName = (m) => m === null ? "Dauerhaft" : GUELTIGKEIT_NAMEN[m] ?? `${m} Minuten`;
+const uhrzeitVon = (iso) => new Date(iso).toLocaleTimeString("de-DE", { hour:"2-digit", minute:"2-digit" });
+function zugangGueltigText(z){
+  if(z.gueltigBis === null) return "Dauerhaft gültig";
+  const rest = Math.round((Date.parse(z.gueltigBis) - Date.now()) / 60000);
+  if(rest <= 0) return `Abgelaufen um ${uhrzeitVon(z.gueltigBis)}`;
+  return `Gültig bis ${uhrzeitVon(z.gueltigBis)} (noch ${rest < 120 ? `${rest} Min.` : `${Math.round(rest / 60)} Std.`})`;
+}
+async function boardZugaengeLaden(){
+  if(DEMO.enabled || !bd.verbindung) return;
+  const r = await api("/dashboard/zugaenge");
+  if(r.ok){ bd.zugaenge = r.data.zugaenge; boardAnzeigen(); }
+}
+function boardZugaengeHtml(){
+  if(DEMO.enabled || !bd.zugaenge) return "";
+  const neu = bd.neuerCode, wahl = bd.zugangWahl ?? String(GUELTIGKEITEN[0]);
+  return `<div class="field-group"><div class="field-group-label">Anzeige-Gerät anmelden</div>
+    ${neu ? `<div class="result-card" role="status" data-neuer-code>
+        <div class="result-label">Zugangs-Code</div>
+        <div class="code-gross">${esc(neu.code)}</div>
+        <div class="card-meta">${esc(zugangGueltigText(neu))} · am TV oder Tablet auf der Anmeldeseite unter „Dashboard-Login“ eingeben</div>
+      </div>` : ""}
+    <div class="card zugang-form">
+      <label class="field"><span class="field-label">Code gültig</span>
+        <select class="orte-eingabe" id="zugGueltig">${GUELTIGKEITEN.map((m) => `<option value="${m ?? "dauerhaft"}" ${String(m ?? "dauerhaft") === wahl ? "selected" : ""}>${gueltigkeitName(m)}</option>`).join("")}</select></label>
+      <label class="field"><span class="field-label">Dashboard-PIN</span>
+        <input class="orte-eingabe mono" id="zugPin" type="password" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="4 bis 8 Ziffern"></label>
+      <label class="field"><span class="field-label">Dashboard-PIN wiederholen</span>
+        <input class="orte-eingabe mono" id="zugPin2" type="password" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="4 bis 8 Ziffern"></label>
+      <button class="btn-primary" data-aktion="zugang-erzeugen">Code generieren</button>
+      <div class="result-hint">Die Anzeige fragt die Dashboard-PIN beim Anmelden und nach über ${OFFLINE_MINUTEN.anzeige} Minuten ohne Verbindung. Sie hat nichts mit deiner eigenen PIN zu tun. Ein abgelaufener Code schaltet keine neuen Geräte mehr frei, angemeldete laufen weiter.</div>
+    </div>
+    ${bd.zugaenge.length ? `<div class="field-group-label">Erzeugte Codes</div>
+      <div class="list-stack">${bd.zugaenge.map((z) => `<div class="card konto-zeile" data-zugang="${esc(z.id)}">
+        <span class="text"><span class="card-title zugang-code">${esc(z.code)}</span>
+          <span class="card-meta" style="display:block">${esc(zugangGueltigText(z))} · ${z.anzeigen} ${z.anzeigen === 1 ? "Anzeige" : "Anzeigen"} · von ${esc(z.von)}</span></span>
+        <span class="knopf-reihe"><button class="btn-secondary" data-aktion="zugang-widerrufen" data-id="${esc(z.id)}">${bd.zugangFrage === z.id ? "Wirklich?" : "Widerrufen"}</button></span>
+      </div>`).join("")}</div>
+      <div class="result-hint">Widerrufen meldet alle Anzeigen ab, die mit diesem Code angemeldet sind.</div>` : ""}
+  </div>`;
+}
+async function zugangErzeugen(){
+  const wert = (id) => document.getElementById(id)?.value ?? "";
+  const pin = wert("zugPin"), g = wert("zugGueltig");
+  if(!KONTO_PIN.test(pin)) return toast("Die Dashboard-PIN hat 4 bis 8 Ziffern", true);
+  if(pin !== wert("zugPin2")) return toast("Die beiden PINs sind verschieden", true);
+  const r = await api("/dashboard/zugaenge", { method:"POST", body:JSON.stringify({ minuten:g === "dauerhaft" ? null : Number(g), pin }) });
+  if(!r.ok) return toast(meldungAus(r), true);
+  bd.neuerCode = r.data;
+  await boardZugaengeLaden();
+  boardSheetRendern();   // auch, wenn die Liste nicht neu kam: PIN-Felder leeren, Code zeigen
+}
+async function zugangWiderrufen(id){
+  bd.zugangFrage = null;
+  const r = await api(`/dashboard/zugaenge/${encodeURIComponent(id)}`, { method:"DELETE" });
+  if(!r.ok) return toast(meldungAus(r), true);
+  if(bd.neuerCode?.id === id) bd.neuerCode = null;
+  toast(r.data.abgemeldet ? `Code widerrufen – ${r.data.abgemeldet === 1 ? "eine Anzeige" : `${r.data.abgemeldet} Anzeigen`} abgemeldet` : "Code widerrufen");
+  boardZugaengeLaden();
+}
 /** Auf diesem Gerät abmelden: das Board vergisst das Gerät, hier bleibt nichts vom Konto */
 async function boardAbmelden(){
   if(!DEMO.enabled && bd.verbindung) await api("/abmelden", { method:"POST" }).catch(() => {});
@@ -3973,6 +4046,7 @@ async function liveAktualisieren({ bereich, weltId }){
   if(bereich === "anzeigen"){ await boardAnzeigenLaden(); return boardSitzungLaden(); }   // Liste frisch, danach die Sitzung der ersten Anzeige
   if(bereich === "layout") return boardSitzungLaden();
   if(bereich === "konten") return bd.konten ? boardKontenLaden() : undefined;
+  if(bereich === "zugaenge") return bd.zugaenge ? boardZugaengeLaden() : undefined;
   if(bereich === "welten"){ await weltenAuffrischen(); return boardEinstellungenLaden(); }
   if(weltId && weltId !== st.weltId) return weltenAuffrischen();
   if(bereich === "orte") return orteAuffrischen();
@@ -4185,13 +4259,14 @@ function boardAnzeigen(){
   boardZeigenKnoepfe();
   // Formular nicht neu zeichnen (Eingaben blieben sonst nicht stehen) – nur die Status-Ansicht,
   // und die auch nicht, solange jemand den Titel der Anzeige tippt
-  if(st.sheet === "board" && bd.verbindung && !["boardTitel", "anzeigeNeu", "anzeigeName"].includes(document.activeElement?.id)) boardSheetRendern();
+  if(st.sheet === "board" && bd.verbindung && !["boardTitel", "anzeigeNeu", "anzeigeName", "zugGueltig", "zugPin", "zugPin2"].includes(document.activeElement?.id)) boardSheetRendern();
 }
 function boardOeffnen(){
   alleSchliessen();
   boardSheetRendern();
   boardEinstellungenLaden();
   boardAnzeigenLaden();
+  boardZugaengeLaden();
   boardKontenLaden();
 }
 
@@ -4289,6 +4364,7 @@ function boardSheetRendern(){
       </div>
       ${boardEinstellungenHtml()}
       ${boardAnzeigenHtml()}
+      ${boardZugaengeHtml()}
       ${boardKontenHtml()}
       <div class="field-group"><div class="field-group-label">Auf der Anzeige</div>
         ${bd.sitzung?.instanzen.length ? `<div class="list-stack">${bd.sitzung.instanzen.map((i) => `<div class="card board-gezeigt" style="flex-direction:row" data-instanz="${esc(i.id)}">
@@ -5542,6 +5618,11 @@ $sheet.addEventListener("click", async (e) => {
     case "konto-ablehnen":
       if(bd.kontoFrage !== id){ bd.kontoFrage = id; boardSheetRendern(); break; }
       kontoAblehnen(id); break;
+    case "zugang-erzeugen": zugangErzeugen(); break;
+    case "zugang-widerrufen":
+      // Zweimal tippen – alle damit angemeldeten Anzeigen fliegen raus
+      if(bd.zugangFrage !== id){ bd.zugangFrage = id; a.textContent = "Wirklich?"; return; }
+      zugangWiderrufen(id); break;
     case "board-zeigen": boardZeigen(a.dataset.boardQuelle); break;
     case "board-qr": boardEinstellungenAendern({ qrZeigen:!bd.einstellungen?.qrZeigen }); break;
     case "anheften": {
@@ -5603,6 +5684,8 @@ $sheet.addEventListener("input", (e) => {
     return;
   }
   if(t.id === "formNeu"){ form.neu = t.value; return; }
+  if(t.id === "zugGueltig"){ bd.zugangWahl = t.value; return; }
+  if(t.id === "zugPin" || t.id === "zugPin2"){ t.value = t.value.replace(/\D/g, ""); return; }
   if(t.id === "formEinfuegen" || t.id === "standortEinfuegen"){
     const k = koordinatenErkennen(t.value); if(!k) return;
     const p = t.id === "formEinfuegen" ? "f" : "s";

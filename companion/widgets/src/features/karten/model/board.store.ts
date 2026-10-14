@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { QuellenAntwort, WidgetAntwort } from "../karte.types";
 import { mockKarte, mockQuellen } from "../lib/mock-karten";
-import { zugangHolen, zugangParameter, type Zugang } from "../lib/zugang";
+import { mitToken, zugangHolen, zugangParameter, type Zugang } from "../lib/zugang";
 import { apiUrl, wsUrl } from "../lib/api";
 import type { Beitritt, BoardZustand } from "../../anzeige/anzeige.types";
 import { BEISPIEL_BEITRITT, BEISPIEL_QR, BEISPIEL_TEILNEHMER, beispielZustand } from "../../anzeige/lib/beispiel-zustand";
@@ -10,7 +10,7 @@ import { BEISPIEL_BEITRITT, BEISPIEL_QR, BEISPIEL_TEILNEHMER, beispielZustand } 
  * Verbindung des Dashboards zum Board-Server.
  * - „board“: Karten von GET /api/widgets/:typ, nach jedem `geaendert` über /ws lädt alles neu.
  * - „beispiel“: kein Board erreichbar (z. B. `npm run dev` allein) → feste Beispielkarten.
- * Zwei Rollen: die **Anzeige** (nur mit Anzeige-Link; liest ihr Layout, meldet ihre Reihen)
+ * Zwei Rollen: die **Anzeige** (mit Anzeige-Token vom Dashboard-Login oder Anzeige-Link; liest ihr Layout, meldet ihre Reihen)
  * und die **Steuerung** am Handy („Anzeige anordnen“, angemeldet mit dem Token der Companion).
  * Für die Widgets der Anzeige (Bauplan „Sitzung“, S3) hält der Store außerdem `zustand` und
  * `teilnehmer` vom /ws sowie Beitritt und QR-Code (GET /api/anzeige, /api/anzeige/qr).
@@ -28,7 +28,7 @@ interface BoardState {
   /** steigt bei jeder Änderung am Board – Widgets laden dann ihre Karte neu */
   version: number;
   zugang: Zugang | null;
-  /** Welche Anzeige dieses Gerät ist (aus dem Anzeige-Link); null ohne Zugang */
+  /** Welche Anzeige dieses Gerät ist (Anzeige-Link oder gewähltes Layout des Anzeige-Geräts); null ohne Zugang */
   anzeige: { id: string; name: string } | null;
   /** Layout der Anzeige vom Board: undefined noch nicht geladen, null noch keins gespeichert */
   layout: AnzeigeLayout | null | undefined;
@@ -83,7 +83,21 @@ async function jsonLaden<T>(url: string, beiFehler: (status: number) => T, token
   }
 }
 
-/** 403 an der Anzeige: ohne Link „braucht ihren Anzeige-Link“, mit (gemerktem) Link hat jemand einen neuen Schlüssel erzeugt */
+/**
+ * Anzeige ohne Zugang oder mit Anzeige-Token, der gerade nicht reicht (abgemeldet, widerrufen, Dashboard-PIN nach
+ * über 15 Minuten, noch kein Layout): zur Anmeldeseite, Reiter „Dashboard-Login“ (Bauplan „Anmeldung“, 6.3).
+ * Die Anmeldeseite liegt eine Ebene über dem Dashboard (/ und /dashboard/, lokal wie auf Netlify).
+ */
+const ANMELDESEITE = new URL("../", new URL(import.meta.env.BASE_URL, location.origin)).href;
+const TOKEN_REICHT_NICHT = new Set([401, 403, 409, 423]);
+let unterwegs = false;
+function zumDashboardLogin(): void {
+  if (unterwegs) return;
+  unterwegs = true;
+  location.replace(`${ANMELDESEITE}?dashboard`);
+}
+
+/** 403 an der Anzeige mit (gemerktem) Anzeige-Link: jemand hat einen neuen Schlüssel erzeugt */
 const fehlerHinweis = (status: number, zugang: Zugang | null = null) =>
   status === 403 ? (zugang ? "Dieser Anzeige-Link gilt nicht mehr" : "Diese Anzeige braucht ihren Anzeige-Link")
     : status === 404 ? "Unbekanntes Widget" : "Board nicht erreichbar";
@@ -119,11 +133,14 @@ export const useBoardStore = create<BoardState>((set, get) => ({
       neuLaden = setTimeout(() => set({ version: get().version + 1 }), 150);
     };
 
+    /** Antwort an der Anzeige mit Anzeige-Token, die nicht reicht → zur Anmeldeseite */
+    const tokenPruefen = (status: number) => { if (mitToken(zugang) && TOKEN_REICHT_NICHT.has(status)) zumDashboardLogin(); };
+
     // Anzeige: eigenes Layout laden. Steuerung: „Anordnen“ lädt das Layout der gewählten Anzeige selbst.
     const layoutLaden = async () => {
       if (token) { set({ layoutVersion: get().layoutVersion + 1 }); return; }
       const antwort = await jsonLaden<{ anzeige: BoardState["anzeige"]; layout: AnzeigeLayout | null; vollbild?: string | null } | null>(
-        adresse("/api/anzeige/layout", zugangParameter(zugang)), () => null);
+        adresse("/api/anzeige/layout", zugangParameter(zugang)), (status) => { tokenPruefen(status); return null; });
       if (aus) return;
       set({ anzeige: antwort?.anzeige ?? null, layout: antwort?.layout ?? null, vollbild: antwort?.vollbild ?? null });
     };
@@ -134,7 +151,7 @@ export const useBoardStore = create<BoardState>((set, get) => ({
       const parameter = zugangParameter(zugang);
       let ohneLink = false;
       const [beitritt, qr] = await Promise.all([
-        jsonLaden<Beitritt | null>(adresse("/api/anzeige", parameter), (status) => { ohneLink ||= status === 403; return null; }),
+        jsonLaden<Beitritt | null>(adresse("/api/anzeige", parameter), (status) => { tokenPruefen(status); ohneLink ||= status === 403; return null; }),
         jsonLaden<{ svg: string } | null>(adresse("/api/anzeige/qr", parameter), () => null),
       ]);
       if (aus) return;
@@ -170,6 +187,8 @@ export const useBoardStore = create<BoardState>((set, get) => ({
       socket.onclose = (e) => {
         if (aus) return;
         set({ verbunden: false });
+        // Anzeige-Token: 4003 widerrufen, Anzeige gelöscht oder kein Layout, 4023 Dashboard-PIN, 4001 abgemeldet
+        if (mitToken(zugang) && [4001, 4003, 4023].includes(e.code)) return zumDashboardLogin();
         // 4003: kein oder ein alter Anzeige-Link, 4001: Anmeldung abgelaufen – neu verbinden hilft nicht
         if (e.code === 4003) set({ zugangHinweis: fehlerHinweis(403, zugang) });
         if (e.code === 4003 || e.code === 4001) return geaendert();
@@ -179,6 +198,8 @@ export const useBoardStore = create<BoardState>((set, get) => ({
 
     void boardDa().then(async (da) => {
       if (aus) return;
+      // Anzeige ganz ohne Zugang: am Board anmelden (Zugangs-Code), statt leerer Widgets
+      if (da && !token && !zugang) return zumDashboardLogin();
       if (da && !token) await layoutLaden();   // erst das Layout, dann den Modus – kein Aufblitzen des lokalen Layouts
       if (!da) {
         set({ modus: "beispiel", zustand: beispielZustand(), teilnehmer: BEISPIEL_TEILNEHMER, beitritt: BEISPIEL_BEITRITT, qrSvg: BEISPIEL_QR });
@@ -218,7 +239,10 @@ export const useBoardStore = create<BoardState>((set, get) => ({
     if (get().modus !== "board") return mockKarte(typ, quelle);
     const parameter = { ...(quelle ? { quelle } : {}), ...zugangParameter(get().zugang) };
     return jsonLaden<WidgetAntwort>(adresse(`/api/widgets/${encodeURIComponent(typ)}`, parameter),
-      (status) => ({ karte: null, hinweis: fehlerHinweis(status, get().zugang) }), get().token);
+      (status) => {
+        if (mitToken(get().zugang) && TOKEN_REICHT_NICHT.has(status)) zumDashboardLogin();
+        return { karte: null, hinweis: fehlerHinweis(status, get().zugang) };
+      }, get().token);
   },
 
   quellenLaden: async (typ) => {

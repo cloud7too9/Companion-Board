@@ -530,6 +530,25 @@ export class Daten {
     return kopie(a);
   }
 
+  /**
+   * Kopie einer Anzeige für ein weiteres Anzeige-Gerät (Bauplan „Anmeldung“, AN4: Layout und Raster je Gerät):
+   * das gespeicherte Layout (ohne Sitzung, ohne Vollbild), eigene Reihen, eigener Schlüssel. Name „Board 2“,
+   * „Board 3“ … – aus „Board 2“ wird wieder „Board 3“, nicht „Board 2 2“.
+   */
+  anzeigeKopieren(id) {
+    const vorlage = this.anzeige(id);
+    const namen = new Set(this.inhalt.anzeigen.map((a) => a.name));
+    const ohneNummer = vorlage.name.replace(/ \d+$/, '');
+    const basis = (ohneNummer !== vorlage.name && namen.has(ohneNummer) ? ohneNummer : vorlage.name).slice(0, 36);
+    let n = 2;
+    while (namen.has(`${basis} ${n}`)) n += 1;
+    const a = { id: this.neueId('a'), name: `${basis} ${n}`, schluessel: neuerSchluessel(), am: new Date().toISOString(),
+      ...(vorlage.layout ? { layout: kopie(vorlage.layout) } : {}) };
+    this.inhalt.anzeigen.push(a);
+    this.speichernVerzoegert();
+    return kopie(a);
+  }
+
   anzeigeUmbenennen(id, body) {
     const a = this.anzeige(id);
     a.name = anzeigeName(body);

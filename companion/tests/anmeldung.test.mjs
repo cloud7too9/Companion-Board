@@ -62,7 +62,7 @@ try {
   pruefe((await text(max, "#navigation")) === "Companion-App Dashboard-Login", "Navigation Companion-App | Dashboard-Login");
   await max.screenshot({ path: `${DIR}/a1-anmeldung.png` });
   await max.click('[data-nav="dashboard"]');
-  pruefe((await ansicht(max)).includes("Zugangs-Code") && (await ansicht(max)).includes("Anzeige-Link"), "Reiter Dashboard-Login: Hinweis, bis die Codes kommen (L5)");
+  pruefe(await warteAuf(max, () => document.getElementById("dashCode")), "Reiter Dashboard-Login: Feld für den Zugangs-Code (L5, Ablauf in dashboard-login.test.mjs)");
   await max.click('[data-nav="app"]');
 
   await max.fill("#anmName", "Max"); await max.fill("#anmPasswort", PASSWORT);

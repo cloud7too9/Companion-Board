@@ -109,7 +109,7 @@ Handy ──http──▶ Board-Server :3000 (lokal; online: Seiten von Netlify,
                 ├─ /app/biom-*.js, /app/vendor/…  Welt-Import (Worker im Browser des Handys)
                 ├─ /api/…            Companion-API (daten.js) + Konten (identitaet.js)
                 ├─ /ws               Live: geaendert, zustand, teilnehmer
-                └─ /dashboard        die Anzeige: Widget-Dashboard (nur mit Anzeige-Link); /anzeige leitet hierher
+                └─ /dashboard        die Anzeige: Widget-Dashboard (Anzeige-Token vom Dashboard-Login oder Anzeige-Link); /anzeige leitet hierher
 Daten: koordinaten-board/server/daten/daten.db (SQLite; daten.json bleibt als Sicherung vom Umzug)
 ```
 
@@ -119,7 +119,8 @@ Daten: koordinaten-board/server/daten/daten.db (SQLite; daten.json bleibt als Si
 - **Texterkennung**: läuft seit Umbau Phase 3 am Handy (`companion/texterkennung.js`, tesseract.js im Browser, `fuerCompanion()`); der Server lädt dieselbe Auswertung per `node:vm`. Ist kein Seed-Map-Popup drauf, sucht sie eine **Banner-Anleitung** („Black Base“, „Cyan Bordure“ …); die Companion speichert daraus einen Bauplan.
 - **Welt-Import**: Biome kommen nur noch aus dem Weltordner (`.zip` aus der Dateien-App oder `.mcworld`). Die Companion liest ihn am Handy im Web Worker und schickt die Biome als Kacheln ans Board (`/api/welten/:id/biome`), je Welt ein Import. Seit 13.10.2026 kommen auch die **Funde** mit (Strukturen, Portale, Schmiedevorlagen, Rüstung, Banner; Bauplan „Welt-Funde“), je Art mit Schalter, automatisch übernommen. Einzelheiten in `companion/README.md` → Welt-Import.
 - **Anzeige steuern** (Board-Sheet der Companion): Welt auf der Anzeige, Titel, QR-Code; Orte anheften.
-- **Anzeige-Link**: Die Anzeige kann auf jedem Gerät im WLAN laufen (TV-Browser, Tablet). Jede Anzeige hat einen Link mit eigenem Schlüssel; die Companion zeigt ihn unter Board → Anzeigen (kopieren, QR-Code, umbenennen, neuer Schlüssel), die Konsole beim Start.
+- **Dashboard-Login** (seit 14.10.2026, Bauplan „Anmeldung“, L5): Ein TV oder Tablet wird zur Anzeige, indem es auf der Anmeldeseite unter „Dashboard-Login“ einen Zugangs-Code und die Dashboard-PIN eingibt und ein Layout wählt. Den Code erzeugt die Companion unter Board → „Anzeige-Gerät anmelden“. Layout und Raster gehören dem Gerät: Ein zweites Gerät auf demselben Layout bekommt eine Kopie. Nach über 15 Minuten ohne Verbindung fragt die Anzeige wieder nach der Dashboard-PIN.
+- **Anzeige-Link** (fällt mit L6 weg): Jede Anzeige hat außerdem noch einen Link mit eigenem Schlüssel; die Companion zeigt ihn unter Board → Anzeigen (kopieren, QR-Code, umbenennen, neuer Schlüssel), die Konsole beim Start.
 - **Aufs Board**: Die Companion legt Inhalte als Widget in die Sitzung der Anzeige (Bauplan „Sitzung“, seit 13.10.2026; vorher groß über die alte Anzeige geworfen). **Jeder Inhalt hat ein Anzeigeschema** (Wunsch von Max): `BOARD_KARTEN` übersetzt Ort, Sammelobjekt, Sammel-Fortschritt, Portal-Verbindung, Banner und Rüstungs-Set in allgemeine Karten (Titel + Blöcke `koordinaten`/`zeilen`/`text`/`bild`, optional `typ` für den Kennblock), geprüft in `koordinaten-board/server/src/zeigen.js`. Das Board kennt keine Bereiche; neue Bereiche tragen ihr Schema ein.
 - **Kennblöcke**: liegen nur noch in `companion/icons/`; das Dashboard lädt sie über den Server (oder Netlify) unter `/icons/`.
 - **Dashboard**: Das Board ist das Raum-Dashboard. Jeder Companion-Bereich bekommt eigene Dashboard-Ansichten (Widgets), die dort laufen sollen.

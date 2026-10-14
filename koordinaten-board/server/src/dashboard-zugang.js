@@ -1,8 +1,10 @@
 // Dashboard-Zugänge (Bauplan „Anmeldung und Dashboard-Zugang“, L4): Anzeige-Geräte (TV, Tablet) melden sich nicht mit
 // einem Konto an, sondern mit einem Zugangs-Code und einer eigenen Dashboard-PIN. Ein Konto erzeugt den Code in der
 // Companion (gültig 20 Minuten … dauerhaft, GUELTIGKEITEN). Am Anzeige-Gerät: Code → Ticket (5 Minuten) →
-// Dashboard-PIN → Anzeige-Token; danach wählt es sein Layout (eine der Anzeigen). Nach über OFFLINE_MINUTEN.anzeige
-// ohne Kontakt fragt es wieder nach der Dashboard-PIN. Ein abgelaufener Code schaltet keine neuen Geräte frei,
+// Dashboard-PIN → Anzeige-Token; danach wählt es sein Layout (eine der Anzeigen). Layout und Raster gehören dem
+// Gerät (AN4, Max 14.10.2026): Eine freie Anzeige übernimmt es, eine schon von einem anderen Gerät gewählte
+// bekommt es als Kopie („Board 2“). Nach über OFFLINE_MINUTEN.anzeige ohne Kontakt fragt es wieder nach der
+// Dashboard-PIN. Ein abgelaufener Code schaltet keine neuen Geräte frei,
 // angemeldete laufen weiter; Widerrufen löscht den Zugang und meldet alle seine Anzeigen ab (AN5).
 // Codes liegen im Klartext (die Companion zeigt sie), die Dashboard-PIN nur als scrypt-Hash.
 import { randomInt } from 'node:crypto';
@@ -47,13 +49,16 @@ export function dashboardZugang({ daten, geheim, jetzt = Date.now }) {
     if (rest) fehler(429, `Zu viele Fehlversuche – bitte ${rest} s warten`);
   };
 
-  /** Layout-Auswahl: je Anzeige Name, enthaltene Bereiche und Zahl der Widgets (ohne die Sitzung) */
-  function layouts() {
+  /** Layout-Auswahl: je Anzeige Name, enthaltene Bereiche, Zahl der Widgets (ohne die Sitzung) und ob ein anderes
+      Gerät sie schon zeigt (dann bekommt dieses eine Kopie) */
+  function layouts(geraet) {
+    const belegt = new Set(daten.anzeigeGeraeteListe().filter((a) => a.id !== geraet.id && a.anzeigeId).map((a) => a.anzeigeId));
     return daten.anzeigenListe().map((a) => {
       const { layout } = daten.anzeigeLayout(a.id);
       const instanzen = (layout?.layer ?? []).filter((l) => l.id !== 'sitzung').flatMap((l) => l.instanzen);
       const bereiche = [...new Set(instanzen.map((i) => BEREICH_NAMEN[i.typ.split('.')[0]]).filter(Boolean))];
-      return { id: a.id, name: a.name, inhalt: layout ? bereiche.join(', ') || 'leer' : 'Standard-Layout', widgets: layout ? instanzen.length : null };
+      return { id: a.id, name: a.name, inhalt: layout ? bereiche.join(', ') || 'leer' : 'Standard-Layout', widgets: layout ? instanzen.length : null,
+        belegt: belegt.has(a.id) };
     });
   }
 
@@ -151,7 +156,7 @@ export function dashboardZugang({ daten, geheim, jetzt = Date.now }) {
       const grund = this.pinGrund(geraet);
       if (grund) return { pinNoetig: true, offline: Number(grund.split(':')[1]) };
       this.kontakt(geraet);
-      const auswahl = layouts();
+      const auswahl = layouts(geraet);
       // Ist die gewählte Anzeige inzwischen gelöscht, wählt das Gerät neu
       const anzeigeId = auswahl.some((l) => l.id === geraet.anzeigeId) ? geraet.anzeigeId : null;
       return { pinNoetig: false, anzeigeId, layouts: auswahl };
@@ -171,12 +176,15 @@ export function dashboardZugang({ daten, geheim, jetzt = Date.now }) {
       return { ok: true };
     },
 
-    /** Layout wählen: eine der Anzeigen */
+    /** Layout wählen (AN4): eine freie Anzeige übernehmen, eine belegte kopieren → { anzeigeId, kopie } */
     layoutWaehlen(geraet, anzeigeId) {
       daten.anzeige(anzeigeId);   // 404, wenn es sie nicht gibt
       this.kontakt(geraet);
-      daten.anzeigeGeraetAendern(geraet.id, { anzeigeId });
-      return { anzeigeId };
+      if (geraet.anzeigeId === anzeigeId) return { anzeigeId, kopie: false };
+      const belegt = daten.anzeigeGeraeteListe().some((a) => a.id !== geraet.id && a.anzeigeId === anzeigeId);
+      const ziel = belegt ? daten.anzeigeKopieren(anzeigeId).id : anzeigeId;
+      daten.anzeigeGeraetAendern(geraet.id, { anzeigeId: ziel });
+      return { anzeigeId: ziel, kopie: belegt };
     },
 
     abmelden(geraet) {
