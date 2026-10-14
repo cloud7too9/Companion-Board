@@ -276,7 +276,7 @@ Branch: **`board/anmeldung`** für alles. Nach jeder Phase pushen.
 | ~~AN1~~ | **Entschieden (Max, 13.10.2026): Die Board-PIN fällt weg** (L15), Abbau in L6. | – | – |
 | ~~AN2~~ | **Entschieden (Max, 13.10.2026): Konten werden neu angelegt** (L16). Die Migration entfernt die alten Konten samt Geräten. | – | – |
 | ~~AN3~~ | **Entschieden (Max, 13.10.2026): Der Anzeige-Link wird durch „Code generieren“ ersetzt** (L17), Abbau in L6. | – | – |
-| AN4 | Zeigen zwei Geräte **dasselbe Layout** bei unterschiedlicher Bildschirmgröße, passen die gemeldeten `reihen` nicht für beide. Layout pro Gerät kopieren oder mit der kleineren Reihenzahl arbeiten? | – | L5 |
+| ~~AN4~~ | **Entschieden (Max, 14.10.2026): „Layout und Rasteranzahl/-größe pro Gerät“.** Gebaut: Jedes Anzeige-Gerät hat seine eigene Anzeige (Layout, Reihen, Vollbild, Sitzung). „Layout wählen“ übernimmt eine freie Anzeige; zeigt schon ein anderes Gerät sie, bekommt dieses eine Kopie („Board 2“), die man in der Companion eigens anordnet. Die Reihen misst jedes Gerät selbst, die 32 Spalten bleiben. | – | – |
 | ~~AN5~~ | **Bestätigt (Max, 13.10.2026): ja und ja.** Angemeldete Anzeigen laufen nach Ablauf des Codes weiter; Widerrufen meldet alle Anzeigen des Codes ab. | – | – |
 | ~~AN6~~ | **Bestätigt (Max, 13.10.2026): 15 Minuten** (`OFFLINE_MINUTEN.anzeige`). | – | – |
 | ~~AN7~~ | **Bestätigt (Max, 13.10.2026): im Board-Sheet** unter „Anzeigen“. | – | – |
@@ -292,7 +292,7 @@ Branch: **`board/anmeldung`** für alles. Nach jeder Phase pushen.
 
 ## 10. Stand der Umsetzung (14.10.2026)
 
-**L1–L4 gebaut**, auf dem Branch der Cloud-Sitzung (`claude/festive-euler-a82up2`) statt `board/anmeldung`, ein PR je Schritt (L1–L3 zusammen, L4 allein). ⏸ **H15** (Max meldet sich nach dem Pi-Update am Handy an; Screenshots `a1`–`a8`, `n6-offline-pin.png`).
+**L1–L5 gebaut**, auf dem Branch der Cloud-Sitzung (`claude/festive-euler-a82up2`) statt `board/anmeldung`, ein PR je Schritt (L1–L3 zusammen, L4 und L5 einzeln). ⏸ **H15** (Max meldet sich nach dem Pi-Update am Handy an; Screenshots `a1`–`a8`, `n6-offline-pin.png`), ⏸ **H16** (Max meldet TV bzw. Tablet mit einem Code an; Screenshots `d1`–`d7`).
 
 | Phase | Gebaut |
 |---|---|
@@ -300,6 +300,7 @@ Branch: **`board/anmeldung`** für alles. Nach jeder Phase pushen.
 | L2 | `identitaet.js` neu, Routen aus 5.1, Hook in `server.js` (Reihenfolge 401 → 403 wartet → 423 PIN → Kontakt), `/ws` mit 4030/4023, Sperren (Passwort je Anzeigename, PIN je Gerät, Zurücksetzen je Konto). Server-Tests: `identitaet.test.js`, `api.test.js` (Konten, Passwort-Sperre, PIN-Pflicht mit Test-Uhr) |
 | L3 | `companion/anmeldung.html`, Server und Netlify liefern sie unter `/`, die Companion unter `/app/`; Companion leitet bei fehlendem Token, 401, 423 und wartendem Konto dorthin; Konten im Board-Sheet; Offline-Sperre. Playwright: `anmeldung.test.mjs` (neu), alle anderen Tests auf Konten umgestellt |
 | L4 | `dashboard-zugang.js` (neu) mit den Routen aus 5.2, `signatur.js` (neu, HMAC-Signatur für Konto-Token, Ticket und Anzeige-Token, je mit eigenem Zweck), `daten.js` (Zugänge und Anzeige-Geräte). `server.js`: Anzeige-Token neben dem Anzeige-Link für `/api/anzeige/*`, `/api/widgets/*` und `/ws` (Rolle `anzeige`, Herzschlag, 4023 PIN nötig, 4003 widerrufen). Server-Tests: `dashboard-zugang.test.js` (neu), `api.test.js` (ganzer Ablauf mit Test-Uhr) |
+| L5 | Anmeldeseite: Reiter **Dashboard-Login** (Code, Dashboard-PIN, Layout wählen, „Anzeige starten“, „Anzeige abmelden“), Anzeige-Token unter `board.anzeige`. Companion: **„Anzeige-Gerät anmelden“** im Board-Sheet (Gültigkeit, Dashboard-PIN, „Code generieren“, „Erzeugte Codes“ mit Widerrufen). Dashboard: liest den Anzeige-Token (`zugang.ts`), schickt ohne Zugang und bei 401/403/409/423 bzw. 4001/4003/4023 zur Anmeldeseite (`/?dashboard`). Server: AN4 (eigene Anzeige je Gerät, `anzeigeKopieren`). Playwright: `dashboard-login.test.mjs` (neu, Screenshots `d1`–`d7`) |
 
 **Abweichungen vom Bauplan** (bewusst, kurz begründet):
 
@@ -327,5 +328,13 @@ Branch: **`board/anmeldung`** für alles. Nach jeder Phase pushen.
 - **Abgelaufene Codes** bleiben in der Liste (`gueltig: false`), bis jemand sie widerruft. Angemeldete Anzeigen laufen weiter (AN5).
 - **Noch ohne Oberfläche:** Companion und Dashboard nutzen die Zugänge erst mit L5.
 
-**Als Nächstes:** L5 (Dashboard-Login auf der Anmeldeseite, Code generieren in der Companion, Dashboard mit Anzeige-Token) wartet auf **AN4**. Danach L6 (Anzeige-Link mit Schlüssel abbauen, Doku).
+**Zu L5 im Einzelnen:**
+
+- **Einstieg:** `/?dashboard` (so schickt das Dashboard zurück) oder ein Gerät, das nur als Anzeige angemeldet ist, landet im Reiter Dashboard-Login. Mit gültigem Anzeige-Token und ohne PIN-Pflicht zeigt er gleich „Layout wählen“, das gewählte Layout ist vorausgewählt.
+- **Layout wählen (AN4):** Die Auswahl zeigt je Anzeige die Bereiche und die Zahl der Widgets. Läuft eine schon auf einem anderen Gerät, steht dort „dieses bekommt eine Kopie“. `PUT /api/dashboard/layout` antwortet `{ anzeigeId, kopie }`; eine Kopie meldet `geaendert` „anzeigen“, sie erscheint in der Companion unter Board → Anzeigen.
+- **Dashboard ohne Zugang** (weder Link noch Anzeige-Token) geht zur Anmeldeseite statt leere Widgets mit „braucht ihren Anzeige-Link“ zu zeigen. Ein alter Anzeige-Link läuft bis L6 weiter wie bisher.
+- **Konto und Anzeige auf einem Gerät** bleiben getrennt (`board.verbindung` und `board.anzeige`). Abmelden des einen lässt das andere stehen.
+- **Offen (Vorschlag für L6):** Anzeigen lassen sich noch nicht löschen. Wechselt ein Gerät auf ein Layout, das schon ein anderes zeigt, bekommt es eine neue Kopie, und seine bisherige Anzeige bleibt in der Liste stehen. Abhilfe: „Anzeige löschen“ unter Board → Anzeigen (nur, wenn kein Gerät sie zeigt).
+
+**Als Nächstes:** L6 (Anzeige-Link mit Schlüssel abbauen, Doku).
 
