@@ -79,7 +79,7 @@ sudo journalctl -u companion-board -f              # Konsole: Adresse der Anmeld
 
 Cloudflare flacht den CNAME auf `@` automatisch ab (CNAME flattening). Falls Netlify stattdessen einen A-Record verlangt: `A @ 75.2.60.5`, ebenfalls Proxy aus. Die graue Wolke ist wichtig: Nur dann kann Netlify das Zertifikat für die Domain ausstellen.
 
-**Einstellungen, die man nicht braucht:** *SSL/TLS* betrifft nur den Proxy (also `api`), dort passt *Full*. Keine *Page Rules*, kein *Access*, keine Firewall-Regel nötig. **Empfohlen** (Stand 13.10.2026 noch offen, siehe Warteliste Kapitel 5) unter *Security → WAF → Rate limiting rules*: Anfragen an `api.mainhubv1.com/api/anmelden`, `/api/registrieren` und `/api/pin*` auf z. B. 10 pro Minute je IP begrenzen (Schutz vor Passwort- und PIN-Raten, zusätzlich zur Sperre im Server).
+**Einstellungen, die man nicht braucht:** *SSL/TLS* betrifft nur den Proxy (also `api`), dort passt *Full*. Keine *Page Rules*, kein *Access*, keine Firewall-Regel nötig. **Empfohlen** (Stand 13.10.2026 noch offen, siehe Warteliste Kapitel 5) unter *Security → WAF → Rate limiting rules*: Anfragen an `api.mainhubv1.com/api/anmelden`, `/api/registrieren`, `/api/pin*` und `/api/dashboard/code`, `/api/dashboard/freischalten`, `/api/dashboard/pin` auf z. B. 10 pro Minute je IP begrenzen (Schutz vor Passwort-, PIN- und Code-Raten, zusätzlich zur Sperre im Server).
 
 **Tunnel auf dem Pi**
 
