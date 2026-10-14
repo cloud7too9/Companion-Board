@@ -2,6 +2,8 @@
 // meldet sich auf der Anmeldeseite mit Code und Dashboard-PIN an, wählt ein Layout und zeigt das Dashboard; neu
 // laden geht ohne Code. Ein Tablet wählt dasselbe Layout und bekommt eine Kopie mit eigenem Raster (AN4). Nach über
 // 15 Minuten ohne Kontakt fragt die Anzeige nach der Dashboard-PIN; Widerrufen meldet beide ab. Screenshots d1–d7.
+// TV-Ansicht: Ein Fernseher-Browser (Kennung wie Samsung Tizen, Full HD) bekommt das Großbild und meldet sich nur
+// mit Tasten an – Pfeiltasten, OK, Zifferntasten. Screenshots t1–t3.
 import { chromium } from "playwright";
 import { fileURLToPath } from "node:url";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
@@ -28,8 +30,9 @@ const uhr = (minuten) => fetch(`${BOARD}/api/test/uhr`, { method: "POST", header
 
 const browser = await chromium.launch(CHROMIUM_OPTIONEN);
 const fehler = [];
-async function geraet(breite, hoehe) {
-  const k = await browser.newContext({ viewport: { width: breite, height: hoehe }, deviceScaleFactor: 1 });
+const TIZEN = "Mozilla/5.0 (SMART-TV; LINUX; Tizen 6.0) AppleWebKit/537.36 (KHTML, like Gecko) 76.0.3809.146/6.0 TV Safari/537.36";
+async function geraet(breite, hoehe, userAgent) {
+  const k = await browser.newContext({ viewport: { width: breite, height: hoehe }, deviceScaleFactor: 1, ...(userAgent && { userAgent }) });
   const p = await k.newPage();
   p.on("pageerror", (e) => fehler.push(e.message));
   p.on("console", (m) => { if (m.type() === "error" && !m.text().startsWith("Failed to load resource")) fehler.push(m.text()); });
@@ -180,6 +183,51 @@ try {
   await tablet.click('[data-weiter="anzeige-abmelden"]');
   pruefe(await amLogin(tablet) && (await text(tablet, "#buehne")).includes("Anzeige abgemeldet"), "„Anzeige abmelden“ → wieder der Code");
   pruefe(await warteAuf(handy, () => document.querySelector("[data-zugang] .card-meta")?.textContent.includes("0 Anzeigen")), "Der dauerhafte Code bleibt, 0 Anzeigen");
+
+  // ---- TV-Ansicht: Fernseher-Browser, nur Fernbedienung (Pfeiltasten, OK, Zifferntasten) ----
+  const fokus = (p) => p.evaluate(() => { const e = document.activeElement; return e?.id || e?.dataset?.ziffer || e?.dataset?.pin || e?.textContent?.trim() || e?.tagName; });
+  const fernseher = await geraet(1920, 1080, TIZEN);
+  await fernseher.goto(`${BOARD}/`);
+  pruefe(await warteAuf(fernseher, () => document.documentElement.classList.contains("tv") && document.documentElement.classList.contains("fernbedienung")
+    && document.getElementById("dashCode")), "Fernseher: TV-Ansicht, öffnet gleich den Dashboard-Login");
+  pruefe(await fokus(fernseher) === "dashCode", "Fokus steht im Code-Feld");
+  const masse = await fernseher.evaluate(() => {
+    const k = document.querySelector(".kopf").getBoundingClientRect(), b = document.querySelector("#formDashboard").getBoundingClientRect();
+    return { links: k.right <= b.left, knopf: document.querySelector(".knopf").getBoundingClientRect().height, hinweis: getComputedStyle(document.querySelector(".tv-hinweis")).display };
+  });
+  pruefe(masse.links && masse.knopf >= 80 && masse.hinweis === "block", `Zwei Spalten, Knöpfe groß (${Math.round(masse.knopf)} px hoch), Hinweis zur Fernbedienung`);
+  await fernseher.keyboard.type(dauer);
+  await fernseher.waitForTimeout(150);
+  await fernseher.screenshot({ path: `${DIR}/t1-tv-dashboard-login.png` });
+  await fernseher.keyboard.press("ArrowDown");
+  pruefe(await fokus(fernseher) === "Weiter", "Pfeil runter: „Weiter“");
+  await fernseher.keyboard.press("Enter");
+  pruefe(await warteAuf(fernseher, () => document.activeElement?.dataset?.ziffer === "1"), "OK → Dashboard-PIN, Fokus auf der 1");
+  await fernseher.keyboard.press("ArrowRight"); await fernseher.keyboard.press("ArrowDown");
+  pruefe(await fokus(fernseher) === "5", "Pfeil rechts, runter: auf der 5");
+  await fernseher.keyboard.press("Enter");
+  pruefe(await fernseher.$$eval("#pinPunkte .voll", (e) => e.length) === 1, "OK auf der 5 tippt die 5");
+  await fernseher.keyboard.press("Backspace");
+  await fernseher.keyboard.type("97531");
+  pruefe(await fokus(fernseher) === "ok", "Zifferntasten getippt: Fokus springt auf OK");
+  await fernseher.screenshot({ path: `${DIR}/t2-tv-dashboard-pin.png` });
+  await fernseher.keyboard.press("Enter");
+  pruefe(await warteAuf(fernseher, () => document.activeElement?.matches?.(".layout-karte input:checked")), "OK → Layout wählen, Fokus auf dem ersten freien Layout");
+  await fernseher.keyboard.press("ArrowDown");
+  pruefe(await fernseher.evaluate(() => document.activeElement?.value === document.querySelector(".layout-karte input:checked")?.value
+    && document.activeElement.closest(".layout-karte").textContent.includes("Board 2")), "Pfeil runter: „Board 2“ gewählt");
+  await fernseher.keyboard.press("ArrowUp");
+  await fernseher.screenshot({ path: `${DIR}/t3-tv-layout-waehlen.png` });
+  await fernseher.keyboard.press("Enter");
+  pruefe(await dashboardZeigt(fernseher, "d-sammel"), "OK auf „Board“ startet die Anzeige");
+  // Breiter Bildschirm ohne Fernseher-Kennung: Großbild, aber ohne Fernbedienung und mit dem Konto als Start
+  const laptop = await geraet(1440, 900);
+  await laptop.goto(`${BOARD}/`);
+  pruefe(await warteAuf(laptop, () => document.documentElement.classList.contains("tv") && !document.documentElement.classList.contains("fernbedienung")
+    && document.getElementById("anmName")), "Breiter Bildschirm: Großbild, Start bei der Anmeldung mit Konto, keine Pfeiltasten-Navigation");
+  const handyNeu = await geraet(390, 844);
+  await handyNeu.goto(`${BOARD}/`);
+  pruefe(await warteAuf(handyNeu, () => document.getElementById("anmName") && !document.documentElement.classList.contains("tv")), "Handy: Anmeldeseite ohne TV-Ansicht");
 } catch (e) {
   pruefe(false, `Abbruch: ${e.stack || e}`);
 } finally {
