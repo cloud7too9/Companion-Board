@@ -10,6 +10,7 @@ Seit dem 14.10.2026 mergt Claude ohne Rückfrage, sobald die CI grün ist (Max: 
 
 | PR | Inhalt |
 |---|---|
+| #29 | Karte: Kategorien ein- und ausblenden (Knopf oben rechts, Schalter je Kategorie, „Alle zeigen“/„Alle ausblenden“, gemerkt pro Gerät; die Liste zeigt weiter alles) |
 | #28 | Anmeldeseite: TV-Ansicht (Großbild auf Fernsehern und breiten Bildschirmen, Fernbedienung mit Pfeiltasten, OK und Zifferntasten, Fernseher starten im Dashboard-Login, `?tv`), Test mit Fernseher-Browser (Screenshots `t1`–`t3`) |
 | #27 | Anmeldung L5: Dashboard-Login auf der Anmeldeseite (Code, Dashboard-PIN, Layout wählen), „Anzeige-Gerät anmelden“ im Board-Sheet (Code generieren, Widerrufen), Dashboard mit Anzeige-Token; **AN4** (Max): Layout und Raster je Gerät, ein zweites Gerät bekommt eine Kopie; `dashboard-login.test.mjs` (⏸ H16) |
 | #26 | Anmeldung L4: Dashboard-Zugänge am Server (`dashboard-zugang.js`) – Zugangs-Code mit Dashboard-PIN, Code → Ticket → Anzeige-Token, Layout wählen, 15-Minuten-Regel, Widerrufen meldet ab; Anzeige-Token neben dem Anzeige-Link für `/api/anzeige/*`, `/api/widgets/*` und `/ws`; `signatur.js` für alle Tokens. Noch ohne Oberfläche (L5 wartet auf AN4) |
