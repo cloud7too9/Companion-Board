@@ -109,6 +109,7 @@ export class Daten {
       this.gespeichert = gespeichert;
       this.version = speicher.aenderungsNr();
     }
+    this.gespeichertAm ??= new Date().toISOString();   // frisch geladen: daten.db ist auf Stand
     this.erstellerNachtragen();
     this.kontenUmstellen();
     this.anzeigenSicherstellen();
