@@ -26,6 +26,8 @@ export interface Karte {
 export interface WidgetAntwort {
   karte: Karte | null;
   hinweis?: string;
+  /** Nur im Dashboard: Das Board war nicht erreichbar (kein Netz) – die letzte Karte bleibt stehen */
+  netzFehler?: boolean;
 }
 
 /** Was man beim Hinzufügen als Quelle wählen kann (GET /api/widgets/:typ/quellen) */

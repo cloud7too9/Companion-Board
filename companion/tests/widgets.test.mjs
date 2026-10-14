@@ -184,6 +184,22 @@ try {
   await p.goto(`${ADRESSE}vollbild/gibt-es-nicht`);
   pruefe((await p.textContent('[data-testid="vollbild"] [role="status"]')) === "Dieses Widget gibt es nicht (mehr).", "Unbekannte Instanz: Hinweis");
   await p.close();
+
+  // ---- Angemeldeter Fernseher, Board gerade weg: keine Beispielkarten, sondern weiter versuchen ----
+  {
+    const tv = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+    tv.on("pageerror", (e) => fehler.push(e.message));
+    await tv.goto(ADRESSE);
+    await tv.evaluate((adresse) => localStorage.setItem("board.anzeige", JSON.stringify({ adresse, token: "tv-token" })), new URL(ADRESSE).origin);
+    let versuche = 0;
+    tv.on("request", (r) => { if (r.url().endsWith("/api/server")) versuche += 1; });
+    await tv.reload();
+    await tv.waitForSelector('[data-testid="nicht-erreichbar"]');
+    pruefe(!(await tv.$('[data-testid="beispielkarten"]')), "Angemeldet, Board weg: „Board nicht erreichbar“ statt Beispielkarten");
+    await tv.waitForTimeout(2600);
+    pruefe(versuche >= 2, `… und fragt das Board erneut (${versuche} Anfragen)`);
+    await tv.close();
+  }
 } catch (f) {
   pruefe(false, `Abbruch: ${f.stack || f}`);
 } finally {

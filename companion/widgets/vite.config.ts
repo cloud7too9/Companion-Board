@@ -6,6 +6,9 @@ import path from "node:path";
 export default defineConfig({
   base: "/dashboard/",
   plugins: [react()],
+  // Fernseher haben oft einen alten Browser (Chromium ab 69, Safari ab 12): Syntax wie ?. und ?? wird
+  // beim Bauen übersetzt. Neue Funktionen (z. B. Object.hasOwn) übersetzt das nicht – die meiden wir im Code.
+  build: { target: ["es2018", "chrome69", "safari12", "firefox68"] },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),

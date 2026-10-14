@@ -15,7 +15,7 @@ export function WorkspacePage() {
   return (
     // Feste Bildschirmhöhe ohne Seiten-Scroll: Header oben, die Fläche füllt
     // den Rest. So kollidiert Ziehen und Skalieren auf Touch nie mit Scrollen.
-    <div className="flex h-dvh flex-col overflow-hidden bg-surface text-text">
+    <div className="flex hoehe-voll flex-col overflow-hidden bg-surface text-text">
       <WorkspaceHeader />
       <main className="flex min-h-0 flex-1 flex-col p-2 sm:p-3 lg:px-5 lg:py-4">
         <div className="mx-auto min-h-0 w-full max-w-screen-2xl flex-1">

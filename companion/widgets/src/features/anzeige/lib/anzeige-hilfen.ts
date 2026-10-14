@@ -50,7 +50,7 @@ export const sortieren = (a: Ort, b: Ort) => kategorieIndex(a.kategorie) - kateg
 export const NEU_DAUER_MS = 90_000;
 export const istNeu = (o: Ort, jetzt: number) => jetzt - Date.parse(o.geaendertAm) < NEU_DAUER_MS;
 
-/** Aktuelle Zeit, jede Sekunde neu (Uhr im Kopf, „vor x Min.“, „Neu“) */
+/** Aktuelle Zeit, alle `intervall` ms neu (Uhr im Kopf, „vor x Min.“, „Neu“) – am Fernseher so selten wie möglich */
 export function useJetzt(intervall = 1000): number {
   const [jetzt, setJetzt] = useState(() => Date.now());
   useEffect(() => {

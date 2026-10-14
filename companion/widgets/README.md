@@ -150,7 +150,20 @@ Bauplan: `docs/bauplaene/Bauplan-Widget-Inhalte.md`, Entscheidung E3.
   nicht mehr“. Seit Bauplan „Sitzung“ (S4) ist das Dashboard die einzige
   Anzeige; `/anzeige` leitet mit Schlüssel hierher um.
 - **Ohne Board** (`GET /api/server` antwortet nicht): feste Beispielkarten aus
-  `lib/mock-karten.ts`, im Kopf steht „Beispielkarten“.
+  `lib/mock-karten.ts`, im Kopf steht „Beispielkarten“ – aber nur ohne Zugang
+  (Entwicklung mit `npm run dev`). Ein angemeldetes Anzeige-Gerät zeigt
+  „Board nicht erreichbar · neuer Versuch läuft“ und fragt erneut (2 s, dann
+  doppelt so lange, höchstens alle 30 s), bis das Board wieder antwortet.
+- **Kurz kein Netz:** Schlägt das Neuladen einer Karte ohne Antwort fehl, bleibt
+  die letzte Karte stehen.
+- Ein `geaendert` mit Bereich `layout` und fremder `anzeigeId` lädt das Layout
+  nicht neu (Sitzung oder Anordnen an einer anderen Anzeige).
+- **Fernseher:** `build.target` übersetzt neue Syntax (`?.`, `??`) für Browser
+  ab Chromium 69 / Safari 12; neue Funktionen wie `Object.hasOwn` meidet der
+  Code, weil sie nicht übersetzt werden. Volle Höhe über `.hoehe-voll`
+  (100vh, wo bekannt 100dvh). Stürzt ein Widget ab, zeigt nur dieses einen
+  Hinweis (`Fehlergrenze`); stürzt die ganze Seite ab, lädt sie nach 30 s neu.
+  Uhr und „vor x Min.“ ticken alle 5 bzw. 15 Sekunden statt jede Sekunde.
 - Die Schrift der Karten wächst mit der Zelle (`--zelle`); was nicht passt, wird
   abgeschnitten, bis A7 die Größen festlegt.
 

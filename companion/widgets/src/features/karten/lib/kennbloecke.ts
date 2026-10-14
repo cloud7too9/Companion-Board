@@ -21,4 +21,4 @@ const KENNBLOECKE: Record<string, string> = {
 
 /** Pfad zum Kennblock eines Feature-Typs (`karte.typ`) oder null */
 export const kennblockDatei = (typ: string | undefined | null): string | null =>
-  typ && Object.hasOwn(KENNBLOECKE, typ) ? `/icons/struktur_kennbloecke/${KENNBLOECKE[typ]}.png` : null;
+  typ && Object.prototype.hasOwnProperty.call(KENNBLOECKE, typ) ? `/icons/struktur_kennbloecke/${KENNBLOECKE[typ]}.png` : null;
