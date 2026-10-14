@@ -161,8 +161,8 @@ export const useBoardStore = create<BoardState>((set, get) => ({
           if (n?.art === "zustand" && n.zustand) return set({ zustand: n.zustand as BoardZustand });
           if (n?.art === "teilnehmer" && Array.isArray(n.namen)) return set({ teilnehmer: n.namen as string[] });
           if (n?.art !== "geaendert") return;
-          // Konten (Bauplan „Anmeldung“) zeigt die Anzeige nicht; Layout und Anzeigen betreffen keine Karte
-          if (n.bereich === "konten") return;
+          // Konten und Dashboard-Zugänge (Bauplan „Anmeldung“) zeigt die Anzeige nicht; Layout und Anzeigen betreffen keine Karte
+          if (n.bereich === "konten" || n.bereich === "zugaenge") return;
           if (n.bereich === "layout" || n.bereich === "anzeigen") void layoutLaden();
           else geaendert();
         } catch { /* keine JSON-Nachricht */ }

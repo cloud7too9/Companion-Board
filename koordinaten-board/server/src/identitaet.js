@@ -5,10 +5,11 @@
 // Gerät (L5). Neue Konten gelten erst, wenn ein freigegebenes Konto sie freigibt (L19); das erste Konto gilt
 // sofort, weil es sonst niemanden gäbe, der freigeben könnte (⚠ AN14). Alle Einträge hängen an der Benutzer-ID
 // (erstellerId), nie am Namen. Das Modul kennt vom Board nur die Daten-Schnittstelle (benutzer…, geraet…, konto…).
-import { createHmac, randomBytes, randomInt, scrypt, timingSafeEqual } from 'node:crypto';
+import { randomBytes, randomInt, scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 import { fehlversuchSperre } from './sperre.js';
 import { regeln } from './regeln.js';
+import { signierer } from './signatur.js';
 
 const { KONTO_PIN, OFFLINE_MINUTEN, kontoPruefen, anzeigenameSauber } = regeln;
 const scryptAsync = promisify(scrypt);
@@ -52,7 +53,7 @@ const leerHashHolen = async () => (leerHash ??= await pinHashen(randomBytes(16).
  *   jetzt: Uhr in ms (Tests stellen sie vor, um „30 Minuten offline“ zu prüfen)
  */
 export function identitaet({ daten, geheim, jetzt = Date.now }) {
-  const signieren = (x) => createHmac('sha256', geheim).update(x).digest('base64url');
+  const token = signierer(geheim);
   const iso = () => new Date(jetzt()).toISOString();
   // Gegen Durchprobieren: Passwort je Anzeigename, PIN je Gerät, Passwort beim Zurücksetzen je Konto
   const passwortSperre = fehlversuchSperre({ jetzt });
@@ -61,27 +62,9 @@ export function identitaet({ daten, geheim, jetzt = Date.now }) {
   /** geraetId → letzter Kontakt in ms (jede Anfrage, jeder Herzschlag) */
   const kontakte = new Map();
 
-  function tokenErstellen(inhalt) {
-    const teil = Buffer.from(JSON.stringify(inhalt)).toString('base64url');
-    return `${teil}.${signieren(teil)}`;
-  }
-
-  function tokenLesen(token) {
-    if (typeof token !== 'string' || !token.includes('.')) return null;
-    const [teil, signatur] = token.split('.');
-    const erwartet = Buffer.from(signieren(teil));
-    const erhalten = Buffer.from(signatur ?? '');
-    if (erwartet.length !== erhalten.length || !timingSafeEqual(erwartet, erhalten)) return null;
-    try {
-      return JSON.parse(Buffer.from(teil, 'base64url').toString('utf8'));
-    } catch {
-      return null;
-    }
-  }
-
   /** Wer steckt hinter einem Token? { id, name, echterName, farbe, geraetId, freigegeben } – null bei unbekanntem Gerät */
-  function ausToken(token) {
-    const t = tokenLesen(token);
+  function ausToken(text) {
+    const t = token.lesen(text);
     if (!t?.b || !t?.g) return null;
     const b = daten.benutzerVonGeraet(t.g);
     if (!b || b.id !== t.b) return null;
@@ -116,7 +99,7 @@ export function identitaet({ daten, geheim, jetzt = Date.now }) {
     const g = daten.geraetAnlegen(b.id, iso());
     kontakte.set(g.id, jetzt());
     return {
-      token: tokenErstellen({ b: b.id, g: g.id, f: FARBEN[randomInt(FARBEN.length)] }),
+      token: token.erstellen({ b: b.id, g: g.id, f: FARBEN[randomInt(FARBEN.length)] }),
       id: b.id, name: b.anzeigename, freigegeben: Boolean(b.freigegebenAm),
     };
   }

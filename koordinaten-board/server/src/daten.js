@@ -761,6 +761,72 @@ export class Daten {
     return g?.freigeschaltet ? this.benutzer(g.benutzerId) : null;
   }
 
+  // ---------- Dashboard-Zugänge und Anzeige-Geräte (Bauplan „Anmeldung“, L4; Abläufe in dashboard-zugang.js) ----------
+
+  zugaengeListe() {
+    return kopie(this.inhalt.zugaenge);
+  }
+
+  zugang(id) {
+    const z = this.inhalt.zugaenge.find((x) => x.id === id);
+    return z ? kopie(z) : null;
+  }
+
+  /** Zugang zu einem Code; Groß- und Kleinschreibung zählt */
+  zugangMitCode(code) {
+    const z = this.inhalt.zugaenge.find((x) => x.code === code);
+    return z ? kopie(z) : null;
+  }
+
+  zugangAnlegen({ code, pinHash, erstelltVon, erstelltAm, gueltigBis }) {
+    if (this.inhalt.zugaenge.some((z) => z.code === code)) fehler(409, 'Diesen Code gibt es schon');
+    const z = { id: randomUUID(), code, pinHash, erstelltVon, erstelltAm, gueltigBis };
+    this.inhalt.zugaenge.unshift(z);
+    this.speichernVerzoegert();
+    return kopie(z);
+  }
+
+  /** Widerrufen: der Zugang ist weg, alle damit angemeldeten Anzeigen auch (AN5) → IDs der abgemeldeten Anzeige-Geräte */
+  zugangWiderrufen(id) {
+    if (!this.inhalt.zugaenge.some((z) => z.id === id)) fehler(404, 'Zugang nicht gefunden');
+    const weg = this.inhalt.anzeigeGeraete.filter((a) => a.zugangId === id).map((a) => a.id);
+    this.inhalt.zugaenge = this.inhalt.zugaenge.filter((z) => z.id !== id);
+    this.inhalt.anzeigeGeraete = this.inhalt.anzeigeGeraete.filter((a) => a.zugangId !== id);
+    this.speichernVerzoegert();
+    return weg;
+  }
+
+  anzeigeGeraeteListe() {
+    return kopie(this.inhalt.anzeigeGeraete);
+  }
+
+  anzeigeGeraet(id) {
+    const a = this.inhalt.anzeigeGeraete.find((x) => x.id === id);
+    return a ? kopie(a) : null;
+  }
+
+  anzeigeGeraetAnlegen({ zugangId, letzterKontakt }) {
+    const a = { id: randomUUID(), zugangId, anzeigeId: null, letzterKontakt };
+    this.inhalt.anzeigeGeraete.push(a);
+    this.speichernVerzoegert();
+    return kopie(a);
+  }
+
+  /** Felder setzen (anzeigeId, letzterKontakt); unbekanntes Gerät → null */
+  anzeigeGeraetAendern(id, felder) {
+    const a = this.inhalt.anzeigeGeraete.find((x) => x.id === id);
+    if (!a) return null;
+    Object.assign(a, felder);
+    this.speichernVerzoegert();
+    return kopie(a);
+  }
+
+  anzeigeGeraetEntfernen(id) {
+    const vorher = this.inhalt.anzeigeGeraete.length;
+    this.inhalt.anzeigeGeraete = this.inhalt.anzeigeGeraete.filter((a) => a.id !== id);
+    if (this.inhalt.anzeigeGeraete.length !== vorher) this.speichernVerzoegert();
+  }
+
   // ---------- Einstellungen der Anzeige ----------
 
   einstellungenLesen() {

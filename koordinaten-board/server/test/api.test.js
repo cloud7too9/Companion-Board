@@ -650,3 +650,88 @@ test('PIN-Pflicht (Anmeldung L2): nach über 30 Minuten ohne Kontakt 423, PIN be
   await new Promise((ok) => { ws.onopen = ok; });
   ws.close();
 });
+
+test('Dashboard-Zugänge (Anmeldung L4): Code, Dashboard-PIN, Layout wählen, Anzeige-Token für API, Widgets und /ws, 15 Minuten, widerrufen', async () => {
+  const uhr = (minuten) => anfrage('POST', '/api/test/uhr', null, { minuten });
+  const wsCode = (query) => new Promise((ok) => { const w = new WebSocket(`ws://127.0.0.1:${PORT}/ws?${query}`); w.onclose = (e) => ok(e.code); });
+  const max = await konto('Max');   // neues Gerät: die Uhr steht nach dem Test davor weit vorne
+  assert.equal((await anfrage('POST', '/api/dashboard/zugaenge', null, { minuten: 20, pin: '8642' })).status, 401, 'Codes nur für Konten');
+  assert.equal((await anfrage('POST', '/api/dashboard/zugaenge', max, { minuten: 20, pin: '12' })).status, 400);
+  let r = await anfrage('POST', '/api/dashboard/zugaenge', max, { minuten: 20, pin: '8642' });
+  assert.equal(r.status, 201);
+  const { id, code } = r.daten;
+  assert.match(code, /^[2-9A-HJ-NP-Za-km-z]{5}$/);
+
+  // Am Anzeige-Gerät: Code → Ticket → Dashboard-PIN → Anzeige-Token
+  assert.equal((await anfrage('POST', '/api/dashboard/code', null, { code: 'abc' })).status, 400);
+  const { ticket } = (await anfrage('POST', '/api/dashboard/code', null, { code })).daten;
+  r = await anfrage('POST', '/api/dashboard/freischalten', null, { ticket, pin: '1111' });
+  assert.deepEqual([r.status, r.daten.fehler], [401, 'Falsche Dashboard-PIN']);
+  const tv = (await anfrage('POST', '/api/dashboard/freischalten', null, { ticket, pin: '8642' })).daten.anzeigeToken;
+  assert.ok(tv);
+  r = await anfrage('GET', '/api/dashboard/zugaenge', max);
+  assert.deepEqual(r.daten.zugaenge.map((z) => [z.code, z.von, z.anzeigen, z.gueltig]), [[code, 'Max', 1, true]]);
+  assert.equal((await anfrage('GET', '/api/dashboard/zugaenge', tv)).status, 401, 'Anzeige-Token ist kein Konto');
+  assert.equal((await anfrage('GET', '/api/dashboard/sitzung', max)).status, 401, 'Konto-Token ist kein Anzeige-Token');
+
+  // Noch kein Layout gewählt: Auswahl in der Sitzung, die Anzeige-API sagt 409, /ws schließt
+  r = await anfrage('GET', '/api/dashboard/sitzung', tv);
+  assert.deepEqual([r.daten.pinNoetig, r.daten.anzeigeId], [false, null]);
+  const board = r.daten.layouts.find((l) => l.name === 'Board');
+  assert.ok(board && typeof board.inhalt === 'string', JSON.stringify(r.daten.layouts));
+  assert.deepEqual([(await anfrage('GET', '/api/anzeige/layout', tv)).status, (await anfrage('GET', '/api/anzeige/layout', tv)).daten.error], [409, 'layout']);
+  assert.equal(await wsCode(`rolle=anzeige&anzeigeToken=${encodeURIComponent(tv)}`), 4003);
+  assert.equal((await anfrage('PUT', '/api/dashboard/layout', tv, { anzeigeId: 'gibt-es-nicht' })).status, 404);
+  assert.deepEqual((await anfrage('PUT', '/api/dashboard/layout', tv, { anzeigeId: board.id })).daten, { anzeigeId: board.id });
+
+  // Mit Layout: Anzeige-API mit Header oder ?anzeigeToken=, Widgets, Reihen melden
+  assert.deepEqual((await anfrage('GET', '/api/anzeige', tv)).daten.anzeige, { id: board.id, name: 'Board' });
+  assert.equal((await anfrage('GET', `/api/anzeige/layout?anzeigeToken=${encodeURIComponent(tv)}`)).daten.anzeige.id, board.id);
+  assert.match((await anfrage('GET', '/api/anzeige/qr', tv)).daten.svg, /^<svg/);
+  assert.equal((await anfrage('GET', '/api/widgets/sammelobjekte.status', tv)).status, 200);
+  assert.deepEqual((await anfrage('PUT', '/api/anzeige/reihen', tv, { reihen: 20 })).daten, { reihen: 20 });
+  assert.equal((await anfrage('GET', '/api/anzeige/layout', 'erfunden.token')).status, 403);
+
+  // 14 Minuten offline: läuft; danach 16 Minuten → Dashboard-PIN (423, /ws 4023)
+  await uhr(14);
+  assert.equal((await anfrage('GET', '/api/anzeige', tv)).status, 200, '14 Minuten: läuft (und zählt als Kontakt)');
+  assert.equal((await anfrage('GET', '/api/dashboard/zugaenge', max)).status, 200);
+  await uhr(16);
+  r = await anfrage('GET', '/api/anzeige/layout', tv);
+  assert.deepEqual([r.status, r.daten.error], [423, 'pin']);
+  assert.equal((await anfrage('GET', '/api/widgets/sammelobjekte.status', tv)).status, 423);
+  assert.deepEqual((await anfrage('GET', '/api/dashboard/sitzung', tv)).daten, { pinNoetig: true, offline: 16 });
+  assert.equal(await wsCode(`rolle=anzeige&anzeigeToken=${encodeURIComponent(tv)}`), 4023);
+  assert.equal((await anfrage('PUT', '/api/dashboard/layout', tv, { anzeigeId: board.id })).status, 423);
+  assert.equal((await anfrage('POST', '/api/dashboard/pin', tv, { pin: '1111' })).status, 401);
+  assert.deepEqual((await anfrage('POST', '/api/dashboard/pin', tv, { pin: '8642' })).daten, { ok: true });
+  assert.equal((await anfrage('GET', '/api/anzeige/layout', tv)).status, 200);
+
+  // Der Code (20 Minuten) ist abgelaufen: keine neuen Geräte, das angemeldete läuft weiter
+  r = await anfrage('POST', '/api/dashboard/code', null, { code });
+  assert.equal(r.status, 410);
+  assert.equal((await anfrage('GET', '/api/dashboard/zugaenge', max)).daten.zugaenge[0].gueltig, false);
+
+  // Live-Verbindung mit Anzeige-Token; Widerrufen meldet ab und schließt sie mit 4003 (AN5)
+  const live = new WebSocket(`ws://127.0.0.1:${PORT}/ws?rolle=anzeige&anzeigeToken=${encodeURIComponent(tv)}`);
+  const nachrichten = [];
+  live.onmessage = (e) => nachrichten.push(JSON.parse(e.data));
+  await new Promise((ok) => { live.onopen = ok; });
+  const zu = new Promise((ok) => { live.onclose = (e) => ok(e.code); });
+  await new Promise((ok) => setTimeout(ok, 100));
+  assert.ok(nachrichten.some((n) => n.art === 'zustand'), 'die Anzeige bekommt den Zustand');
+  assert.deepEqual((await anfrage('DELETE', `/api/dashboard/zugaenge/${id}`, max)).daten, { ok: true, abgemeldet: 1 });
+  assert.equal(await zu, 4003);
+  assert.equal((await anfrage('GET', '/api/dashboard/sitzung', tv)).status, 401);
+  assert.equal((await anfrage('GET', '/api/anzeige', tv)).status, 403);
+  assert.equal((await anfrage('DELETE', `/api/dashboard/zugaenge/${id}`, max)).status, 404);
+
+  // Dauerhafter Code; Abmelden löscht nur das Gerät
+  r = await anfrage('POST', '/api/dashboard/zugaenge', max, { minuten: null, pin: '97531' });
+  assert.equal(r.daten.gueltigBis, null);
+  const t2 = (await anfrage('POST', '/api/dashboard/code', null, { code: r.daten.code })).daten.ticket;
+  const tablet = (await anfrage('POST', '/api/dashboard/freischalten', null, { ticket: t2, pin: '97531' })).daten.anzeigeToken;
+  assert.deepEqual((await anfrage('POST', '/api/dashboard/abmelden', tablet)).daten, { ok: true });
+  assert.equal((await anfrage('GET', '/api/dashboard/sitzung', tablet)).status, 401);
+  assert.deepEqual((await anfrage('GET', '/api/dashboard/zugaenge', max)).daten.zugaenge.map((z) => [z.gueltigBis, z.anzeigen]), [[null, 0]]);
+});

@@ -10,6 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Daten, DatenFehler } from './daten.js';
 import { identitaet, AnmeldeFehler } from './identitaet.js';
+import { dashboardZugang } from './dashboard-zugang.js';
 import QRCode from 'qrcode';
 import { companionApi } from './companion-api.js';
 import { anzeigeSicht } from './sicht.js';
@@ -32,8 +33,9 @@ const DATEN = path.resolve(process.env.DATEN_ORDNER ?? path.join(HIER, '..', 'da
 const DASHBOARD_DIST = path.join(COMPANION_ORDNER, 'widgets', 'dist');
 // Seite der Companion, die unter /app/ ausgeliefert wird
 const COMPANION_DATEI = process.env.COMPANION_DATEI ?? 'companion-prototyp.html';
-// Anzeige nur mit Anzeige-Link (Anzeige + Schlüssel), auch auf dem Board-Gerät selbst (Umbau Phase 1):
-// hinter einem Tunnel käme sonst jede Anfrage aus dem Internet als „localhost“ herein.
+// Anzeige nur mit Anzeige-Link (Anzeige + Schlüssel) oder Anzeige-Token (Zugangs-Code + Dashboard-PIN, Bauplan
+// „Anmeldung“, L4), auch auf dem Board-Gerät selbst (Umbau Phase 1): hinter einem Tunnel käme sonst jede Anfrage
+// aus dem Internet als „localhost“ herein.
 
 // ---------- Signatur der Tokens (bleibt über Neustarts erhalten) ----------
 
@@ -66,12 +68,37 @@ function clientIp(req) {
   if (istLokal(req) && typeof kopf === 'string' && kopf.trim()) return kopf.trim();
   return req.socket.remoteAddress;
 }
-/** Darf diese Anfrage Anzeige sein? Nur mit gültigem Anzeige-Link (?anzeige=…&schluessel=…) */
+/** Anzeige-Token: ?anzeigeToken=… (WebSocket, Links) oder Header „Authorization: Bearer …“ */
+const anzeigeTokenVon = (req) => {
+  if (typeof req.query?.anzeigeToken === 'string') return req.query.anzeigeToken;
+  const kopf = req.headers.authorization ?? '';
+  return kopf.startsWith('Bearer ') ? kopf.slice(7) : '';
+};
+/**
+ * Darf diese Anfrage Anzeige sein? Mit gültigem Anzeige-Link (?anzeige=…&schluessel=…) oder mit dem Anzeige-Token
+ * eines Anzeige-Geräts, das ein Layout gewählt hat und nicht über 15 Minuten offline war (sonst pinNoetig).
+ * → { erlaubt, anzeige, geraet?, pinNoetig? }; nur ein erlaubtes Anzeige-Gerät zählt als Kontakt.
+ */
 const anzeigeZugang = (req) => {
   const { anzeige, schluessel } = req.query ?? {};
-  const mitLink = anzeige ? daten.anzeigeMitSchluessel(String(anzeige), String(schluessel ?? '')) : null;
-  return { erlaubt: Boolean(mitLink), anzeige: mitLink };
+  if (anzeige) {
+    const mitLink = daten.anzeigeMitSchluessel(String(anzeige), String(schluessel ?? ''));
+    return { erlaubt: Boolean(mitLink), anzeige: mitLink };
+  }
+  const geraet = dash.ausToken(anzeigeTokenVon(req));
+  if (!geraet) return { erlaubt: false, anzeige: null };
+  if (dash.pinGrund(geraet)) return { erlaubt: false, anzeige: null, geraet, pinNoetig: true };
+  const gewaehlt = daten.anzeigenListe().find((a) => a.id === geraet.anzeigeId);
+  if (!gewaehlt) return { erlaubt: false, anzeige: null, geraet };   // noch kein Layout gewählt oder Anzeige gelöscht
+  dash.kontakt(geraet);
+  return { erlaubt: true, anzeige: gewaehlt, geraet };
 };
+/** Antwort, wenn anzeigeZugang nicht erlaubt: Dashboard-PIN nötig (423), Layout fehlt (409), sonst 403 */
+function anzeigeAbgelehnt(reply, zugang, text = 'Anzeige nur mit Anzeige-Link oder Zugangs-Code') {
+  if (zugang.pinNoetig) return reply.code(423).send({ error: 'pin', fehler: 'Dashboard-PIN nötig', message: 'Dashboard-PIN nötig' });
+  if (zugang.geraet) return reply.code(409).send({ error: 'layout', fehler: 'Erst ein Layout wählen', message: 'Erst ein Layout wählen' });
+  return reply.code(403).send({ fehler: text, message: text });
+}
 
 /** Anzeige-Link aufs Dashboard – dieselbe Adresse wie im QR-Code der Handys; ohne ihn ist kein Gerät Anzeige, auch das Board-Gerät nicht */
 const anzeigeLink = (a) => `${OEFFENTLICHE_URL}/dashboard?anzeige=${encodeURIComponent(a.id)}&schluessel=${encodeURIComponent(a.schluessel)}`;
@@ -83,6 +110,8 @@ const daten = new Daten(DATEN);
 await daten.laden();
 // Konten mit Passwort und PIN, Geräteschlüssel, „Wer bist du?“ (Bauplan „Anmeldung“, identitaet.js)
 const ident = identitaet({ daten, geheim: GEHEIM, jetzt });
+// Anzeige-Geräte mit Zugangs-Code und Dashboard-PIN (Bauplan „Anmeldung“, L4, dashboard-zugang.js)
+const dash = dashboardZugang({ daten, geheim: GEHEIM, jetzt });
 
 // ---------- Server ----------
 
@@ -124,15 +153,17 @@ app.options('/api/*', async (req, reply) =>
 // ---------- Anmeldung (Bauplan „Anmeldung“, L2): Wer fragt, ist das Konto frei, fehlt die PIN? ----------
 // Bei jeder Anfrage mit gültigem Token: wartendes Konto → 403, PIN nötig (über 30 Min. ohne Kontakt oder PIN
 // woanders gewechselt) → 423. Erst danach zählt die Anfrage als Kontakt. Ohne gültiges Token entscheidet die Route
-// (öffentlich oder 401). req.nutzer ist danach der angemeldete Nutzer.
+// (öffentlich oder 401). req.nutzer ist danach der angemeldete Nutzer. Die Routen der Anzeige-Geräte unter
+// /api/dashboard/ (außer den Zugängen, die ein Konto verwaltet) prüfen ihren Anzeige-Token selbst.
 const OEFFENTLICH = new Set(['/api/server', '/api/anmelden', '/api/registrieren', '/api/test/uhr']);
+const oeffentlich = (pfad) => OEFFENTLICH.has(pfad) || (pfad.startsWith('/api/dashboard/') && !pfad.startsWith('/api/dashboard/zugaenge'));
 const OHNE_FREIGABE = new Set(['/api/ich', '/api/abmelden']);
 const OHNE_PIN = new Set(['/api/ich', '/api/pin', '/api/pin/zuruecksetzen', '/api/abmelden']);
 const WARTET = 'Dein Konto wartet auf Freigabe';
 app.decorateRequest('nutzer', null);
 app.addHook('onRequest', async (req, reply) => {
   const pfad = req.url.split('?')[0];
-  if (req.method === 'OPTIONS' || !pfad.startsWith('/api/') || OEFFENTLICH.has(pfad)) return;
+  if (req.method === 'OPTIONS' || !pfad.startsWith('/api/') || oeffentlich(pfad)) return;
   const nutzer = ident.werBistDu(req);
   if (!nutzer) return;
   if (!nutzer.freigegeben && !OHNE_FREIGABE.has(pfad)) return reply.code(403).send({ error: 'freigabe', fehler: WARTET, message: WARTET });
@@ -238,9 +269,92 @@ if (process.env.TEST_UHR === '1') {
   });
 }
 
+// ---------- Dashboard-Zugänge (Bauplan „Anmeldung“, L4, Kapitel 5.2) ----------
+// Ein Konto erzeugt einen Zugangs-Code mit Dashboard-PIN. Das Anzeige-Gerät tauscht Code → Ticket → Anzeige-Token,
+// wählt ein Layout (eine der Anzeigen) und liest damit /api/anzeige/*, /api/widgets/* und /ws (Rolle anzeige).
+app.post('/api/dashboard/zugaenge', async (req, reply) => {
+  if (!angemeldet(req, reply)) return reply;
+  try {
+    const zugang = await dash.erzeugen(req.nutzer, req.body ?? {});
+    geaendertMelden('zugaenge');
+    return reply.code(201).send(zugang);
+  } catch (f) {
+    return anmeldeFehler(reply, f);
+  }
+});
+app.get('/api/dashboard/zugaenge', async (req, reply) => (angemeldet(req, reply) ? { zugaenge: dash.liste() } : reply));
+app.delete('/api/dashboard/zugaenge/:id', async (req, reply) => {
+  if (!angemeldet(req, reply)) return reply;
+  try {
+    const weg = new Set(dash.widerrufen(req.params.id));
+    // Alle damit angemeldeten Anzeigen sind abgemeldet (AN5): ihre Live-Verbindung endet sofort
+    geraeteTrennen((v) => weg.has(v.anzeigeGeraetId), 4003, 'Zugang widerrufen');
+    geaendertMelden('zugaenge');
+    return { ok: true, abgemeldet: weg.size };
+  } catch (f) {
+    return anmeldeFehler(reply, f);
+  }
+});
+app.post('/api/dashboard/code', async (req, reply) => {
+  try {
+    return dash.codePruefen(req.body?.code, clientIp(req));
+  } catch (f) {
+    return anmeldeFehler(reply, f);
+  }
+});
+app.post('/api/dashboard/freischalten', async (req, reply) => {
+  try {
+    const r = await dash.freischalten(req.body ?? {});
+    geaendertMelden('zugaenge');   // Zahl der Anzeigen je Code
+    return r;
+  } catch (f) {
+    return anmeldeFehler(reply, f);
+  }
+});
+/** Route nur für angemeldete Anzeige-Geräte → das Gerät oder null (dann ist 401 schon gesendet) */
+function anzeigeGeraetVon(req, reply) {
+  const geraet = dash.ausToken(anzeigeTokenVon(req));
+  if (!geraet) {
+    const text = 'Diese Anzeige ist nicht mehr angemeldet';
+    reply.code(401).send({ error: 'anmeldung', fehler: text, message: text });
+  }
+  return geraet;
+}
+app.get('/api/dashboard/sitzung', async (req, reply) => {
+  const geraet = anzeigeGeraetVon(req, reply);
+  return geraet ? dash.sitzung(geraet) : reply;
+});
+app.post('/api/dashboard/pin', async (req, reply) => {
+  const geraet = anzeigeGeraetVon(req, reply);
+  if (!geraet) return reply;
+  try {
+    return await dash.pinBestaetigen(geraet, req.body?.pin);
+  } catch (f) {
+    return anmeldeFehler(reply, f);
+  }
+});
+app.put('/api/dashboard/layout', async (req, reply) => {
+  const geraet = anzeigeGeraetVon(req, reply);
+  if (!geraet) return reply;
+  if (dash.pinGrund(geraet)) return anzeigeAbgelehnt(reply, { geraet, pinNoetig: true });
+  try {
+    return dash.layoutWaehlen(geraet, String(req.body?.anzeigeId ?? ''));
+  } catch (f) {
+    return anmeldeFehler(reply, f);
+  }
+});
+app.post('/api/dashboard/abmelden', async (req, reply) => {
+  const geraet = anzeigeGeraetVon(req, reply);
+  if (!geraet) return reply;
+  dash.abmelden(geraet);
+  geraeteTrennen((v) => v.anzeigeGeraetId === geraet.id, 4001, 'Abgemeldet');
+  geaendertMelden('zugaenge');
+  return { ok: true };
+});
+
 app.get('/api/anzeige', async (req, reply) => {
   const zugang = anzeigeZugang(req);
-  if (!zugang.erlaubt) return reply.code(403).send({ fehler: 'Anzeige nur mit Anzeige-Link' });
+  if (!zugang.erlaubt) return anzeigeAbgelehnt(reply, zugang);
   return {
     anzeige: zugang.anzeige && { id: zugang.anzeige.id, name: zugang.anzeige.name },
     beitrittsUrl: BEITRITT_URL,   // die Anmeldeseite (Bauplan „Anmeldung“: keine Board-PIN mehr)
@@ -250,16 +364,17 @@ app.get('/api/anzeige', async (req, reply) => {
 
 // QR-Code zur Anmeldeseite als SVG fürs Widget „Beitreten“ des Dashboards (Bauplan „Sitzung“, S3)
 app.get('/api/anzeige/qr', async (req, reply) => {
-  if (!anzeigeZugang(req).erlaubt) return reply.code(403).send({ fehler: 'Anzeige nur mit Anzeige-Link' });
+  const zugang = anzeigeZugang(req);
+  if (!zugang.erlaubt) return anzeigeAbgelehnt(reply, zugang);
   return { svg: await QRCode.toString(BEITRITT_URL, { type: 'svg', margin: 0, errorCorrectionLevel: 'M' }) };
 });
 
 // Widget-Dashboard (A6): Die Anzeige liest ihr Layout und meldet ihre Reihen. Welche Anzeige sie ist,
-// sagt der Anzeige-Link.
+// sagt der Anzeige-Link bzw. das gewählte Layout des Anzeige-Geräts.
 function anzeigeVonAnfrage(req, reply) {
   const zugang = anzeigeZugang(req);
   if (!zugang.erlaubt) {
-    reply.code(403).send({ fehler: 'Anzeige nur mit Anzeige-Link' });
+    anzeigeAbgelehnt(reply, zugang);
     return null;
   }
   return zugang.anzeige;
@@ -298,12 +413,12 @@ await app.register(companionApi, {
 });
 
 // Widgets des Dashboards: fertige Karte je Widget-Typ (und Quelle) aus den Daten der aktiven Welt.
-// Lesen darf die Anzeige (mit Anzeige-Link) und jedes angemeldete Handy.
+// Lesen darf die Anzeige (mit Anzeige-Link oder Anzeige-Token) und jedes angemeldete Handy.
 await app.register(async (widgets) => {
   widgets.addHook('onRequest', async (req, reply) => {
-    if (!anzeigeZugang(req).erlaubt && !req.nutzer) {
-      return reply.code(403).send({ fehler: 'Widgets nur auf der Anzeige oder für angemeldete Handys' });
-    }
+    if (req.nutzer) return;
+    const zugang = anzeigeZugang(req);
+    if (!zugang.erlaubt) return anzeigeAbgelehnt(reply, zugang, 'Widgets nur auf der Anzeige oder für angemeldete Handys');
   });
   widgets.get('/:typ', async (req, reply) => {
     const quelle = typeof req.query.quelle === 'string' ? req.query.quelle : '';
@@ -315,13 +430,15 @@ await app.register(async (widgets) => {
 
 // ---------- Echtzeit-Sync ----------
 
-const verbindungen = new Set(); // { socket, rolle, nutzer, zugang? }
+const verbindungen = new Set(); // { socket, rolle, nutzer, zugang? (Anzeige-Link), anzeigeGeraetId? (Anzeige-Token) }
 
-/** Nach „Neuer Schlüssel“: Anzeigen trennen, die nur über den alten Link verbunden waren */
+/** Nach „Neuer Schlüssel“ oder gelöschter Anzeige: Anzeigen trennen, deren Link bzw. Layout nicht mehr gilt */
 function veralteteAnzeigenTrennen() {
+  const anzeigen = new Set(daten.anzeigenListe().map((a) => a.id));
   for (const v of verbindungen) {
-    if (v.rolle !== 'anzeige' || !v.zugang) continue;
-    if (!daten.anzeigeMitSchluessel(v.zugang.id, v.zugang.schluessel)) v.socket.close(4003, 'Anzeige-Link nicht mehr gültig');
+    if (v.rolle !== 'anzeige') continue;
+    if (v.zugang && !daten.anzeigeMitSchluessel(v.zugang.id, v.zugang.schluessel)) v.socket.close(4003, 'Anzeige-Link nicht mehr gültig');
+    if (v.anzeigeGeraetId && !anzeigen.has(daten.anzeigeGeraet(v.anzeigeGeraetId)?.anzeigeId)) v.socket.close(4003, 'Diese Anzeige gibt es nicht mehr');
   }
 }
 
@@ -422,9 +539,18 @@ app.get('/ws', { websocket: true }, (socket, req) => {
   let verbindung;
   if (rolle === 'anzeige') {
     const zugang = anzeigeZugang(req);
-    if (!zugang.erlaubt) return socket.close(4003, 'Anzeige nur mit Anzeige-Link');
-    // Wird der Schlüssel neu erzeugt, fliegt die Anzeige mit dem alten raus (veralteteAnzeigenTrennen)
-    verbindung = { socket, rolle: 'anzeige', nutzer: null, zugang: { id: zugang.anzeige.id, schluessel: zugang.anzeige.schluessel } };
+    if (zugang.pinNoetig) return socket.close(4023, 'Dashboard-PIN nötig');
+    if (!zugang.erlaubt) return socket.close(4003, zugang.geraet ? 'Erst ein Layout wählen' : 'Anzeige nur mit Anzeige-Link oder Zugangs-Code');
+    if (zugang.geraet) {
+      // Anzeige-Gerät: Widerrufen, Abmelden oder eine gelöschte Anzeige schließen die Verbindung (geraeteTrennen,
+      // veralteteAnzeigenTrennen); jedes Pong ist Kontakt, wie bei den Handys
+      const { geraet } = zugang;
+      verbindung = { socket, rolle: 'anzeige', nutzer: null, anzeigeGeraetId: geraet.id };
+      socket.on('pong', () => { if (!dash.pinGrund(geraet)) dash.kontakt(geraet); });
+    } else {
+      // Wird der Schlüssel neu erzeugt, fliegt die Anzeige mit dem alten raus (veralteteAnzeigenTrennen)
+      verbindung = { socket, rolle: 'anzeige', nutzer: null, zugang: { id: zugang.anzeige.id, schluessel: zugang.anzeige.schluessel } };
+    }
   } else {
     // Wie bei REST: wartendes Konto oder fehlende PIN → keine Live-Verbindung (sonst hielte der Herzschlag das Gerät frisch)
     const nutzer = ident.ausToken(token);
