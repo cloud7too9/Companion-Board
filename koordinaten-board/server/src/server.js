@@ -5,7 +5,7 @@ import fastifyStatic from '@fastify/static';
 import fastifyWebsocket from '@fastify/websocket';
 import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, chmod } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Daten, DatenFehler } from './daten.js';
@@ -39,13 +39,18 @@ const COMPANION_DATEI = process.env.COMPANION_DATEI ?? 'companion-prototyp.html'
 
 // ---------- Signatur der Tokens (bleibt über Neustarts erhalten) ----------
 
+/** Nur für den Nutzer des Dienstes lesbar (Schlüssel, Anzeige-Link) – auch Dateien, die es schon gibt */
+const nurFuerMich = (pfad) => chmod(pfad, 0o600).catch(() => {});
+
 async function dauerwertLaden(datei, erzeugen) {
   const pfad = path.join(DATEN, datei);
   try {
-    return (await readFile(pfad, 'utf8')).trim();
+    const wert = (await readFile(pfad, 'utf8')).trim();
+    await nurFuerMich(pfad);
+    return wert;
   } catch {
     const wert = erzeugen();
-    await writeFile(pfad, wert);
+    await writeFile(pfad, wert, { mode: 0o600 });
     return wert;
   }
 }
@@ -155,7 +160,7 @@ app.options('/api/*', async (req, reply) =>
 // woanders gewechselt) → 423. Erst danach zählt die Anfrage als Kontakt. Ohne gültiges Token entscheidet die Route
 // (öffentlich oder 401). req.nutzer ist danach der angemeldete Nutzer. Die Routen der Anzeige-Geräte unter
 // /api/dashboard/ (außer den Zugängen, die ein Konto verwaltet) prüfen ihren Anzeige-Token selbst.
-const OEFFENTLICH = new Set(['/api/server', '/api/anmelden', '/api/registrieren', '/api/test/uhr']);
+const OEFFENTLICH = new Set(['/api/server', '/api/health', '/api/anmelden', '/api/registrieren', '/api/test/uhr']);
 const oeffentlich = (pfad) => OEFFENTLICH.has(pfad) || (pfad.startsWith('/api/dashboard/') && !pfad.startsWith('/api/dashboard/zugaenge'));
 const OHNE_FREIGABE = new Set(['/api/ich', '/api/abmelden']);
 const OHNE_PIN = new Set(['/api/ich', '/api/pin', '/api/pin/zuruecksetzen', '/api/abmelden']);
@@ -174,7 +179,8 @@ app.addHook('onRequest', async (req, reply) => {
   }
   req.nutzer = nutzer;
 });
-await app.register(fastifyWebsocket);
+// Nachrichten über /ws sind klein („Aufs Board“ schickt nur eine Quelle); ohne Grenze nähme ws bis 100 MiB an
+await app.register(fastifyWebsocket, { options: { maxPayload: 64 * 1024 } });
 // Leerer Rumpf bei „Content-Type: application/json“ (z. B. DELETE) ist kein Fehler
 app.addContentTypeParser('application/json', { parseAs: 'string' }, (req, rumpf, fertig) => {
   if (!rumpf) return fertig(null, {});
@@ -195,14 +201,14 @@ function anmeldeFehler(reply, f) {
 // Konten (Bauplan „Anmeldung“, L2): anmelden, registrieren, PIN, Freigabe. Die Anmeldeseite (/) ruft sie auf.
 app.post('/api/anmelden', async (req, reply) => {
   try {
-    return await ident.anmelden(req.body ?? {});
+    return await ident.anmelden(req.body ?? {}, clientIp(req));
   } catch (f) {
     return anmeldeFehler(reply, f);
   }
 });
 app.post('/api/registrieren', async (req, reply) => {
   try {
-    const r = await ident.registrieren(req.body ?? {});
+    const r = await ident.registrieren(req.body ?? {}, clientIp(req));
     geaendertMelden('konten');
     return reply.code(201).send(r);
   } catch (f) {
@@ -262,7 +268,10 @@ app.delete('/api/konten/:id', async (req, reply) => {
     return anmeldeFehler(reply, f);
   }
 });
-if (process.env.TEST_UHR === '1') {
+// Nie im Betrieb: Mit einer https-Adresse (Pi hinter dem Tunnel) bleibt die Test-Uhr aus, auch wenn TEST_UHR gesetzt ist
+if (process.env.TEST_UHR === '1' && OEFFENTLICHE_URL.startsWith('https://')) {
+  console.warn('  TEST_UHR=1 ignoriert: Die Test-Uhr gibt es nur ohne https-Adresse (lokal und in den Tests).');
+} else if (process.env.TEST_UHR === '1') {
   app.post('/api/test/uhr', async (req) => {
     uhrVersatz += Number(req.body?.minuten ?? 0) * 60_000;
     return { versatzMinuten: uhrVersatz / 60_000 };
@@ -396,6 +405,11 @@ app.put('/api/anzeige/reihen', async (req, reply) => {
 
 // Daran erkennt die Companion, dass sie vom Board ausgeliefert wird (Live-Betrieb statt DEMO)
 app.get('/api/server', async () => ({ name: 'koordinaten-board' }));
+// Für eine Überwachung von außen (z. B. Uptime-Dienst über den Tunnel): 503, solange das Speichern in daten.db scheitert
+app.get('/api/health', async (req, reply) => {
+  const stand = { ok: !daten.speicherFehler, lauf: aenderungen.lauf, gespeichertAm: daten.gespeichertAm, fehler: daten.speicherFehler?.text ?? null };
+  return stand.ok ? stand : reply.code(503).send(stand);
+});
 
 await app.register(companionApi, {
   prefix: '/api',
@@ -645,10 +659,12 @@ app.setNotFoundHandler((req, reply) => {
   return reply.code(404).send({ fehler: 'Nicht gefunden' });
 });
 
-// Sauber speichern beim Beenden
+// Sauber beenden: keine neuen Anfragen mehr, dann speichern; ein Fehler dabei landet im Log
 for (const signal of ['SIGINT', 'SIGTERM']) {
-  process.on(signal, async () => {
-    await daten.schliessen().catch(() => {});
+  process.once(signal, async () => {
+    // höchstens 3 s auf offene Verbindungen warten (Live-Verbindungen der Handys und Anzeigen)
+    await Promise.race([app.close().catch(() => {}), new Promise((ok) => setTimeout(ok, 3000).unref())]);
+    await daten.schliessen().catch((f) => console.error('FEHLER beim Speichern vor dem Beenden:', f));
     process.exit(0);
   });
 }
@@ -657,7 +673,7 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
 const ANZEIGE_LINK_DATEI = path.join(DATEN, 'anzeige-link.txt');
 function anzeigeLinkMerken() {
   const [erste] = daten.anzeigenListe();   // enthält den Schlüssel (anders als /api/anzeigen)
-  if (erste) writeFile(ANZEIGE_LINK_DATEI, anzeigeLink(erste)).catch(() => {});
+  if (erste) writeFile(ANZEIGE_LINK_DATEI, anzeigeLink(erste), { mode: 0o600 }).then(() => nurFuerMich(ANZEIGE_LINK_DATEI)).catch(() => {});
 }
 
 await app.listen({ port: PORT, host: HOST });

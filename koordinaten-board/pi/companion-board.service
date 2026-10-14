@@ -21,6 +21,8 @@ ProtectSystem=strict
 ReadWritePaths=/var/lib/companion-board
 PrivateTmp=true
 NoNewPrivileges=true
+# Neue Dateien (daten.db, geheim.txt, Sicherungen) nur für den Nutzer board lesbar
+UMask=0077
 
 [Install]
 WantedBy=multi-user.target

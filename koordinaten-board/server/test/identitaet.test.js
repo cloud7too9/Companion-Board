@@ -128,3 +128,33 @@ test('Sperre gegen Durchprobieren: Passwort je Anzeigename, PIN je Gerät', asyn
   await lehntAb(() => ident.pinBestaetigen(na, '2468'), 429);
   assert.deepEqual(await ident.pinBestaetigen(b, '2468'), { ok: true }, 'anderes Gerät nicht gesperrt');
 });
+
+test('Grenzen je Adresse: Fehlanmeldungen mit wechselnden Namen sperren die Adresse, neue Konten höchstens 20 pro Stunde, höchstens 10 warten', async () => {
+  const { uhr, ident } = neu();
+  await ident.registrieren(KONTO, '10.0.0.1');
+  for (let i = 0; i < 30; i++) await lehntAb(() => ident.anmelden({ anzeigename: `Rater${i}`, passwort: 'falsch123' }, '10.0.0.9'), 401);
+  await lehntAb(() => ident.anmelden({ anzeigename: 'Max', passwort: 'creeper123' }, '10.0.0.9'), 429);
+  assert.ok((await ident.anmelden({ anzeigename: 'Max', passwort: 'creeper123' }, '10.0.0.1')).token, 'andere Adresse frei');
+  uhr.ms += 11 * MINUTE;
+  assert.ok((await ident.anmelden({ anzeigename: 'Max', passwort: 'creeper123' }, '10.0.0.9')).token, 'nach 10 Minuten wieder');
+
+  // Zehn neue Konten warten → das elfte wird abgewiesen, bis jemand freigibt
+  const wartende = [];
+  for (let i = 0; i < 10; i++) wartende.push(await ident.registrieren({ ...KONTO, echterName: `Gast ${i}`, anzeigename: `Gast${i}` }, `10.1.0.${i}`));
+  await lehntAb(() => ident.registrieren({ ...KONTO, echterName: 'Elf', anzeigename: 'Elf' }, '10.1.1.1'), 429);
+  const max = ident.ausToken((await ident.anmelden({ anzeigename: 'Max', passwort: 'creeper123' })).token);
+  ident.ablehnen(max, wartende[0].id);
+  assert.equal((await ident.registrieren({ ...KONTO, echterName: 'Elf', anzeigename: 'Elf' }, '10.1.1.1')).name, 'Elf');
+
+  // Von einer Adresse: 20 neue Konten pro Stunde (Ungültiges zählt nicht)
+  for (const w of wartende.slice(1)) ident.freigeben(max, w.id);
+  ident.ablehnen(max, (await ident.konten()).find((k) => k.anzeigename === 'Elf').id);
+  await lehntAb(() => ident.registrieren({ ...KONTO, pin: '1' }, '10.2.0.1'), 400);
+  for (let i = 0; i < 20; i++) {
+    const k = await ident.registrieren({ ...KONTO, echterName: `Viel ${i}`, anzeigename: `Viel${i}` }, '10.2.0.1');
+    ident.freigeben(max, k.id);
+  }
+  await lehntAb(() => ident.registrieren({ ...KONTO, echterName: 'Zu viel', anzeigename: 'Zuviel' }, '10.2.0.1'), 429);
+  uhr.ms += 61 * MINUTE;
+  assert.equal((await ident.registrieren({ ...KONTO, echterName: 'Zu viel', anzeigename: 'Zuviel' }, '10.2.0.1')).name, 'Zuviel');
+});
