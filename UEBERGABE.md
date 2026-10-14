@@ -92,7 +92,7 @@ Was wohin gehört:
 | Zweck | Die App am Handy: Karte, Sammelobjekte, Portale, Banner, Rüstung, später Handbuch, Baupläne | **Server der Companion** (Daten, Live-Sync) und Anzeige im Zimmer |
 | Technik | eine HTML-Seite + `regeln.js`, Vanilla JS, kein Build; live vom Board ausgeliefert, sonst DEMO-Mock | Fastify 5, Vite + React 19 + TypeScript (nur Anzeige), SQLite (`node:sqlite`, seit Umbau Phase 4) |
 | Stand | 5 von 7 Bereichen umgesetzt, Handbuch und Baupläne offen; Welt-Import; nur Bedrock | Server der Companion; Widget-Dashboard unter `/dashboard` (A0–A6); Accounts mit PIN (B1, B2) |
-| Tests | Playwright: 16 Dateien, dazu 20 Dekoder-Tests (`companion/tests`); Widgets: 110 Unit-Tests | `node --test`: 59 Tests (Daten, API, Regeln, Auswertung der Texterkennung, Karten, Identität …) |
+| Tests | Playwright: 18 Dateien, dazu 37 Tests für Dekoder und Welt-Funde (`companion/tests`, `npm test` = `alle.mjs`); Widgets: 126 Unit-Tests | `node --test`: 83 Tests (Daten, API, Regeln, Auswertung der Texterkennung, Karten, Identität, Sperren …) |
 | CI | alle Tests bei jedem PR und Push auf `main` (`.github/workflows/tests.yml`) | ← dieselbe CI |
 
 ---

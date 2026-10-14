@@ -286,7 +286,7 @@ Branch: **`board/anmeldung`** für alles. Nach jeder Phase pushen.
 | ~~AN11~~ | **Bestätigt (Max, 13.10.2026): Platzhalter** mit „Willkommen, <Anzeigename>“ und „Weiter zur Companion“, bis Max den Inhalt liefert. | – | – |
 | ~~AN12~~ | **Bestätigt (Max, 13.10.2026): ja**, lokaler scrypt-Hash der Konto-PIN im `localStorage`. | – | – |
 | ~~AN13~~ | **Entschieden (Max, 14.10.2026): Neue Konten gelten erst, wenn ein bestehendes Konto sie freigibt** (L19). | – | – |
-| AN14 | ⚠ **Freigabe im Einzelnen:** Das erste Konto gilt sofort als freigegeben (nach der Migration gibt es keins, das freigeben könnte). Jedes freigegebene Konto darf freigeben und ablehnen; ablehnen löscht das wartende Konto. Freigegeben wird im **Board-Sheet unter „Konten“**. Ein wartendes Konto sieht nach der Anmeldung nur „Wartet auf Freigabe“. | so wie links | – |
+| AN14 | ⚠ **Freigabe im Einzelnen:** Das erste Konto gilt sofort als freigegeben (nach der Migration gibt es keins, das freigeben könnte). Jedes freigegebene Konto darf freigeben und ablehnen; ablehnen löscht das wartende Konto. Freigegeben wird im **Board-Sheet unter „Konten“**. Ein wartendes Konto sieht nach der Anmeldung nur „Wartet auf Freigabe“. **Gebaut so (L2), dazu seit 14.10.2026 (#30):** höchstens 10 Konten warten gleichzeitig, je Adresse höchstens 20 Registrierungen pro Stunde. | so wie links | – |
 
 ---
 

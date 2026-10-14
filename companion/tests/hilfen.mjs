@@ -35,8 +35,9 @@ export async function threeUmleiten(ziel) {
     headers: { "access-control-allow-origin": "*" } }));
 }
 
-/** Anzeige-Link der ersten Anzeige („Board“) als Query „?anzeige=…&schluessel=…“. Seit Umbau Phase 1 braucht ihn
- *  jedes Gerät, auch das Board-Gerät selbst (localhost). Der Server schreibt ihn nach <Datenordner>/anzeige-link.txt. */
+/** Anzeige-Link der ersten Anzeige („Board“) als Query „?anzeige=…&schluessel=…“. Seit Umbau Phase 1 braucht jedes
+ *  Gerät einen Zugang, auch das Board-Gerät selbst (localhost): diesen Link (bis L6) oder den Anzeige-Token aus dem
+ *  Dashboard-Login (L5). Der Server schreibt den Link nach <Datenordner>/anzeige-link.txt. */
 export async function anzeigeLinkQuery(datenOrdner) {
   const datei = path.join(datenOrdner, "anzeige-link.txt");
   for (let i = 0; i < 50; i++) {

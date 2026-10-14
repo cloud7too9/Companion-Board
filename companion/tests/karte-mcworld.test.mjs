@@ -363,7 +363,7 @@ try {
   // Live: Board liefert Worker, Dekoder und Bibliothek aus und speichert den Import
   // ======================================================================================
   tmp = mkdtempSync(path.join(tmpdir(), "mcworld-test-"));
-  const PORT = 3190, BOARD = `http://127.0.0.1:${PORT}`;
+  const PORT = 3200, BOARD = `http://127.0.0.1:${PORT}`;
   board = spawn(process.execPath, ["src/server.js"], {
     cwd: path.join(HIER, "../../koordinaten-board/server"),
     env: { ...process.env, PORT: String(PORT), DATEN_ORDNER: path.join(tmp, "daten") }, stdio: "ignore",
